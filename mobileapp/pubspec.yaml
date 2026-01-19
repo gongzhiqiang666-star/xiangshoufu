@@ -1,0 +1,31 @@
+name: xiangshoufu_app
+description: 代理商分润管理系统 - 享收付APP
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # ========== 屏幕适配 ==========
+  flutter_screenutil: ^5.9.0
+
+  # ========== 工具类 ==========
+  intl: ^0.20.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/icons/

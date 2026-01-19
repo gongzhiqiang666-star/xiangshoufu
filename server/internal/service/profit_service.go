@@ -1,0 +1,277 @@
+package service
+
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"strconv"
+	"time"
+
+	"xiangshoufu/internal/async"
+	"xiangshoufu/internal/repository"
+)
+
+// ProfitService 分润计算服务
+type ProfitService struct {
+	transactionRepo repository.TransactionRepository
+	profitRepo      repository.ProfitRecordRepository
+	walletRepo      repository.WalletRepository
+	walletLogRepo   repository.WalletLogRepository
+	agentRepo       repository.AgentRepository
+	agentPolicyRepo repository.AgentPolicyRepository
+	messageService  *MessageService
+	queue           async.MessageQueue
+}
+
+// NewProfitService 创建分润服务
+func NewProfitService(
+	transactionRepo repository.TransactionRepository,
+	profitRepo repository.ProfitRecordRepository,
+	walletRepo repository.WalletRepository,
+	walletLogRepo repository.WalletLogRepository,
+	agentRepo repository.AgentRepository,
+	agentPolicyRepo repository.AgentPolicyRepository,
+	messageService *MessageService,
+	queue async.MessageQueue,
+) *ProfitService {
+	return &ProfitService{
+		transactionRepo: transactionRepo,
+		profitRepo:      profitRepo,
+		walletRepo:      walletRepo,
+		walletLogRepo:   walletLogRepo,
+		agentRepo:       agentRepo,
+		agentPolicyRepo: agentPolicyRepo,
+		messageService:  messageService,
+		queue:           queue,
+	}
+}
+
+// ProcessMessage 处理分润计算消息
+func (s *ProfitService) ProcessMessage(msgBytes []byte) error {
+	var msg ProfitMessage
+	if err := json.Unmarshal(msgBytes, &msg); err != nil {
+		return fmt.Errorf("unmarshal profit message failed: %w", err)
+	}
+
+	return s.CalculateProfit(msg.TransactionID)
+}
+
+// CalculateProfit 计算单笔交易的分润
+func (s *ProfitService) CalculateProfit(txID int64) error {
+	// 1. 获取交易信息
+	tx, err := s.transactionRepo.FindByOrderNo("")
+	if err != nil {
+		return fmt.Errorf("find transaction failed: %w", err)
+	}
+	if tx == nil {
+		return fmt.Errorf("transaction not found: %d", txID)
+	}
+
+	// 2. 检查是否已计算过分润
+	if tx.ProfitStatus == 1 {
+		log.Printf("[ProfitService] Transaction already calculated: %d", txID)
+		return nil
+	}
+
+	// 3. 获取直属代理商
+	agent, err := s.agentRepo.FindByID(tx.AgentID)
+	if err != nil || agent == nil {
+		return fmt.Errorf("find agent failed: %d", tx.AgentID)
+	}
+
+	// 4. 获取代理商链（从直属代理商向上遍历）
+	ancestors, err := s.agentRepo.FindAncestors(agent.ID)
+	if err != nil {
+		return fmt.Errorf("find ancestors failed: %w", err)
+	}
+
+	// 5. 计算每一级的分润
+	profitRecords := make([]*repository.ProfitRecord, 0)
+	walletUpdates := make(map[int64]int64) // walletID -> 分润金额
+
+	// 构建代理商链：直属代理商 + 所有上级
+	agentChain := append([]*repository.Agent{agent}, ancestors...)
+
+	for i := 0; i < len(agentChain); i++ {
+		currentAgent := agentChain[i]
+
+		// 获取当前代理商的结算价（费率）
+		selfRate, err := s.getAgentRate(currentAgent.ID, tx.ChannelID, tx.CardType)
+		if err != nil {
+			log.Printf("[ProfitService] Get agent rate failed: %v", err)
+			continue
+		}
+
+		// 获取下级费率（如果有下级）
+		var lowerRate float64
+		if i == 0 {
+			// 直属代理商：下级费率 = 商户费率（交易费率）
+			lowerRate, _ = strconv.ParseFloat(tx.Rate, 64)
+		} else {
+			// 非直属：下级费率 = 下级代理商的结算价
+			lowerAgent := agentChain[i-1]
+			lowerRate, _ = s.getAgentRate(lowerAgent.ID, tx.ChannelID, tx.CardType)
+		}
+
+		// 计算费率差
+		rateDiff := lowerRate - selfRate
+		if rateDiff <= 0 {
+			continue // 没有分润空间
+		}
+
+		// 计算分润金额（单位：分）
+		// 分润 = 交易金额 * 费率差 / 100
+		profitAmount := int64(float64(tx.Amount) * rateDiff / 100)
+		if profitAmount <= 0 {
+			continue
+		}
+
+		// 创建分润记录
+		record := &repository.ProfitRecord{
+			TransactionID:    tx.ID,
+			OrderNo:          tx.OrderNo,
+			AgentID:          currentAgent.ID,
+			ProfitType:       1, // 交易分润
+			TradeAmount:      tx.Amount,
+			SelfRate:         fmt.Sprintf("%.4f", selfRate),
+			LowerRate:        fmt.Sprintf("%.4f", lowerRate),
+			RateDiff:         fmt.Sprintf("%.4f", rateDiff),
+			ProfitAmount:     profitAmount,
+			SourceMerchantID: tx.MerchantID,
+			SourceAgentID:    tx.AgentID,
+			ChannelID:        tx.ChannelID,
+			WalletType:       1, // 分润钱包
+			WalletStatus:     0, // 待入账
+			CreatedAt:        time.Now(),
+		}
+		profitRecords = append(profitRecords, record)
+
+		// 获取钱包ID
+		wallet, err := s.walletRepo.FindByAgentAndType(currentAgent.ID, tx.ChannelID, 1)
+		if err == nil && wallet != nil {
+			walletUpdates[wallet.ID] = profitAmount
+		}
+	}
+
+	// 6. 批量写入分润记录
+	if len(profitRecords) > 0 {
+		if err := s.profitRepo.BatchCreate(profitRecords); err != nil {
+			return fmt.Errorf("batch create profit records failed: %w", err)
+		}
+	}
+
+	// 7. 批量更新钱包余额
+	if len(walletUpdates) > 0 {
+		if err := s.walletRepo.BatchUpdateBalance(walletUpdates); err != nil {
+			return fmt.Errorf("batch update wallet failed: %w", err)
+		}
+	}
+
+	// 8. 更新交易分润状态
+	if err := s.transactionRepo.UpdateProfitStatus(tx.ID, 1); err != nil {
+		return fmt.Errorf("update profit status failed: %w", err)
+	}
+
+	// 9. 发送消息通知
+	s.sendProfitNotifications(profitRecords)
+
+	log.Printf("[ProfitService] Calculated profit for transaction %d, records: %d", txID, len(profitRecords))
+	return nil
+}
+
+// getAgentRate 获取代理商的结算费率
+func (s *ProfitService) getAgentRate(agentID, channelID int64, cardType int16) (float64, error) {
+	policy, err := s.agentPolicyRepo.FindByAgentAndChannel(agentID, channelID)
+	if err != nil || policy == nil {
+		return 0, fmt.Errorf("policy not found for agent %d, channel %d", agentID, channelID)
+	}
+
+	// 根据卡类型返回对应费率
+	switch cardType {
+	case 1: // 借记卡
+		return strconv.ParseFloat(policy.DebitRate, 64)
+	case 2: // 贷记卡
+		return strconv.ParseFloat(policy.CreditRate, 64)
+	default:
+		return strconv.ParseFloat(policy.CreditRate, 64)
+	}
+}
+
+// sendProfitNotifications 发送分润通知
+func (s *ProfitService) sendProfitNotifications(records []*repository.ProfitRecord) {
+	if s.messageService == nil {
+		return
+	}
+
+	for _, record := range records {
+		msg := &NotificationMessage{
+			AgentID:     record.AgentID,
+			MessageType: 1, // 分润通知
+			Title:       "交易分润到账",
+			Content:     fmt.Sprintf("您获得交易分润 ¥%.2f", float64(record.ProfitAmount)/100),
+			RelatedID:   record.ID,
+			RelatedType: "profit_record",
+		}
+
+		msgBytes, _ := json.Marshal(msg)
+		if err := s.queue.Publish(async.TopicNotification, msgBytes); err != nil {
+			log.Printf("[ProfitService] Send notification failed: %v", err)
+		}
+	}
+}
+
+// RevokeProfit 撤销分润（退款时调用）
+func (s *ProfitService) RevokeProfit(txID int64, reason string) error {
+	// 1. 获取该交易的所有分润记录
+	records, err := s.profitRepo.FindByTransactionID(txID)
+	if err != nil {
+		return fmt.Errorf("find profit records failed: %w", err)
+	}
+
+	// 2. 扣减钱包余额
+	walletDeductions := make(map[int64]int64)
+	for _, record := range records {
+		if record.IsRevoked {
+			continue
+		}
+		wallet, err := s.walletRepo.FindByAgentAndType(record.AgentID, record.ChannelID, int16(record.WalletType))
+		if err == nil && wallet != nil {
+			walletDeductions[wallet.ID] = -record.ProfitAmount // 负值表示扣减
+		}
+	}
+
+	// 3. 批量扣减钱包
+	if len(walletDeductions) > 0 {
+		if err := s.walletRepo.BatchUpdateBalance(walletDeductions); err != nil {
+			return fmt.Errorf("deduct wallet failed: %w", err)
+		}
+	}
+
+	// 4. 标记分润记录为已撤销
+	if err := s.profitRepo.RevokeByTransactionID(txID, reason); err != nil {
+		return fmt.Errorf("revoke profit records failed: %w", err)
+	}
+
+	// 5. 更新交易退款状态
+	if err := s.transactionRepo.UpdateRefundStatus(txID, 1); err != nil {
+		return fmt.Errorf("update refund status failed: %w", err)
+	}
+
+	// 6. 发送撤销通知
+	for _, record := range records {
+		msg := &NotificationMessage{
+			AgentID:     record.AgentID,
+			MessageType: 5, // 退款撤销
+			Title:       "分润撤销通知",
+			Content:     fmt.Sprintf("交易已退款，分润 ¥%.2f 已扣回", float64(record.ProfitAmount)/100),
+			RelatedID:   record.ID,
+			RelatedType: "profit_record",
+		}
+
+		msgBytes, _ := json.Marshal(msg)
+		s.queue.Publish(async.TopicNotification, msgBytes)
+	}
+
+	log.Printf("[ProfitService] Revoked profit for transaction %d, records: %d", txID, len(records))
+	return nil
+}

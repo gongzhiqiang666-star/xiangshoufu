@@ -1,0 +1,100 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "代理商分润管理系统 - 支付通道回调处理服务",
+        "title": "8通道回调服务 API",
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "API Support",
+            "email": "support@xiangshoufu.com"
+        },
+        "license": {
+            "name": "Apache 2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        },
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/",
+    "paths": {
+        "/callback/{channel_code}": {
+            "post": {
+                "description": "接收各支付通道的回调通知，支持8个通道：HENGXINTONG(恒信通)、LAKALA(拉卡拉)、YEAHKA(乐刷)、SUIXINGFU(随行付)、LIANLIAN(连连)、SANDPAY(杉德)、FUIOU(富友)、HEEPAY(汇付天下)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "回调"
+                ],
+                "summary": "支付通道回调",
+                "parameters": [
+                    {
+                        "enum": [
+                            "HENGXINTONG",
+                            "LAKALA",
+                            "YEAHKA",
+                            "SUIXINGFU",
+                            "LIANLIAN",
+                            "SANDPAY",
+                            "FUIOU",
+                            "HEEPAY"
+                        ],
+                        "type": "string",
+                        "description": "通道编码",
+                        "name": "channel_code",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "回调数据（各通道格式不同）",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/handler.CallbackResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/handler.CallbackResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "handler.CallbackResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "message": {
+                    "type": "string",
+                    "example": "success"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "ApiKeyAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

@@ -1,0 +1,551 @@
+# 收享付实施方案（单机版 + 升级预留）
+
+## 设计原则
+
+> **当前单机优先，预留升级空间**
+> - 第一阶段：单机部署，简单可靠
+> - 第二阶段：业务增长后，平滑升级到分布式架构
+
+---
+
+## 一、核心问题解答
+
+### 1. 原始交易数据保留策略
+
+| 项目 | 当前方案（单机） | 升级方案 |
+|------|------------------|----------|
+| **保留位置** | PostgreSQL 分区表 | 不变 |
+| **热数据** | 90天在线查询 | 不变 |
+| **冷数据** | 本地归档目录 | → OSS云存储 |
+| **清理策略** | 定时任务自动清理 | 不变 |
+
+### 2. 服务器压力与性能保障（单机版）
+
+**预估负载：**
+| 指标 | 初期预估 | 单机可承受 |
+|------|----------|------------|
+| 日均回调量 | 10-50万次 | ✅ 轻松应对 |
+| 峰值QPS | 100-500/s | ✅ Go单机可达5000+/s |
+| 日增存储 | 200MB-1GB | ✅ 500GB SSD足够 |
+
+**单机性能保障措施：**
+- **Goroutine池**：替代Kafka，使用Go协程池异步处理（后续可替换为Kafka）
+- **本地缓存**：使用 go-cache 做幂等检查（后续可替换为Redis）
+- **批量写入**：100条一批入库，减少数据库压力
+- **限流中间件**：单机限流，防止突发流量
+
+### 3. 8通道对接策略：适配器模式（保持不变）
+
+```
+通道回调 → 统一入口 → 适配器工厂 → 具体适配器 → 统一数据模型 → 核心表
+```
+
+**每个通道实现统一接口：**
+- `VerifySign()` - 签名验证（RSA/MD5/HMAC）
+- `ParseActionType()` - 解析回调类型
+- `ParseMerchantIncome()` - 商户入网映射
+- `ParseTerminalBind()` - 终端绑定映射
+- `ParseTransaction()` - 交易数据映射
+- `ParseDeviceFee()` - 流量费映射
+- `ParseRateChange()` - 费率变更映射
+
+---
+
+## 二、恒信通对接实现
+
+### 2.1 接口概览（5种回调）
+
+| 回调类型 | action值 | 用途 |
+|----------|----------|------|
+| 商户入网 | `merc_income` | 审核状态、费率信息同步 |
+| 终端绑定 | `sn_bind` | 机具与商户绑定/解绑 |
+| 流量费扣费 | `sn_device_fee` | 触发流量返现计算 |
+| 交易回调 | `pos_order` | **核心**，触发分润计算 |
+| 费率修改 | `merc_rate_update` | 费率变更同步 |
+
+### 2.2 关键字段映射（以交易回调为例）
+
+| 恒信通字段 | 统一字段 | 说明 |
+|------------|----------|------|
+| `orderNo` | `order_no` | 订单号 |
+| `tusn` | `terminal_no` | 终端号 |
+| `merchantNo` | `merchant_no` | 商户号 |
+| `agentId` | `agent_id` | 代理商ID |
+| `transTime` | `trans_time` | 交易时间 |
+| `amount` | `amount` | 金额(分) |
+| `transCardType` | `card_type` | 00→debit, 01→credit, 061→wechat... |
+| `transactionFee` | `fee_rate` | 交易费率(%) |
+| `feeExt` | `d0_fee` | D0手续费(分) |
+| `highRate` | `high_rate` | 调价费率(%) |
+
+### 2.3 签名验证
+
+- **算法**：RSA + SHA256
+- **流程**：移除sign字段 → 字典序排列 → key1=value1&key2=value2 → RSA验签
+
+---
+
+## 三、数据库表结构
+
+### 3.1 原始数据表（新增）
+
+```sql
+CREATE TABLE raw_callback_logs (
+    id              BIGSERIAL PRIMARY KEY,
+    channel_code    VARCHAR(32) NOT NULL,      -- 通道编码
+    action_type     VARCHAR(64) NOT NULL,      -- 回调类型
+    raw_request     JSONB NOT NULL,            -- 原始JSON
+    sign_verified   BOOLEAN DEFAULT FALSE,     -- 签名验证结果
+    process_status  SMALLINT DEFAULT 0,        -- 0待处理 1成功 2失败
+    idempotent_key  VARCHAR(128) NOT NULL,     -- 幂等键
+    received_at     TIMESTAMPTZ DEFAULT NOW(),
+    created_date    DATE DEFAULT CURRENT_DATE  -- 分区键
+) PARTITION BY RANGE (created_date);
+```
+
+### 3.2 核心表结构不变
+
+现有核心表保持不变，通过统一数据映射层写入：
+- `merchants` - 商户表
+- `terminals` - 终端表
+- `transactions` - 交易表
+- `device_fees` - 流量费表（新增）
+- `rate_changes` - 费率变更表（新增）
+
+各通道特有字段存入 `ext_data` (JSONB) 字段。
+
+---
+
+## 三、数据处理流程
+
+### 3.1 整体流程（异步处理 + 定时兜底）
+
+采用**混合方案**：异步Goroutine准实时计算 + 定时任务兜底重试
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                           第一阶段：快速响应（同步，<50ms）                 │
+├──────────────────────────────────────────────────────────────────────────┤
+│   通道回调 → 验签 → 落库(原始数据表，待处理) → 返回 {"code":0}              │
+└────────────────────────────────┬─────────────────────────────────────────┘
+                                 ↓
+                           放入内存队列
+                                 ↓
+┌──────────────────────────────────────────────────────────────────────────┐
+│                           第二阶段：数据解析（异步，秒级）                   │
+├──────────────────────────────────────────────────────────────────────────┤
+│   Goroutine消费 → 解析原始数据 → 写入业务表                                 │
+│                               │                                          │
+│              ┌────────────────┴────────────────┐                         │
+│              ↓                                 ↓                         │
+│        交易(pos_order)                   其他(商户/终端等)                 │
+│              ↓                                 ↓                         │
+│        写入交易表                          直接入库                        │
+│              ↓                                                           │
+│   更新原始数据: process_status = 1 (已处理)                                │
+└────────────────────────────────┬─────────────────────────────────────────┘
+                                 ↓
+                           放入分润队列
+                                 ↓
+┌──────────────────────────────────────────────────────────────────────────┐
+│                           第三阶段：分润计算（异步，秒级）                   │
+├──────────────────────────────────────────────────────────────────────────┤
+│   Goroutine池消费(并发10) → 计算分润 → 更新钱包                             │
+│                               ↓                                          │
+│       1. 查找商户 → 获取直属代理商                                         │
+│       2. 沿代理商树向上遍历 (parent_id)                                    │
+│       3. 每一级计算费率差分润                                              │
+│       4. 写入分润记录 (profit_records)                                     │
+│       5. 更新钱包余额 (wallet) + 记录流水                                  │
+│       6. 检查激活奖励条件                                                  │
+│       7. 触发消息通知 (站内消息 + APP推送)                                  │
+│                               ↓                                          │
+│   成功: 更新交易 profit_status = 1 (已计算)                                │
+│   失败: 保持 profit_status = 0，等待定时任务重试                            │
+└──────────────────────────────────────────────────────────────────────────┘
+                                 ↓
+                          失败兜底（5分钟定时任务）
+                                 ↓
+┌──────────────────────────────────────────────────────────────────────────┐
+│                           第四阶段：兜底重试（定时，5分钟）                  │
+├──────────────────────────────────────────────────────────────────────────┤
+│   定时任务(每5分钟) → 查询 profit_status=0 且 created_at > 5分钟前的交易    │
+│                    → 重新计算分润                                         │
+│                    → 告警(如果同一笔交易多次失败)                           │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+### 3.2 混合方案优势
+
+| 优势 | 说明 |
+|------|------|
+| **准实时** | 正常情况下秒级完成分润计算 |
+| **快速响应** | 回调<50ms返回，不阻塞 |
+| **并发可控** | Goroutine池限制并发数=10 |
+| **自动重试** | 失败的由定时任务兜底 |
+| **可观测** | 通过profit_status监控积压情况 |
+
+### 3.3 消息通知设计
+
+分润入账后需要通知代理商，设计如下：
+
+```
+分润计算完成 → 更新钱包余额 → 触发消息通知
+                              ↓
+                    ┌─────────┴─────────┐
+                    ↓                   ↓
+              站内消息(message表)    推送通知(可选)
+                    ↓                   ↓
+              APP消息中心显示      极光/个推推送到APP
+```
+
+**消息类型：**
+| 类型 | 触发条件 | 消息内容示例 |
+|------|---------|-------------|
+| 交易分润 | 每笔交易分润入账 | "您获得交易分润 ¥1.25" |
+| 激活奖励 | 达标激活奖励发放 | "恭喜！商户xxx激活奖励 ¥50 已到账" |
+| 押金返现 | 押金扣费成功 | "押金返现 ¥10 已到账" |
+| 流量返现 | 流量费扣费成功 | "流量费返现 ¥5 已到账" |
+| 退款撤销 | 退款导致分润撤销 | "交易xxx已退款，分润 ¥1.25 已扣回" |
+
+**消息表结构：**
+```sql
+CREATE TABLE messages (
+    id              BIGSERIAL PRIMARY KEY,
+    agent_id        BIGINT NOT NULL,           -- 接收人
+    message_type    SMALLINT NOT NULL,         -- 1:分润 2:注册 3:消费 4:系统公告
+    title           VARCHAR(64) NOT NULL,
+    content         TEXT,
+    is_read         BOOLEAN DEFAULT FALSE,
+    related_id      BIGINT,                    -- 关联ID(交易ID/分润ID)
+    related_type    VARCHAR(32),               -- 关联类型
+    expire_at       TIMESTAMPTZ,               -- 过期时间(3天后自动清理)
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_messages_agent ON messages(agent_id, is_read, created_at DESC);
+```
+
+**通知触发逻辑：**
+```go
+// 分润计算完成后触发
+func (s *ProfitService) afterProfitCalculated(tx *Transaction, profits []*ProfitRecord) {
+    for _, profit := range profits {
+        // 1. 创建站内消息
+        msg := &Message{
+            AgentID:     profit.AgentID,
+            MessageType: MessageTypeProfit,
+            Title:       "交易分润到账",
+            Content:     fmt.Sprintf("您获得交易分润 ¥%.2f", float64(profit.Amount)/100),
+            RelatedID:   profit.ID,
+            RelatedType: "profit_record",
+            ExpireAt:    time.Now().Add(72 * time.Hour), // 3天后过期
+        }
+        s.messageRepo.Create(msg)
+
+        // 2. 推送通知(可选，根据用户设置)
+        if s.shouldPush(profit.AgentID) {
+            s.pushService.Send(profit.AgentID, msg.Title, msg.Content)
+        }
+    }
+}
+```
+
+**推送通道选择（单机版简化）：**
+| 方案 | 说明 | 建议 |
+|------|------|------|
+| 极光推送 | 成熟稳定，有免费额度 | ✅ 推荐 |
+| 个推 | 国内主流，免费额度大 | ✅ 备选 |
+| 自建WebSocket | 实现复杂，需长连接 | ❌ 单机阶段不建议 |
+
+### 3.4 定时任务设计
+
+```go
+// internal/jobs/profit_calculator.go
+
+// 每5分钟执行一次
+func (j *ProfitCalculator) Run() {
+    // 1. 查询待计算的交易（每批处理500条）
+    transactions := j.transactionRepo.FindUnprocessed(limit: 500)
+
+    if len(transactions) == 0 {
+        return
+    }
+
+    // 2. 批量计算分润
+    profitRecords := make([]*ProfitRecord, 0)
+    walletUpdates := make(map[int64]int64) // agentID -> 分润金额
+
+    for _, tx := range transactions {
+        records, updates := j.calculateProfit(tx)
+        profitRecords = append(profitRecords, records...)
+        mergeWalletUpdates(walletUpdates, updates)
+    }
+
+    // 3. 批量写入分润记录
+    j.profitRepo.BatchCreate(profitRecords)
+
+    // 4. 批量更新钱包
+    j.walletRepo.BatchUpdateBalance(walletUpdates)
+
+    // 5. 批量记录流水
+    j.walletLogRepo.BatchCreate(generateLogs(walletUpdates))
+
+    // 6. 更新交易状态
+    j.transactionRepo.BatchUpdateProfitStatus(transactions, 1)
+}
+```
+
+---
+
+## 四、单机版技术架构
+
+### 4.1 整体架构图
+
+```
+                    8个支付通道回调
+                          │
+                          ▼
+               ┌─────────────────────┐
+               │    Nginx (限流)      │
+               └──────────┬──────────┘
+                          │
+                          ▼
+               ┌─────────────────────┐
+               │  Gin HTTP Server    │  ← 单机部署
+               │  (统一回调入口)       │
+               └──────────┬──────────┘
+                          │
+          ┌───────────────┼───────────────┐
+          ▼               ▼               ▼
+    ┌──────────┐   ┌──────────────┐  ┌──────────┐
+    │ 适配器    │   │ Goroutine池  │  │ 本地缓存  │
+    │ 工厂      │   │ (异步处理)   │  │ (幂等)   │
+    └──────────┘   └──────┬───────┘  └──────────┘
+                          │
+                          ▼
+               ┌─────────────────────┐
+               │   PostgreSQL        │  ← 单机数据库
+               │   (分区表存储)       │
+               └─────────────────────┘
+```
+
+### 4.2 项目结构
+
+```
+internal/
+├── channel/                 # 通道适配层
+│   ├── adapter.go          # 适配器接口 + 统一数据模型
+│   ├── factory.go          # 工厂模式
+│   ├── hengxintong/        # 恒信通适配器
+│   │   ├── adapter.go
+│   │   ├── models.go
+│   │   └── adapter_test.go
+│   ├── lakala/             # 拉卡拉适配器
+│   └── ...                 # 其他6个通道
+├── handler/
+│   └── callback_handler.go # 统一回调入口
+├── middleware/
+│   └── rate_limiter.go     # 单机限流
+├── async/                   # 异步处理层（可升级为Kafka）
+│   ├── queue.go            # 队列接口定义
+│   ├── memory_queue.go     # 当前：内存队列实现
+│   └── kafka_queue.go      # 预留：Kafka实现
+├── cache/                   # 缓存层（可升级为Redis）
+│   ├── cache.go            # 缓存接口定义
+│   ├── local_cache.go      # 当前：本地缓存
+│   └── redis_cache.go      # 预留：Redis实现
+├── service/
+│   └── data_mapper.go      # 统一数据映射
+└── jobs/
+    └── data_archiver.go    # 数据归档任务
+```
+
+### 4.3 升级预留设计
+
+```go
+// 队列接口 - 当前用内存队列，后续可无缝切换到Kafka
+type MessageQueue interface {
+    Publish(topic string, msg []byte) error
+    Subscribe(topic string, handler func([]byte) error) error
+}
+
+// 缓存接口 - 当前用本地缓存，后续可无缝切换到Redis
+type Cache interface {
+    Get(key string) (interface{}, bool)
+    Set(key string, value interface{}, ttl time.Duration)
+    Exists(key string) bool
+}
+```
+
+---
+
+## 五、实施计划（单机版简化）
+
+| 阶段 | 内容 | 工期 |
+|------|------|------|
+| **第1周** | 基础架构 | 5天 |
+| | - 原始数据表 + 分区策略 | |
+| | - 适配器框架 + 工厂模式 | |
+| | - 异步队列接口 + 内存实现 | |
+| **第2周** | 恒信通对接 | 5天 |
+| | - 5种回调完整实现 | |
+| | - 签名验证 + 数据映射 | |
+| | - 单元测试 + 联调测试 | |
+| **第3-4周** | 其他7通道 | 10天 |
+| | - 复用适配器模板快速开发 | |
+| **第5周** | 测试上线 | 5天 |
+| | - 功能测试 + 压力测试 | |
+| | - 部署上线 | |
+
+---
+
+## 六、验证方案
+
+### 6.1 功能验证
+
+1. **恒信通回调测试**
+   - 使用Postman模拟5种回调请求
+   - 验证签名验证、数据映射、入库正确性
+
+2. **幂等性测试**
+   - 重复发送相同回调，验证不重复处理
+
+3. **数据一致性**
+   - 对比原始数据与映射后数据
+
+### 6.2 性能验证（单机目标）
+
+| 指标 | 目标值 |
+|------|--------|
+| 单机QPS | > 1000/s |
+| 接口响应时间 | < 50ms (P99) |
+| 数据库写入延迟 | < 100ms |
+| 错误率 | < 0.1% |
+
+---
+
+## 七、升级路径（业务增长后）
+
+| 当前（单机） | 升级后（分布式） | 触发条件 |
+|-------------|-----------------|----------|
+| Goroutine池 | → Kafka集群 | QPS > 2000 |
+| 本地缓存 | → Redis集群 | 需要多实例部署 |
+| 单机PostgreSQL | → 主从复制 | 写入QPS > 500 |
+| 单机部署 | → K8s多副本 | 高可用需求 |
+| 本地归档 | → OSS云存储 | 存储 > 500GB |
+
+**升级成本**：仅需替换接口实现，业务代码无需修改
+
+---
+
+## 八、关键文件
+
+| 文件 | 用途 |
+|------|------|
+| `/Users/apple/claudelife/xiangshoufu/design/恒信通-20251222-API推送接口文档.md` | 恒信通5种回调字段定义 |
+| `/Users/apple/claudelife/xiangshoufu/design/业务逻辑梳理.md` | 分润计算、政策模板等业务规则 |
+| `/Users/apple/claudelife/xiangshoufu/代理商分润管理系统-完整设计方案.md` | 整体架构和表结构设计 |
+
+---
+
+## 九、补充考虑
+
+### 9.1 退款分润撤销机制
+
+交易退款时需要撤销已计算的分润，设计如下：
+
+```sql
+-- 交易表增加退款状态
+ALTER TABLE transactions ADD COLUMN refund_status SMALLINT DEFAULT 0;
+-- 0:正常 1:已退款
+
+-- 分润记录表增加撤销状态
+ALTER TABLE profit_records ADD COLUMN is_revoked BOOLEAN DEFAULT FALSE;
+ALTER TABLE profit_records ADD COLUMN revoked_at TIMESTAMPTZ;
+ALTER TABLE profit_records ADD COLUMN revoke_reason VARCHAR(255);
+```
+
+**撤销流程：**
+1. 收到退款回调 → 更新交易状态为"已退款"
+2. 查找该交易关联的所有分润记录
+3. 标记分润记录为"已撤销"
+4. 扣减各级代理商钱包余额
+5. 记录钱包流水（负值）
+
+### 9.2 轻量级监控方案
+
+考虑服务器资源有限，采用**Go内置 + 企业微信/钉钉告警**方案：
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  应用内置指标    │ →  │   定时检查任务   │ →  │  企业微信告警    │
+│  (expvar/内存)  │     │   (每分钟)       │     │  (Webhook)      │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+```
+
+**监控指标（内存统计）：**
+| 指标 | 告警阈值 | 说明 |
+|------|---------|------|
+| 各通道回调成功率 | < 95% | 5分钟窗口 |
+| 待处理数据积压 | > 500条 | 内存队列长度 |
+| 接口响应时间 | P99 > 500ms | |
+| 签名验证失败 | > 10次/分钟 | 可能遭受攻击 |
+
+**实现方式：**
+```go
+// 简单的指标统计器
+type Metrics struct {
+    sync.RWMutex
+    channelStats map[string]*ChannelStat
+}
+
+type ChannelStat struct {
+    TotalCount   int64
+    SuccessCount int64
+    FailCount    int64
+    SignFailCount int64
+    LastMinuteRT []int64 // 最近一分钟响应时间
+}
+
+// 告警发送（企业微信Webhook）
+func SendAlert(msg string) {
+    webhookURL := "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx"
+    // POST JSON: {"msgtype":"text","text":{"content": msg}}
+}
+```
+
+**定时检查任务（每分钟）：**
+```go
+func CheckAndAlert() {
+    for channel, stat := range metrics.channelStats {
+        rate := float64(stat.SuccessCount) / float64(stat.TotalCount)
+        if rate < 0.95 {
+            SendAlert(fmt.Sprintf("[告警] %s通道成功率%.2f%%", channel, rate*100))
+        }
+    }
+}
+```
+
+### 9.3 安全措施
+
+| 措施 | 实现 |
+|------|------|
+| IP白名单 | Nginx `allow/deny` 配置 |
+| 敏感数据加密 | AES-256-GCM 加密存储 |
+| 签名失败处理 | 记录+告警，返回成功（防止通道重试） |
+
+---
+
+## 十、实施第一步
+
+批准后立即执行：
+
+1. **归档方案文档** - 将本方案复制到项目设计目录：
+   ```
+   /Users/apple/claudelife/xiangshoufu/design/收享付实施方案.md
+   ```
+
+2. **创建恒信通适配器目录结构**
+
+3. **创建原始数据表SQL脚本**
