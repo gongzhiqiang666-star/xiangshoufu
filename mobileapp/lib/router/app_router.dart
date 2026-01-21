@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../features/auth/presentation/login_page.dart';
+import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/home/presentation/home_page.dart';
 import '../features/terminal/presentation/terminal_page.dart';
 import '../features/terminal/presentation/terminal_transfer_page.dart';
@@ -92,17 +93,27 @@ class RoutePaths {
 
 /// 路由配置Provider
 final appRouterProvider = Provider<GoRouter>((ref) {
+  final authState = ref.watch(authStateProvider);
+
   return GoRouter(
     initialLocation: RoutePaths.home,
     debugLogDiagnostics: true,
 
     // 重定向逻辑（检查登录状态）
     redirect: (context, state) {
-      // TODO: 检查登录状态
-      // final isLoggedIn = ref.read(authStateProvider);
-      // if (!isLoggedIn && !state.matchedLocation.startsWith('/login')) {
-      //   return RoutePaths.login;
-      // }
+      final isLoggedIn = authState.isAuthenticated;
+      final isLoggingIn = state.matchedLocation == RoutePaths.login;
+
+      // 未登录且不在登录页，跳转到登录页
+      if (!isLoggedIn && !isLoggingIn) {
+        return RoutePaths.login;
+      }
+
+      // 已登录但在登录页，跳转到首页
+      if (isLoggedIn && isLoggingIn) {
+        return RoutePaths.home;
+      }
+
       return null;
     },
 
