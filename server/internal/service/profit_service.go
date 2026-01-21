@@ -13,14 +13,16 @@ import (
 
 // ProfitService 分润计算服务
 type ProfitService struct {
-	transactionRepo repository.TransactionRepository
-	profitRepo      repository.ProfitRecordRepository
-	walletRepo      repository.WalletRepository
-	walletLogRepo   repository.WalletLogRepository
-	agentRepo       repository.AgentRepository
-	agentPolicyRepo repository.AgentPolicyRepository
-	messageService  *MessageService
-	queue           async.MessageQueue
+	transactionRepo   repository.TransactionRepository
+	profitRepo        repository.ProfitRecordRepository
+	walletRepo        repository.WalletRepository
+	walletLogRepo     repository.WalletLogRepository
+	agentRepo         repository.AgentRepository
+	agentPolicyRepo   repository.AgentPolicyRepository
+	messageService    *MessageService
+	queue             async.MessageQueue
+	rateStagingService *RateStagingService // 费率阶梯服务
+	goodsDeductionService *GoodsDeductionService // 货款代扣服务
 }
 
 // NewProfitService 创建分润服务
@@ -44,6 +46,16 @@ func NewProfitService(
 		messageService:  messageService,
 		queue:           queue,
 	}
+}
+
+// SetRateStagingService 设置费率阶梯服务（延迟注入，避免循环依赖）
+func (s *ProfitService) SetRateStagingService(rss *RateStagingService) {
+	s.rateStagingService = rss
+}
+
+// SetGoodsDeductionService 设置货款代扣服务（延迟注入，避免循环依赖）
+func (s *ProfitService) SetGoodsDeductionService(gds *GoodsDeductionService) {
+	s.goodsDeductionService = gds
 }
 
 // ProcessMessage 处理分润计算消息
@@ -167,6 +179,27 @@ func (s *ProfitService) CalculateProfit(txID int64) error {
 		}
 	}
 
+	// 7.1 触发货款代扣（实时扣款）
+	if s.goodsDeductionService != nil && len(profitRecords) > 0 {
+		for _, record := range profitRecords {
+			// 触发该代理商的货款代扣
+			deducted, err := s.goodsDeductionService.TriggerRealtimeDeduction(
+				record.AgentID,
+				record.ChannelID,
+				int16(record.WalletType), // 分润钱包
+				record.ProfitAmount,
+				"profit_income",
+				&tx.ID,
+				&record.ID,
+			)
+			if err != nil {
+				log.Printf("[ProfitService] Trigger goods deduction failed for agent %d: %v", record.AgentID, err)
+			} else if deducted > 0 {
+				log.Printf("[ProfitService] Goods deduction triggered: agent=%d, deducted=%d", record.AgentID, deducted)
+			}
+		}
+	}
+
 	// 8. 更新交易分润状态
 	if err := s.transactionRepo.UpdateProfitStatus(tx.ID, 1); err != nil {
 		return fmt.Errorf("update profit status failed: %w", err)
@@ -187,14 +220,39 @@ func (s *ProfitService) getAgentRate(agentID, channelID int64, cardType int16) (
 	}
 
 	// 根据卡类型返回对应费率
+	var baseRate float64
 	switch cardType {
 	case 1: // 借记卡
-		return strconv.ParseFloat(policy.DebitRate, 64)
+		baseRate, _ = strconv.ParseFloat(policy.DebitRate, 64)
 	case 2: // 贷记卡
-		return strconv.ParseFloat(policy.CreditRate, 64)
+		baseRate, _ = strconv.ParseFloat(policy.CreditRate, 64)
 	default:
-		return strconv.ParseFloat(policy.CreditRate, 64)
+		baseRate, _ = strconv.ParseFloat(policy.CreditRate, 64)
 	}
+
+	// 应用费率阶梯调整（如果配置了RateStagingService）
+	if s.rateStagingService != nil {
+		adjustedRate, err := s.rateStagingService.GetAgentRateAdjustment(agentID, channelID, baseRate, cardType)
+		if err == nil && adjustedRate != nil {
+			return adjustedRate.AdjustedRate, nil
+		}
+	}
+
+	return baseRate, nil
+}
+
+// getMerchantAdjustedRate 获取商户调整后的费率（应用商户入网时间的费率阶梯）
+func (s *ProfitService) getMerchantAdjustedRate(merchantID, channelID int64, baseRate float64, cardType int16) float64 {
+	if s.rateStagingService == nil {
+		return baseRate
+	}
+
+	adjustment, err := s.rateStagingService.GetMerchantRateAdjustment(merchantID, channelID, baseRate, cardType)
+	if err != nil {
+		return baseRate
+	}
+
+	return adjustment.AdjustedRate
 }
 
 // sendProfitNotifications 发送分润通知

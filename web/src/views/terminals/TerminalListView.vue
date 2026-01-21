@@ -169,6 +169,94 @@
         <el-button type="primary" @click="handleSubmitDispatch">确认下发</el-button>
       </template>
     </el-dialog>
+
+    <!-- 入库弹窗 -->
+    <el-dialog v-model="importDialogVisible" title="终端入库" width="600px">
+      <el-form :model="importForm" label-width="100px">
+        <el-form-item label="选择通道" required>
+          <ChannelSelect v-model="importForm.channel_id" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="品牌编码">
+          <el-input v-model="importForm.brand_code" placeholder="可选，填写品牌编码" />
+        </el-form-item>
+        <el-form-item label="型号编码">
+          <el-input v-model="importForm.model_code" placeholder="可选，填写型号编码" />
+        </el-form-item>
+        <el-form-item label="终端SN号" required>
+          <el-input
+            v-model="importForm.sn_text"
+            type="textarea"
+            :rows="8"
+            placeholder="请输入终端SN号，每行一个，或使用逗号/分号分隔&#10;最多支持1000个"
+          />
+        </el-form-item>
+      </el-form>
+
+      <template v-if="importResult && importResult.failed_count > 0">
+        <el-divider />
+        <div class="import-result">
+          <el-alert type="warning" :closable="false" show-icon>
+            <template #title>
+              入库完成：成功 {{ importResult.success_count }} 台，失败 {{ importResult.failed_count }} 台
+            </template>
+          </el-alert>
+          <div v-if="importResult.errors.length > 0" class="error-list">
+            <div v-for="(error, index) in importResult.errors.slice(0, 10)" :key="index" class="error-item">
+              {{ error }}
+            </div>
+            <div v-if="importResult.errors.length > 10" class="error-more">
+              ... 还有 {{ importResult.errors.length - 10 }} 条错误
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <template #footer>
+        <el-button @click="importDialogVisible = false">关闭</el-button>
+        <el-button type="primary" :loading="importLoading" @click="handleSubmitImport">确认入库</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 回拨弹窗 -->
+    <el-dialog v-model="recallDialogVisible" title="终端回拨" width="500px">
+      <div class="recall-info">
+        已选终端: {{ selectedTerminals.length }}台
+      </div>
+      <el-form :model="recallForm" label-width="120px">
+        <el-form-item label="回拨给代理商" required>
+          <AgentSelect v-model="recallForm.to_agent_id" style="width: 100%" placeholder="请选择上级代理商" />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="recallForm.remark" type="textarea" :rows="2" placeholder="可选，填写回拨备注" />
+        </el-form-item>
+      </el-form>
+
+      <div class="recall-warning">
+        <el-icon><WarningFilled /></el-icon>
+        注意: 只能回拨未激活的终端，PC端支持跨级回拨，APP端仅支持回拨给直属上级
+      </div>
+
+      <template v-if="recallResult && recallResult.failed_count > 0">
+        <el-divider />
+        <div class="recall-result">
+          <el-alert type="warning" :closable="false" show-icon>
+            <template #title>
+              回拨完成：成功 {{ recallResult.success_count }} 台，失败 {{ recallResult.failed_count }} 台
+            </template>
+          </el-alert>
+          <div v-if="recallResult.errors.length > 0" class="error-list">
+            <div v-for="(error, index) in recallResult.errors.slice(0, 10)" :key="index" class="error-item">
+              {{ error }}
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <template #footer>
+        <el-button @click="recallDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="recallLoading" @click="handleSubmitRecall">确认回拨</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -176,14 +264,14 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Upload, Bottom, Top, WarningFilled } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import PageHeader from '@/components/Common/PageHeader.vue'
 import SearchForm from '@/components/Common/SearchForm.vue'
 import ProTable from '@/components/Common/ProTable.vue'
 import ChannelSelect from '@/components/Common/ChannelSelect.vue'
 import AgentSelect from '@/components/Common/AgentSelect.vue'
-import { getTerminals, getTerminalStats, dispatchTerminals } from '@/api/terminal'
-import type { Terminal, TerminalStatus, TerminalStats } from '@/types'
+import { getTerminals, getTerminalStats, dispatchTerminals, importTerminals, recallTerminals } from '@/api/terminal'
+import type { Terminal, TerminalStatus, TerminalStats, TerminalImportResult, TerminalRecallResult } from '@/types'
 
 const router = useRouter()
 
@@ -295,10 +383,86 @@ function handleView(row: Terminal) {
   router.push(`/terminals/${row.id}`)
 }
 
+// 入库弹窗
+const importDialogVisible = ref(false)
+const importForm = reactive({
+  channel_id: undefined as number | undefined,
+  channel_code: '',
+  brand_code: '',
+  model_code: '',
+  sn_text: '', // 多行文本输入
+})
+const importLoading = ref(false)
+const importResult = ref<TerminalImportResult | null>(null)
+
 // 入库
 function handleImport() {
-  ElMessage.info('入库功能开发中...')
+  importForm.channel_id = undefined
+  importForm.channel_code = ''
+  importForm.brand_code = ''
+  importForm.model_code = ''
+  importForm.sn_text = ''
+  importResult.value = null
+  importDialogVisible.value = true
 }
+
+// 提交入库
+async function handleSubmitImport() {
+  if (!importForm.channel_id) {
+    ElMessage.warning('请选择通道')
+    return
+  }
+
+  // 解析SN列表（支持换行、逗号、分号分隔）
+  const snList = importForm.sn_text
+    .split(/[\n,;]+/)
+    .map(sn => sn.trim())
+    .filter(sn => sn.length > 0)
+
+  if (snList.length === 0) {
+    ElMessage.warning('请输入终端SN号')
+    return
+  }
+
+  if (snList.length > 1000) {
+    ElMessage.warning('单次入库不能超过1000台')
+    return
+  }
+
+  importLoading.value = true
+  try {
+    const result = await importTerminals({
+      channel_id: importForm.channel_id,
+      channel_code: importForm.channel_code,
+      brand_code: importForm.brand_code,
+      model_code: importForm.model_code,
+      sn_list: snList,
+    })
+    importResult.value = result
+
+    if (result.failed_count === 0) {
+      ElMessage.success(`入库成功: 共${result.success_count}台`)
+      importDialogVisible.value = false
+      fetchData()
+      fetchStats()
+    } else {
+      ElMessage.warning(`入库完成: 成功${result.success_count}台，失败${result.failed_count}台`)
+    }
+  } catch (error) {
+    console.error('Import terminals error:', error)
+  } finally {
+    importLoading.value = false
+  }
+}
+
+// 回拨弹窗
+const recallDialogVisible = ref(false)
+const recallForm = reactive({
+  to_agent_id: undefined as number | undefined,
+  remark: '',
+})
+const recallLoading = ref(false)
+const recallResult = ref<TerminalRecallResult | null>(null)
 
 // 批量下发
 function handleBatchDispatch() {
@@ -356,7 +520,50 @@ function handleBatchRecall() {
 
 // 回拨
 function handleRecall(terminals: Terminal[]) {
-  ElMessage.info('回拨功能开发中...')
+  // 检查是否有已激活的终端
+  const activatedTerminals = terminals.filter(t => t.status === 'activated')
+  if (activatedTerminals.length > 0) {
+    ElMessage.warning('已激活的终端不能回拨')
+    return
+  }
+
+  selectedTerminals.value = terminals
+  recallForm.to_agent_id = undefined
+  recallForm.remark = ''
+  recallResult.value = null
+  recallDialogVisible.value = true
+}
+
+// 提交回拨
+async function handleSubmitRecall() {
+  if (!recallForm.to_agent_id) {
+    ElMessage.warning('请选择回拨给的代理商')
+    return
+  }
+
+  recallLoading.value = true
+  try {
+    const result = await recallTerminals({
+      terminal_sns: selectedTerminals.value.map(t => t.sn),
+      to_agent_id: recallForm.to_agent_id,
+      remark: recallForm.remark,
+    })
+    recallResult.value = result
+
+    if (result.failed_count === 0) {
+      ElMessage.success(`回拨成功: 共${result.success_count}台`)
+      recallDialogVisible.value = false
+      tableRef.value?.clearSelection()
+      fetchData()
+      fetchStats()
+    } else {
+      ElMessage.warning(`回拨完成: 成功${result.success_count}台，失败${result.failed_count}台`)
+    }
+  } catch (error) {
+    console.error('Recall terminals error:', error)
+  } finally {
+    recallLoading.value = false
+  }
 }
 
 onMounted(() => {
@@ -438,5 +645,53 @@ onMounted(() => {
   border-radius: $border-radius-sm;
   color: $warning-color;
   font-size: 12px;
+}
+
+.recall-info {
+  margin-bottom: $spacing-md;
+  padding: $spacing-sm;
+  background: $bg-color;
+  border-radius: $border-radius-sm;
+}
+
+.recall-warning {
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
+  margin-top: $spacing-md;
+  padding: $spacing-sm;
+  background: lighten($warning-color, 40%);
+  border-radius: $border-radius-sm;
+  color: $warning-color;
+  font-size: 12px;
+}
+
+.import-result,
+.recall-result {
+  margin-top: $spacing-md;
+
+  .error-list {
+    margin-top: $spacing-sm;
+    max-height: 200px;
+    overflow-y: auto;
+
+    .error-item {
+      padding: $spacing-xs;
+      font-size: 12px;
+      color: $text-secondary;
+      border-bottom: 1px dashed $border-color;
+
+      &:last-child {
+        border-bottom: none;
+      }
+    }
+
+    .error-more {
+      padding: $spacing-xs;
+      font-size: 12px;
+      color: $text-secondary;
+      font-style: italic;
+    }
+  }
 }
 </style>

@@ -80,3 +80,183 @@ export interface TerminalQueryParams {
   page?: number
   page_size?: number
 }
+
+// 终端入库参数
+export interface TerminalImportParams {
+  channel_id: number
+  channel_code?: string
+  brand_code?: string
+  model_code?: string
+  sn_list: string[]
+}
+
+// 终端入库结果
+export interface TerminalImportResult {
+  import_no: string
+  total_count: number
+  success_count: number
+  failed_count: number
+  failed_sns: string[]
+  errors: string[]
+}
+
+// 终端回拨参数
+export interface TerminalRecallParams {
+  terminal_sns: string[]
+  to_agent_id: number
+  remark?: string
+}
+
+// 终端回拨结果
+export interface TerminalRecallResult {
+  total_count: number
+  success_count: number
+  failed_count: number
+  errors: string[]
+}
+
+// 回拨记录
+export interface TerminalRecall {
+  id: number
+  recall_no: string
+  from_agent_id: number
+  from_agent_name?: string
+  to_agent_id: number
+  to_agent_name?: string
+  terminal_sn: string
+  channel_id: number
+  is_cross_level: boolean
+  status: number
+  status_name?: string
+  source: number
+  remark: string
+  created_at: string
+  confirmed_at?: string
+}
+
+// 终端政策
+export interface TerminalPolicy {
+  id: number
+  terminal_sn: string
+  channel_id: number
+  agent_id: number
+  // 费率设置 (万分比)
+  credit_rate: number
+  debit_rate: number
+  debit_cap: number
+  unionpay_rate: number
+  wechat_rate: number
+  alipay_rate: number
+  // SIM卡费用设置 (分)
+  first_sim_fee: number
+  non_first_sim_fee: number
+  sim_fee_interval_days: number
+  // 押金设置 (分)
+  deposit_amount: number
+  // 同步状态
+  is_synced: boolean
+  synced_at: string | null
+  sync_error: string
+  created_at: string
+  updated_at: string
+}
+
+// 政策选项
+export interface PolicyOptions {
+  rate_options: number[]
+  first_sim_fee_options: number[]
+  non_first_sim_fee_options: number[]
+  sim_fee_interval_options: number[]
+  deposit_options: number[]
+}
+
+// 批量设置费率参数
+export interface BatchSetRateParams {
+  terminal_sns: string[]
+  credit_rate: number
+  debit_rate?: number
+  debit_cap?: number
+  unionpay_rate?: number
+  wechat_rate?: number
+  alipay_rate?: number
+}
+
+// 批量设置SIM卡费用参数
+export interface BatchSetSimFeeParams {
+  terminal_sns: string[]
+  first_sim_fee: number
+  non_first_sim_fee: number
+  sim_fee_interval_days: number
+}
+
+// 批量设置押金参数
+export interface BatchSetDepositParams {
+  terminal_sns: string[]
+  deposit_amount: number
+}
+
+// 批量设置结果
+export interface BatchPolicyResult {
+  total_count: number
+  success_count: number
+  failed_count: number
+  errors: string[]
+}
+
+// 终端下发记录
+export interface TerminalDistribute {
+  id: number
+  distribute_no: string
+  from_agent_id: number
+  from_agent_name?: string
+  to_agent_id: number
+  to_agent_name?: string
+  terminal_sn: string
+  channel_id: number
+  channel_name?: string
+  is_cross_level: boolean
+  cross_level_path: string
+  goods_price: number
+  deduction_type: number
+  deduction_plan_id?: number
+  status: number
+  status_name?: string
+  source: number
+  remark: string
+  created_by: number
+  confirmed_by?: number
+  created_at: string
+  confirmed_at?: string
+}
+
+// 终端下发参数
+export interface TerminalDistributeParams {
+  to_agent_id: number
+  terminal_sn: string
+  channel_id: number
+  goods_price: number
+  deduction_type: number
+  deduction_periods?: number
+  remark?: string
+}
+
+// 终端流转记录（合并下发和回拨）
+export interface TerminalFlowRecord {
+  id: number
+  type: 'distribute' | 'recall'
+  record_no: string
+  from_agent_id: number
+  from_agent_name?: string
+  to_agent_id: number
+  to_agent_name?: string
+  terminal_sn: string
+  channel_id: number
+  channel_name?: string
+  is_cross_level: boolean
+  status: number
+  status_name?: string
+  source: number
+  remark: string
+  created_at: string
+  confirmed_at?: string
+}

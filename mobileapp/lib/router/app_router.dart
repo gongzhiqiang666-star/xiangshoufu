@@ -6,6 +6,8 @@ import '../features/auth/presentation/login_page.dart';
 import '../features/home/presentation/home_page.dart';
 import '../features/terminal/presentation/terminal_page.dart';
 import '../features/terminal/presentation/terminal_transfer_page.dart';
+import '../features/terminal/presentation/terminal_detail_page.dart';
+import '../features/terminal/presentation/terminal_recall_page.dart';
 import '../features/cargo_deduction/presentation/cargo_deduction_page.dart';
 import '../features/merchant/presentation/merchant_page.dart';
 import '../features/merchant/presentation/merchant_detail_page.dart';
@@ -14,10 +16,16 @@ import '../features/profit/presentation/profit_page.dart';
 import '../features/wallet/presentation/wallet_page.dart';
 import '../features/wallet/presentation/withdraw_page.dart';
 import '../features/agent/presentation/agent_page.dart';
+import '../features/agent/presentation/agent_channels_page.dart';
+import '../features/policy/presentation/my_policy_page.dart';
+import '../features/policy/presentation/subordinate_policy_page.dart';
 import '../features/deduction/presentation/deduction_page.dart';
 import '../features/marketing/presentation/marketing_page.dart';
 import '../features/message/presentation/message_page.dart';
 import '../features/profile/presentation/profile_page.dart';
+import '../features/profile/presentation/settings_page.dart';
+import '../features/profile/presentation/bank_card_edit_page.dart';
+import '../features/profile/presentation/invite_code_page.dart';
 import '../shared/widgets/main_scaffold.dart';
 
 /// 路由路径常量
@@ -59,6 +67,12 @@ class RoutePaths {
   static const String agent = '/agent';
   static const String agentAdd = '/agent/add';
   static const String agentDetail = '/agent/:id';
+  static const String agentChannels = '/agent/:id/channels';
+  static const String agentPolicy = '/agent/:id/policy';
+
+  // 政策管理
+  static const String myPolicy = '/policy/my';
+  static const String subordinatePolicy = '/policy/subordinate/:id';
 
   // 代扣管理
   static const String deduction = '/deduction';
@@ -168,6 +182,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           return TerminalTransferPage(selectedSNs: snList);
         },
       ),
+      GoRoute(
+        path: RoutePaths.terminalRecall,
+        name: 'terminalRecall',
+        builder: (context, state) {
+          final snList = state.extra as List<String>? ?? [];
+          return TerminalRecallPage(selectedSNs: snList);
+        },
+      ),
+      GoRoute(
+        path: RoutePaths.terminalDetail,
+        name: 'terminalDetail',
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return TerminalDetailPage(terminalId: id);
+        },
+      ),
 
       // ==================== 货款代扣 ====================
       GoRoute(
@@ -186,7 +216,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: RoutePaths.merchantDetail,
         name: 'merchantDetail',
         builder: (context, state) {
-          final id = state.pathParameters['id'] ?? '';
+          final idStr = state.pathParameters['id'] ?? '0';
+          final id = int.tryParse(idStr) ?? 0;
           return MerchantDetailPage(merchantId: id);
         },
       ),
@@ -214,6 +245,54 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: 'agent',
         builder: (context, state) => const AgentPage(),
       ),
+      GoRoute(
+        path: RoutePaths.agentChannels,
+        name: 'agentChannels',
+        builder: (context, state) {
+          final idStr = state.pathParameters['id'];
+          final agentId = idStr != null ? int.tryParse(idStr) : null;
+          return AgentChannelsPage(agentId: agentId);
+        },
+      ),
+      GoRoute(
+        path: RoutePaths.agentPolicy,
+        name: 'agentPolicy',
+        builder: (context, state) {
+          final idStr = state.pathParameters['id'] ?? '0';
+          final agentId = int.tryParse(idStr) ?? 0;
+          final extra = state.extra as Map<String, dynamic>?;
+          final agentName = extra?['name'] as String? ?? '下级代理商';
+          final channelId = extra?['channelId'] as int?;
+          return SubordinatePolicyPage(
+            subordinateId: agentId,
+            subordinateName: agentName,
+            initialChannelId: channelId,
+          );
+        },
+      ),
+
+      // ==================== 政策管理 ====================
+      GoRoute(
+        path: RoutePaths.myPolicy,
+        name: 'myPolicy',
+        builder: (context, state) => const MyPolicyPage(),
+      ),
+      GoRoute(
+        path: RoutePaths.subordinatePolicy,
+        name: 'subordinatePolicy',
+        builder: (context, state) {
+          final idStr = state.pathParameters['id'] ?? '0';
+          final subordinateId = int.tryParse(idStr) ?? 0;
+          final extra = state.extra as Map<String, dynamic>?;
+          final name = extra?['name'] as String? ?? '下级代理商';
+          final channelId = extra?['channelId'] as int?;
+          return SubordinatePolicyPage(
+            subordinateId: subordinateId,
+            subordinateName: name,
+            initialChannelId: channelId,
+          );
+        },
+      ),
 
       // ==================== 代扣管理 ====================
       GoRoute(
@@ -234,6 +313,23 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: RoutePaths.message,
         name: 'message',
         builder: (context, state) => const MessagePage(),
+      ),
+
+      // ==================== 设置相关 ====================
+      GoRoute(
+        path: RoutePaths.settings,
+        name: 'settings',
+        builder: (context, state) => const SettingsPage(),
+      ),
+      GoRoute(
+        path: RoutePaths.bankCard,
+        name: 'bankCard',
+        builder: (context, state) => const BankCardEditPage(),
+      ),
+      GoRoute(
+        path: RoutePaths.inviteCode,
+        name: 'inviteCode',
+        builder: (context, state) => const InviteCodePage(),
       ),
     ],
 

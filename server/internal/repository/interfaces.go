@@ -58,6 +58,30 @@ type MessageRepository interface {
 	MarkAsRead(id int64) error
 	MarkAllAsRead(agentID int64) error
 	DeleteExpired() (int64, error) // 删除过期消息
+
+	// 扩展方法 - 按类型筛选
+	FindByAgentIDAndTypes(agentID int64, types []int16, limit, offset int) ([]*models.Message, error)
+	CountByAgentIDAndTypes(agentID int64, types []int16) (int64, error)
+
+	// 扩展方法 - 分类统计
+	GetStatsByAgentID(agentID int64) (*MessageStats, error)
+
+	// 管理端方法
+	FindAll(limit, offset int) ([]*models.Message, error)
+	CountAll() (int64, error)
+	FindByID(id int64) (*models.Message, error)
+	Delete(id int64) error
+	FindByAgentIDs(agentIDs []int64, limit, offset int) ([]*models.Message, error)
+}
+
+// MessageStats 消息统计
+type MessageStats struct {
+	Total        int64 `json:"total"`         // 总消息数
+	UnreadTotal  int64 `json:"unread_total"`  // 未读总数
+	ProfitCount  int64 `json:"profit_count"`  // 分润类消息数
+	RegisterCount int64 `json:"register_count"` // 注册类消息数
+	ConsumptionCount int64 `json:"consumption_count"` // 消费类消息数
+	SystemCount  int64 `json:"system_count"`  // 系统类消息数
 }
 
 // TransactionRepository 交易仓库接口
@@ -203,4 +227,10 @@ type AgentPolicy struct {
 	TemplateID int64  `json:"template_id" gorm:"not null"`
 	CreditRate string `json:"credit_rate"`
 	DebitRate  string `json:"debit_rate"`
+}
+
+// MerchantRepository 商户仓库接口
+type MerchantRepository interface {
+	FindByID(id int64) (*models.Merchant, error)
+	FindByMerchantNo(merchantNo string) (*models.Merchant, error)
 }

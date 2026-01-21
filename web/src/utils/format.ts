@@ -64,6 +64,15 @@ export function formatDateTime(
 }
 
 /**
+ * 格式化日期（简写，等同于 formatDateTime 默认 datetime 格式）
+ * @param date 日期字符串或Date对象
+ */
+export function formatDate(date: string | Date | null | undefined): string {
+  if (!date) return '-'
+  return formatDateTime(date, 'datetime')
+}
+
+/**
  * 计算趋势百分比
  * @param current 当前值
  * @param previous 前期值

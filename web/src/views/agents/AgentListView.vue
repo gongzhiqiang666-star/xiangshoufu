@@ -2,7 +2,7 @@
   <div class="agent-list-view">
     <PageHeader title="代理商管理" sub-title="代理商列表">
       <template #extra>
-        <el-button type="primary" :icon="Plus">新增代理商</el-button>
+        <el-button type="primary" :icon="Plus" @click="handleCreate">新增代理商</el-button>
       </template>
     </PageHeader>
 
@@ -130,6 +130,11 @@ function handleReset() {
 // 查看详情
 function handleView(row: Agent) {
   router.push(`/agents/${row.id}`)
+}
+
+// 新增代理商
+function handleCreate() {
+  router.push('/agents/create')
 }
 
 // 编辑

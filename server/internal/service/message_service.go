@@ -15,6 +15,7 @@ import (
 // MessageService 消息通知服务
 type MessageService struct {
 	messageRepo repository.MessageRepository
+	agentRepo   repository.AgentRepository
 	pushConfig  *PushConfig
 	httpClient  *http.Client
 }
@@ -38,6 +39,17 @@ type NotificationMessage struct {
 	RelatedType string `json:"related_type"`
 }
 
+// SendMessageRequest 发送消息请求（管理端）
+type SendMessageRequest struct {
+	Title       string  `json:"title" binding:"required"`
+	Content     string  `json:"content" binding:"required"`
+	MessageType int16   `json:"message_type" binding:"required"`
+	ExpireDays  int     `json:"expire_days"`   // 1-30天，默认3天
+	SendScope   string  `json:"send_scope"`    // all/agents/level
+	AgentIDs    []int64 `json:"agent_ids"`     // 指定代理商ID列表
+	Level       int     `json:"level"`         // 指定层级
+}
+
 // NewMessageService 创建消息服务
 func NewMessageService(messageRepo repository.MessageRepository, pushConfig *PushConfig) *MessageService {
 	return &MessageService{
@@ -47,6 +59,11 @@ func NewMessageService(messageRepo repository.MessageRepository, pushConfig *Pus
 			Timeout: 10 * time.Second,
 		},
 	}
+}
+
+// SetAgentRepo 设置代理商仓库（用于按层级发送消息）
+func (s *MessageService) SetAgentRepo(agentRepo repository.AgentRepository) {
+	s.agentRepo = agentRepo
 }
 
 // ProcessMessage 处理通知消息
@@ -227,6 +244,31 @@ func (s *MessageService) GetMessages(agentID int64, page, pageSize int) ([]*mode
 	return s.messageRepo.FindByAgentID(agentID, pageSize, offset)
 }
 
+// GetMessagesByTypes 按类型获取消息列表
+func (s *MessageService) GetMessagesByTypes(agentID int64, types []int16, page, pageSize int) ([]*models.Message, int64, error) {
+	offset := (page - 1) * pageSize
+	messages, err := s.messageRepo.FindByAgentIDAndTypes(agentID, types, pageSize, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := s.messageRepo.CountByAgentIDAndTypes(agentID, types)
+	if err != nil {
+		return nil, 0, err
+	}
+	return messages, total, nil
+}
+
+// GetMessagesByCategory 按分类获取消息列表
+func (s *MessageService) GetMessagesByCategory(agentID int64, category string, page, pageSize int) ([]*models.Message, int64, error) {
+	types := models.GetMessageTypesByCategory(category)
+	return s.GetMessagesByTypes(agentID, types, page, pageSize)
+}
+
+// GetMessageStats 获取消息统计
+func (s *MessageService) GetMessageStats(agentID int64) (*repository.MessageStats, error) {
+	return s.messageRepo.GetStatsByAgentID(agentID)
+}
+
 // MarkAsRead 标记消息已读
 func (s *MessageService) MarkAsRead(messageID int64) error {
 	return s.messageRepo.MarkAsRead(messageID)
@@ -240,4 +282,66 @@ func (s *MessageService) MarkAllAsRead(agentID int64) error {
 // CleanupExpiredMessages 清理过期消息
 func (s *MessageService) CleanupExpiredMessages() (int64, error) {
 	return s.messageRepo.DeleteExpired()
+}
+
+// ============================================================
+// 管理端方法
+// ============================================================
+
+// AdminSendMessage 管理员发送消息
+func (s *MessageService) AdminSendMessage(req *SendMessageRequest, agentIDs []int64) error {
+	// 验证有效期（1-30天）
+	expireDays := req.ExpireDays
+	if expireDays <= 0 || expireDays > 30 {
+		expireDays = 3 // 默认3天
+	}
+	expireAt := time.Now().Add(time.Duration(expireDays) * 24 * time.Hour)
+
+	// 创建消息列表
+	messages := make([]*models.Message, 0, len(agentIDs))
+	for _, agentID := range agentIDs {
+		message := &models.Message{
+			AgentID:     agentID,
+			MessageType: req.MessageType,
+			Title:       req.Title,
+			Content:     req.Content,
+			IsRead:      false,
+			IsPushed:    false,
+			ExpireAt:    &expireAt,
+			CreatedAt:   time.Now(),
+		}
+		messages = append(messages, message)
+	}
+
+	// 批量创建
+	if err := s.messageRepo.BatchCreate(messages); err != nil {
+		return fmt.Errorf("batch create messages failed: %w", err)
+	}
+
+	log.Printf("[MessageService] Admin sent message to %d agents: %s", len(agentIDs), req.Title)
+	return nil
+}
+
+// AdminGetAllMessages 管理员获取所有消息
+func (s *MessageService) AdminGetAllMessages(page, pageSize int) ([]*models.Message, int64, error) {
+	offset := (page - 1) * pageSize
+	messages, err := s.messageRepo.FindAll(pageSize, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := s.messageRepo.CountAll()
+	if err != nil {
+		return nil, 0, err
+	}
+	return messages, total, nil
+}
+
+// AdminGetMessageByID 管理员获取消息详情
+func (s *MessageService) AdminGetMessageByID(id int64) (*models.Message, error) {
+	return s.messageRepo.FindByID(id)
+}
+
+// AdminDeleteMessage 管理员删除消息
+func (s *MessageService) AdminDeleteMessage(id int64) error {
+	return s.messageRepo.Delete(id)
 }
