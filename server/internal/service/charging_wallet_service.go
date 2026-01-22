@@ -526,6 +526,7 @@ func (s *ChargingWalletService) toRewardInfo(r *models.ChargingWalletReward) *Re
 }
 
 // GetChargingWalletSummary 获取充值钱包汇总
+// P0修复：增加奖励总金额显示（包含手动发放+系统自动发放）
 func (s *ChargingWalletService) GetChargingWalletSummary(agentID int64) (*ChargingWalletSummary, error) {
 	wallet, _ := s.walletRepo.FindByAgentAndType(agentID, 0, models.WalletTypeCharging)
 
@@ -534,23 +535,38 @@ func (s *ChargingWalletService) GetChargingWalletSummary(agentID int64) (*Chargi
 		balance = wallet.Balance
 	}
 
-	// 获取已发放奖励总额
-	totalIssued, _ := s.chargingRepo.GetTotalRewardsIssuedByAgent(agentID)
+	// 获取手动发放奖励总额（从充值钱包发放的）
+	manualIssued, _ := s.chargingRepo.GetTotalRewardsIssuedByAgent(agentID)
+
+	// 获取自动激活奖励总额（系统自动发放给下级的）
+	// 这里查询从该代理商作为上级（source_agent_id）发放的所有激活奖励
+	autoReward, _ := s.chargingRepo.GetTotalAutoRewardsForDownline(agentID)
+
+	// 总奖励 = 手动发放 + 自动发放
+	totalReward := manualIssued + autoReward
 
 	return &ChargingWalletSummary{
 		Balance:          balance,
 		BalanceYuan:      float64(balance) / 100,
-		TotalIssued:      totalIssued,
-		TotalIssuedYuan:  float64(totalIssued) / 100,
+		TotalIssued:      manualIssued,
+		TotalIssuedYuan:  float64(manualIssued) / 100,
+		TotalAutoReward:  autoReward,
+		TotalAutoRewardYuan: float64(autoReward) / 100,
+		TotalReward:      totalReward,
+		TotalRewardYuan:  float64(totalReward) / 100,
 	}, nil
 }
 
 // ChargingWalletSummary 充值钱包汇总
 type ChargingWalletSummary struct {
-	Balance         int64   `json:"balance"`           // 当前余额(分)
-	BalanceYuan     float64 `json:"balance_yuan"`      // 当前余额(元)
-	TotalIssued     int64   `json:"total_issued"`      // 已发放奖励总额(分)
-	TotalIssuedYuan float64 `json:"total_issued_yuan"` // 已发放奖励总额(元)
+	Balance             int64   `json:"balance"`               // 当前余额(分)
+	BalanceYuan         float64 `json:"balance_yuan"`          // 当前余额(元)
+	TotalIssued         int64   `json:"total_issued"`          // 手动发放奖励总额(分)
+	TotalIssuedYuan     float64 `json:"total_issued_yuan"`     // 手动发放奖励总额(元)
+	TotalAutoReward     int64   `json:"total_auto_reward"`     // 系统自动奖励总额(分)
+	TotalAutoRewardYuan float64 `json:"total_auto_reward_yuan"` // 系统自动奖励总额(元)
+	TotalReward         int64   `json:"total_reward"`          // 奖励总金额(分)（手动+自动）
+	TotalRewardYuan     float64 `json:"total_reward_yuan"`     // 奖励总金额(元)（手动+自动）
 }
 
 // ========== 辅助方法 ==========

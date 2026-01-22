@@ -237,6 +237,27 @@ func (r *GormTransactionRepository) FindByMerchantID(merchantID int64, startTime
 	return transactions, total, err
 }
 
+// GetTerminalTotalTradeAmount 获取终端累计交易量（分）
+// 用于激活奖励检查
+func (r *GormTransactionRepository) GetTerminalTotalTradeAmount(terminalSN string) (int64, error) {
+	var totalAmount int64
+	err := r.db.Model(&Transaction{}).
+		Select("COALESCE(SUM(amount), 0)").
+		Where("terminal_sn = ? AND trade_type = 1", terminalSN). // trade_type=1 表示消费
+		Scan(&totalAmount).Error
+	return totalAmount, err
+}
+
+// GetTerminalTradeAmountBetween 获取终端指定时间范围内的交易量（分）
+func (r *GormTransactionRepository) GetTerminalTradeAmountBetween(terminalSN string, startTime, endTime time.Time) (int64, error) {
+	var totalAmount int64
+	err := r.db.Model(&Transaction{}).
+		Select("COALESCE(SUM(amount), 0)").
+		Where("terminal_sn = ? AND trade_type = 1 AND trade_time >= ? AND trade_time < ?", terminalSN, startTime, endTime).
+		Scan(&totalAmount).Error
+	return totalAmount, err
+}
+
 // FindByAgentID 分页查询代理商分润记录
 func (r *GormProfitRecordRepository) FindByAgentID(agentID int64, profitType *int16, startTime, endTime *time.Time, limit, offset int) ([]*ProfitRecord, int64, error) {
 	query := r.db.Model(&ProfitRecord{}).Where("agent_id = ? AND is_revoked = false", agentID)

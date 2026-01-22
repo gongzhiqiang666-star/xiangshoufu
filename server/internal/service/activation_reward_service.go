@@ -391,7 +391,7 @@ func (s *ActivationRewardService) BatchCheckTerminalRewards(channelID int64, che
 		}
 
 		// 获取终端累计交易量
-		tradeAmount, err := s.getTerminalTradeAmount(terminal.ID)
+		tradeAmount, err := s.getTerminalTradeAmount(terminal.TerminalSN)
 		if err != nil {
 			log.Printf("[ActivationRewardService] Get trade amount failed for terminal %s: %v",
 				terminal.TerminalSN, err)
@@ -424,8 +424,8 @@ func (s *ActivationRewardService) BatchCheckTerminalRewards(channelID int64, che
 }
 
 // getTerminalTradeAmount 获取终端累计交易量
-func (s *ActivationRewardService) getTerminalTradeAmount(terminalID int64) (int64, error) {
-	// 这里需要根据实际的交易统计逻辑来实现
-	// 简化处理，实际应该调用交易统计服务或仓库方法
-	return 0, nil
+// P0修复：实现实际的交易量查询逻辑
+func (s *ActivationRewardService) getTerminalTradeAmount(terminalSN string) (int64, error) {
+	// 调用交易仓库获取终端累计交易量
+	return s.transactionRepo.GetTerminalTotalTradeAmount(terminalSN)
 }

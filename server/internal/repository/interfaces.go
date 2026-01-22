@@ -92,6 +92,8 @@ type TransactionRepository interface {
 	UpdateProfitStatus(id int64, status int16) error
 	BatchUpdateProfitStatus(ids []int64, status int16) error
 	UpdateRefundStatus(id int64, status int16) error
+	// 激活奖励相关
+	GetTerminalTotalTradeAmount(terminalSN string) (int64, error)
 }
 
 // Transaction 交易模型（简化版，实际应从现有模型导入）

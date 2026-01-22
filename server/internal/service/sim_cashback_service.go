@@ -137,14 +137,14 @@ func (s *SimCashbackService) ProcessSimFee(deviceFee *models.DeviceFee) error {
 			UpperCashback:  lowerCashback,
 			ActualCashback: actualCashback,
 			SourceAgentID:  terminal.OwnerAgentID,
-			WalletType:     4, // 流量费返现钱包
-			WalletStatus:   0, // 待入账
+			WalletType:     models.WalletTypeService, // 服务费钱包（P0修复：原为4充值钱包，应为2服务费钱包）
+			WalletStatus:   0,                        // 待入账
 			CreatedAt:      time.Now(),
 		}
 		cashbackRecords = append(cashbackRecords, record)
 
 		// 获取钱包并记录更新
-		wallet, err := s.walletRepo.FindByAgentAndType(currentAgent.ID, deviceFee.ChannelID, 4)
+		wallet, err := s.walletRepo.FindByAgentAndType(currentAgent.ID, deviceFee.ChannelID, models.WalletTypeService)
 		if err == nil && wallet != nil {
 			walletUpdates[wallet.ID] = actualCashback
 		}

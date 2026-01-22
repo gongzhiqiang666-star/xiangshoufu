@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"xiangshoufu/internal/models"
 	"xiangshoufu/internal/repository"
 )
 
@@ -260,6 +261,14 @@ func (s *WalletService) Withdraw(req *WithdrawRequest) error {
 		return fmt.Errorf("提现金额不能低于%d元", wallet.WithdrawThreshold/100)
 	}
 
+	// P0修复：奖励钱包提现需检查上级充值钱包余额
+	// 业务规则：奖励钱包的资金来源于上级代理商的充值钱包，提现需上级充值钱包有足够余额
+	if wallet.WalletType == models.WalletTypeReward {
+		if err := s.checkParentChargingWalletBalance(req.AgentID, req.Amount); err != nil {
+			return err
+		}
+	}
+
 	// 冻结金额
 	if err := s.walletRepo.FreezeBalance(req.WalletID, req.Amount); err != nil {
 		return fmt.Errorf("冻结金额失败: %w", err)
@@ -282,6 +291,36 @@ func (s *WalletService) Withdraw(req *WithdrawRequest) error {
 	log.Printf("[WalletService] Withdraw request: agent=%d, wallet=%d, amount=%d", req.AgentID, req.WalletID, req.Amount)
 
 	// TODO: 创建提现记录，等待审核/自动打款
+
+	return nil
+}
+
+// checkParentChargingWalletBalance 检查上级充值钱包余额是否足够
+// 业务规则：奖励钱包提现时，需要确保上级充值钱包余额 >= 提现金额
+func (s *WalletService) checkParentChargingWalletBalance(agentID int64, amount int64) error {
+	// 获取代理商信息
+	agent, err := s.agentRepo.FindByIDFull(agentID)
+	if err != nil || agent == nil {
+		return errors.New("代理商信息不存在")
+	}
+
+	// 检查是否有上级
+	if agent.ParentID == 0 {
+		return errors.New("顶级代理商无法从奖励钱包提现")
+	}
+
+	// 获取上级充值钱包
+	parentChargingWallet, err := s.walletRepo.FindByAgentAndType(agent.ParentID, 0, models.WalletTypeCharging)
+	if err != nil || parentChargingWallet == nil {
+		return errors.New("上级充值钱包不存在，无法提现")
+	}
+
+	// 检查上级充值钱包可用余额
+	parentAvailable := parentChargingWallet.Balance - parentChargingWallet.FrozenAmount
+	if parentAvailable < amount {
+		return fmt.Errorf("上级充值钱包余额不足，无法提现。上级可用余额：%.2f元，提现金额：%.2f元",
+			float64(parentAvailable)/100, float64(amount)/100)
+	}
 
 	return nil
 }
