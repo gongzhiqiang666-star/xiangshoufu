@@ -177,6 +177,9 @@ func main() {
 		deductionService,
 	)
 
+	// 9.1 将货款代扣服务注入到终端划拨服务
+	terminalDistributeService.SetGoodsDeductionService(goodsDeductionService)
+
 	terminalService := service.NewTerminalService(
 		terminalRepo,
 		terminalRecallRepo,

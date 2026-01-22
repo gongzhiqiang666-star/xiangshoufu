@@ -187,9 +187,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage>
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.inbox_outlined, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
+            Icon(Icons.inbox_outlined, size: 48, color: Colors.grey),
+            SizedBox(height: 12),
             Text('暂无终端数据', style: TextStyle(color: Colors.grey)),
           ],
         ),

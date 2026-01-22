@@ -3,6 +3,9 @@ import '../../../../core/network/api_client.dart';
 import '../../data/models/auth_model.dart';
 import '../../data/services/auth_service.dart';
 
+// 导出 AuthState 供其他文件使用
+export '../../data/models/auth_model.dart' show AuthState, UserInfo;
+
 /// AuthService Provider
 final authServiceProvider = Provider<AuthService>((ref) {
   final apiClient = ref.watch(apiClientProvider);

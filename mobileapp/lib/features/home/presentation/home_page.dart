@@ -138,7 +138,7 @@ class _HomePageState extends State<HomePage> {
         crossAxisCount: 2,
         crossAxisSpacing: AppSpacing.cardGap,
         mainAxisSpacing: AppSpacing.cardGap,
-        childAspectRatio: 1.3,
+        childAspectRatio: 1.6,
         children: [
           _buildProfitCard('交易分润', 856.00, AppColors.profitTrade, Icons.swap_horiz),
           _buildProfitCard('押金返现', 150.00, AppColors.profitDeposit, Icons.monetization_on_outlined),

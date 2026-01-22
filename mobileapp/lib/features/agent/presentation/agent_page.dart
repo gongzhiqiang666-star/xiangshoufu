@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../router/app_router.dart';
 import '../data/models/agent_model.dart';
 import 'providers/agent_provider.dart';
 
@@ -678,8 +679,8 @@ class _AgentPageState extends ConsumerState<AgentPage>
 
     return InkWell(
       onTap: () {
-        // TODO: 跳转到代理详情
-        _showSnackBar('代理详情功能开发中');
+        // 跳转到代理详情
+        context.push('/agent/${agent.id}');
       },
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.md),
@@ -750,45 +751,69 @@ class _AgentPageState extends ConsumerState<AgentPage>
                 ],
               ),
             ),
-            // 统计
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.person, size: 14, color: AppColors.textTertiary),
-                    const SizedBox(width: 2),
-                    Text(
-                      '${agent.directAgentCount}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
+            // 操作菜单
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, size: 20, color: AppColors.textTertiary),
+              onSelected: (value) => _handleAgentAction(value, agent),
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'policy',
+                  child: Row(
+                    children: [
+                      Icon(Icons.policy_outlined, size: 18, color: AppColors.primary),
+                      SizedBox(width: 8),
+                      Text('设置政策'),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(Icons.store, size: 14, color: AppColors.textTertiary),
-                    const SizedBox(width: 2),
-                    Text(
-                      '${agent.directMerchantCount}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
+                const PopupMenuItem(
+                  value: 'channels',
+                  child: Row(
+                    children: [
+                      Icon(Icons.account_tree_outlined, size: 18, color: AppColors.info),
+                      SizedBox(width: 8),
+                      Text('通道政策'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'detail',
+                  child: Row(
+                    children: [
+                      Icon(Icons.person_outline, size: 18, color: AppColors.textSecondary),
+                      SizedBox(width: 8),
+                      Text('查看详情'),
+                    ],
+                  ),
                 ),
               ],
             ),
-            const SizedBox(width: 4),
-            const Icon(Icons.chevron_right, size: 20, color: AppColors.textTertiary),
           ],
         ),
       ),
     );
+  }
+
+  void _handleAgentAction(String action, AgentInfo agent) {
+    switch (action) {
+      case 'policy':
+        // 跳转到设置政策页面
+        context.push(
+          '/agent/${agent.id}/policy',
+          extra: {
+            'name': agent.agentName,
+          },
+        );
+        break;
+      case 'channels':
+        // 跳转到通道政策页面
+        context.push('/agent/${agent.id}/channels');
+        break;
+      case 'detail':
+        // 跳转到代理详情
+        context.push('/agent/${agent.id}');
+        break;
+    }
   }
 
   Widget _buildActionButton({
