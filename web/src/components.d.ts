@@ -72,6 +72,7 @@ declare module 'vue' {
     LineChart: typeof import('./components/Charts/LineChart.vue')['default']
     PageHeader: typeof import('./components/Common/PageHeader.vue')['default']
     PieChart: typeof import('./components/Charts/PieChart.vue')['default']
+    PolicyAssignDialog: typeof import('./components/Policy/PolicyAssignDialog.vue')['default']
     ProTable: typeof import('./components/Common/ProTable.vue')['default']
     RateEditDialog: typeof import('./components/Merchant/RateEditDialog.vue')['default']
     RateStageEditor: typeof import('./components/Policy/RateStageEditor.vue')['default']

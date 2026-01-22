@@ -103,3 +103,25 @@ export function applyPolicyToAgent(
 export function getChannelDefaultTemplate(channelId: number): Promise<PolicyTemplate | null> {
   return get<PolicyTemplate | null>(`/v1/policies/channels/${channelId}/default`)
 }
+
+/**
+ * 分配政策给代理商（带费率调整）
+ */
+export function assignAgentPolicy(
+  agentId: number,
+  data: {
+    channel_id: number
+    template_id: number
+    credit_rate: number
+    debit_rate: number
+  }
+): Promise<void> {
+  return post<void>(`/v1/agents/${agentId}/policies`, data)
+}
+
+/**
+ * 根据通道ID获取政策模板列表
+ */
+export function getTemplatesByChannel(channelId: number): Promise<PolicyTemplate[]> {
+  return get<PolicyTemplate[]>('/v1/policies/templates', { channel_id: channelId })
+}

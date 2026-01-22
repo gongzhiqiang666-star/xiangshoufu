@@ -2,6 +2,13 @@ import { get, post } from './request'
 import type { AgentChannel, AgentChannelStats } from '@/types'
 
 /**
+ * 获取所有可用通道列表（用于选择器）
+ */
+export function getChannels(): Promise<{ id: number; channel_code: string; channel_name: string }[]> {
+  return get<{ id: number; channel_code: string; channel_name: string }[]>('/v1/channels')
+}
+
+/**
  * 获取代理商通道列表
  */
 export function getAgentChannels(agentId?: number): Promise<AgentChannel[]> {

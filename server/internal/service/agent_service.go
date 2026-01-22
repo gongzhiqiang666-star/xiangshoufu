@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"xiangshoufu/internal/repository"
+	"xiangshoufu/pkg/qrcode"
 )
 
 // AgentService 代理商服务
@@ -16,6 +17,7 @@ type AgentService struct {
 	agentPolicyRepo *repository.GormAgentPolicyRepository
 	walletRepo      *repository.GormWalletRepository
 	transactionRepo *repository.GormTransactionRepository
+	qrCodeGenerator *qrcode.Generator
 }
 
 // NewAgentService 创建代理商服务
@@ -30,6 +32,7 @@ func NewAgentService(
 		agentPolicyRepo: agentPolicyRepo,
 		walletRepo:      walletRepo,
 		transactionRepo: transactionRepo,
+		qrCodeGenerator: qrcode.NewGenerator(nil), // 使用默认配置
 	}
 }
 
@@ -348,6 +351,15 @@ func (s *AgentService) GetInviteCode(agentID int64) (string, string, error) {
 		s.agentRepo.Update(agent)
 	}
 
+	// 如果没有二维码URL，生成二维码
+	if agent.QRCodeURL == "" {
+		_, qrCodeURL, err := s.qrCodeGenerator.GenerateInviteQRCode(agent.InviteCode, agent.ID)
+		if err == nil && qrCodeURL != "" {
+			agent.QRCodeURL = qrCodeURL
+			s.agentRepo.Update(agent)
+		}
+	}
+
 	return agent.InviteCode, agent.QRCodeURL, nil
 }
 
@@ -491,6 +503,125 @@ func (s *AgentService) CreateAgent(req *CreateAgentRequest, operatorID int64) (*
 	return s.GetAgentDetail(agent.ID)
 }
 
+// CreateAgentWithStatus 创建代理商（指定状态，用于邀请码注册）
+// status: 1正常 2禁用 3待审核
+// password: 注册时设置的密码（用于创建登录账号）
+func (s *AgentService) CreateAgentWithStatus(req *CreateAgentRequest, operatorID int64, status int16, password string) (*AgentDetailResponse, error) {
+	// 验证手机号唯一性
+	existing, _ := s.agentRepo.FindByPhone(req.ContactPhone)
+	if existing != nil {
+		return nil, errors.New("该手机号已被注册")
+	}
+
+	// 获取上级代理商信息（如果有）
+	var parentAgent *repository.AgentFull
+	var path string
+	var level int = 1
+
+	if req.ParentID > 0 {
+		var err error
+		parentAgent, err = s.agentRepo.FindByIDFull(req.ParentID)
+		if err != nil || parentAgent == nil {
+			return nil, errors.New("上级代理商不存在")
+		}
+		level = parentAgent.Level + 1
+		// 限制最大层级为10
+		if level > 10 {
+			return nil, errors.New("代理商层级不能超过10级")
+		}
+	}
+
+	// 生成代理商编号
+	agentNo := s.generateAgentNo()
+
+	// 创建代理商对象
+	now := time.Now()
+	agent := &repository.AgentFull{
+		Agent: repository.Agent{
+			AgentNo:     agentNo,
+			AgentName:   req.AgentName,
+			ParentID:    req.ParentID,
+			Level:       level,
+			DefaultRate: "0.0060", // 默认费率0.60%
+			Status:      status,   // 使用指定的状态
+		},
+		ContactName:  req.ContactName,
+		ContactPhone: req.ContactPhone,
+		IDCardNo:     req.IDCardNo,
+		BankName:     req.BankName,
+		BankAccount:  req.BankAccount,
+		BankCardNo:   req.BankCardNo,
+		RegisterTime: now,
+		CreatedAt:    now,
+	}
+
+	// 创建代理商
+	if err := s.agentRepo.Create(agent); err != nil {
+		return nil, fmt.Errorf("创建代理商失败: %w", err)
+	}
+
+	// 构建物化路径
+	if parentAgent != nil {
+		path = fmt.Sprintf("%s%d/", parentAgent.Path, agent.ID)
+	} else {
+		path = fmt.Sprintf("/%d/", agent.ID)
+	}
+	agent.Path = path
+
+	// 生成邀请码
+	agent.InviteCode = generateInviteCode(agent.ID)
+
+	// 更新路径和邀请码
+	if err := s.agentRepo.Update(agent); err != nil {
+		return nil, fmt.Errorf("更新代理商路径失败: %w", err)
+	}
+
+	// 更新上级代理商的统计计数
+	if parentAgent != nil {
+		s.agentRepo.IncrementDirectAgentCount(parentAgent.ID)
+		// 更新所有祖先的团队代理商计数
+		ancestors, _ := s.agentRepo.FindAncestors(agent.ID)
+		for _, ancestor := range ancestors {
+			s.agentRepo.IncrementTeamAgentCount(ancestor.ID)
+		}
+
+		// 继承上级代理商的政策模板（状态设为待调整）
+		s.inheritParentPolicies(parentAgent.ID, agent.ID)
+	}
+
+	log.Printf("[AgentService] Created agent via invite code: %s (%d) status=%d", agentNo, agent.ID, status)
+
+	return s.GetAgentDetail(agent.ID)
+}
+
+// inheritParentPolicies 继承上级代理商的政策
+// 复制上级的 AgentPolicy 记录到新代理商，费率需要上级调整后审核通过
+func (s *AgentService) inheritParentPolicies(parentID, newAgentID int64) {
+	// 获取上级代理商的所有政策
+	parentPolicies, err := s.agentPolicyRepo.FindByAgentID(parentID)
+	if err != nil || len(parentPolicies) == 0 {
+		log.Printf("[AgentService] No policies to inherit from parent %d", parentID)
+		return
+	}
+
+	// 复制政策到新代理商
+	for _, policy := range parentPolicies {
+		newPolicy := &repository.AgentPolicy{
+			AgentID:    newAgentID,
+			ChannelID:  policy.ChannelID,
+			TemplateID: policy.TemplateID,
+			CreditRate: policy.CreditRate, // 继承上级费率，上级需要调整后审核
+			DebitRate:  policy.DebitRate,
+		}
+		// 创建新政策记录
+		if err := s.agentPolicyRepo.Create(newPolicy); err != nil {
+			log.Printf("[AgentService] Failed to inherit policy for channel %d: %v", policy.ChannelID, err)
+		} else {
+			log.Printf("[AgentService] Inherited policy from parent %d to agent %d for channel %d", parentID, newAgentID, policy.ChannelID)
+		}
+	}
+}
+
 // generateAgentNo 生成代理商编号
 func (s *AgentService) generateAgentNo() string {
 	// 格式: A + 年月日 + 4位序号，如 A202501200001
@@ -540,6 +671,7 @@ type RegisterByInviteCodeRequest struct {
 }
 
 // RegisterByInviteCode 通过邀请码注册代理商
+// 注册后状态为"待审核"(status=3)，需上级审核通过后才能使用
 func (s *AgentService) RegisterByInviteCode(req *RegisterByInviteCodeRequest) (*AgentDetailResponse, error) {
 	// 查找邀请码对应的代理商
 	inviter, err := s.agentRepo.FindByInviteCode(req.InviteCode)
@@ -551,7 +683,7 @@ func (s *AgentService) RegisterByInviteCode(req *RegisterByInviteCodeRequest) (*
 		return nil, errors.New("邀请人账号已被禁用")
 	}
 
-	// 使用创建代理商的逻辑
+	// 使用创建代理商的逻辑（自注册模式，状态为待审核）
 	createReq := &CreateAgentRequest{
 		AgentName:    req.AgentName,
 		ContactName:  req.ContactName,
@@ -560,7 +692,7 @@ func (s *AgentService) RegisterByInviteCode(req *RegisterByInviteCodeRequest) (*
 		ParentID:     inviter.ID,
 	}
 
-	return s.CreateAgent(createReq, 0) // 0表示自注册
+	return s.CreateAgentWithStatus(createReq, 0, 3, req.Password) // 0表示自注册, 3表示待审核状态
 }
 
 // SearchAgentsRequest 搜索代理商请求

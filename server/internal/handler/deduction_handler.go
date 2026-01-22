@@ -304,20 +304,6 @@ func RegisterDeductionRoutes(r *gin.RouterGroup, h *DeductionHandler) {
 	}
 }
 
-// getCurrentUserID 获取当前用户ID（从context中获取）
-func getCurrentUserID(c *gin.Context) int64 {
-	// 从JWT或session中获取用户ID
-	// 这里简化处理，实际应该从认证中间件中获取
-	userID, exists := c.Get("user_id")
-	if !exists {
-		return 0
-	}
-	if id, ok := userID.(int64); ok {
-		return id
-	}
-	return 0
-}
-
 // DeductionPlanTypeDesc 代扣计划类型描述
 func DeductionPlanTypeDesc(planType int16) string {
 	switch planType {

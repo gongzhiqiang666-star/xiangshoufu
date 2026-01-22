@@ -93,6 +93,11 @@
           <!-- 政策模板Tab -->
           <el-tab-pane label="政策模板" name="policy">
             <div class="tab-content">
+              <div class="tab-toolbar">
+                <el-button type="primary" @click="showPolicyAssignDialog = true">
+                  分配政策
+                </el-button>
+              </div>
               <el-table v-if="policies.length > 0" :data="policies" style="width: 100%">
                 <el-table-column prop="channel_name" label="通道名称" width="150" />
                 <el-table-column prop="template_name" label="政策模板" width="180" />
@@ -424,6 +429,14 @@
         </el-tabs>
       </el-card>
     </div>
+
+    <!-- 政策分配弹窗 -->
+    <PolicyAssignDialog
+      v-model="showPolicyAssignDialog"
+      :agent-id="agentId"
+      :agent-name="agentDetail?.agent_name || ''"
+      @success="handlePolicyAssignSuccess"
+    />
   </div>
 </template>
 
@@ -432,6 +445,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PageHeader from '@/components/Common/PageHeader.vue'
+import PolicyAssignDialog from '@/components/Policy/PolicyAssignDialog.vue'
 import {
   getAgentDetail,
   getAgentPolicies,
@@ -458,6 +472,7 @@ const router = useRouter()
 const loading = ref(false)
 const agentDetail = ref<AgentDetail | null>(null)
 const activeTab = ref('policy')
+const showPolicyAssignDialog = ref(false)
 
 // 获取代理商ID
 const agentId = Number(route.params.id)
@@ -702,6 +717,11 @@ function viewAgent(id: number) {
 // 查看商户
 function viewMerchant(id: number) {
   router.push(`/merchants/${id}`)
+}
+
+// 政策分配成功回调
+function handlePolicyAssignSuccess() {
+  fetchPolicies()
 }
 
 // 辅助函数

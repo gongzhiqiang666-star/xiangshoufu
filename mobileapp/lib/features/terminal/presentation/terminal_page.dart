@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../agent/presentation/providers/agent_provider.dart';
 import '../domain/models/terminal.dart';
 import 'providers/terminal_provider.dart';
 
@@ -328,10 +329,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage>
               title: const Text('查看详情'),
               onTap: () {
                 Navigator.pop(context);
-                // TODO: 跳转到详情页
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('详情页开发中...')),
-                );
+                context.push('/terminal/${terminal.terminalSn}');
               },
             ),
             if (terminal.canDistribute)
@@ -428,7 +426,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage>
   void _showRecallDialog(List<Terminal> terminals) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('终端回拨'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -444,21 +442,88 @@ class _TerminalPageState extends ConsumerState<TerminalPage>
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('取消'),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // TODO: 实现回拨功能，需要选择上级代理商
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('回拨功能需要选择上级代理商，暂未完整实现')),
-              );
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await _executeRecall(terminals);
             },
             child: const Text('确认回拨'),
           ),
         ],
       ),
+    );
+  }
+
+  /// 执行回拨操作
+  Future<void> _executeRecall(List<Terminal> terminals) async {
+    // 获取当前代理商信息，获取上级代理商ID
+    final myProfileAsync = ref.read(myProfileProvider);
+
+    await myProfileAsync.when(
+      data: (agentDetail) async {
+        // 检查是否有上级代理商
+        if (agentDetail.parentId == null || agentDetail.parentId == 0) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('您是顶级代理商，无法回拨'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+          return;
+        }
+
+        // 执行回拨
+        final success = await ref.read(terminalRecallProvider.notifier).batchRecall(
+          toAgentId: agentDetail.parentId!,
+          terminalSns: terminals.map((t) => t.terminalSn).toList(),
+        );
+
+        if (mounted) {
+          final recallState = ref.read(terminalRecallProvider);
+          if (success) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('回拨成功，共${recallState.successCount}台终端'),
+                backgroundColor: AppColors.success,
+              ),
+            );
+            // 清空选中状态
+            ref.read(selectedTerminalsProvider.notifier).state = [];
+          } else if (recallState.failedCount > 0) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('部分回拨失败: 成功${recallState.successCount}台, 失败${recallState.failedCount}台'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('回拨失败: ${recallState.error ?? "未知错误"}'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      },
+      loading: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('正在获取代理商信息...')),
+        );
+      },
+      error: (error, stack) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('获取代理商信息失败: $error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      },
     );
   }
 }

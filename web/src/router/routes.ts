@@ -386,6 +386,85 @@ export const privateRoutes: RouteRecordRaw[] = [
           },
         ],
       },
+      // 营销管理
+      {
+        path: 'marketing',
+        name: 'Marketing',
+        redirect: '/marketing/banners',
+        meta: {
+          title: '营销管理',
+          icon: 'Picture',
+        },
+        children: [
+          {
+            path: 'banners',
+            name: 'BannerList',
+            component: () => import('@/views/marketing/BannerListView.vue'),
+            meta: {
+              title: '滚动图管理',
+              breadcrumb: [{ title: '首页' }, { title: '营销管理' }, { title: '滚动图管理' }],
+            },
+          },
+          {
+            path: 'banners/create',
+            name: 'BannerCreate',
+            component: () => import('@/views/marketing/BannerFormView.vue'),
+            meta: {
+              title: '新增滚动图',
+              hidden: true,
+              breadcrumb: [{ title: '首页' }, { title: '营销管理' }, { title: '新增滚动图' }],
+            },
+          },
+          {
+            path: 'banners/:id/edit',
+            name: 'BannerEdit',
+            component: () => import('@/views/marketing/BannerFormView.vue'),
+            meta: {
+              title: '编辑滚动图',
+              hidden: true,
+              breadcrumb: [{ title: '首页' }, { title: '营销管理' }, { title: '编辑滚动图' }],
+            },
+          },
+          {
+            path: 'posters',
+            name: 'PosterList',
+            component: () => import('@/views/marketing/PosterListView.vue'),
+            meta: {
+              title: '海报管理',
+              breadcrumb: [{ title: '首页' }, { title: '营销管理' }, { title: '海报管理' }],
+            },
+          },
+          {
+            path: 'posters/create',
+            name: 'PosterCreate',
+            component: () => import('@/views/marketing/PosterFormView.vue'),
+            meta: {
+              title: '新增海报',
+              hidden: true,
+              breadcrumb: [{ title: '首页' }, { title: '营销管理' }, { title: '新增海报' }],
+            },
+          },
+          {
+            path: 'posters/:id/edit',
+            name: 'PosterEdit',
+            component: () => import('@/views/marketing/PosterFormView.vue'),
+            meta: {
+              title: '编辑海报',
+              hidden: true,
+              breadcrumb: [{ title: '首页' }, { title: '营销管理' }, { title: '编辑海报' }],
+            },
+          },
+          {
+            path: 'poster-categories',
+            name: 'PosterCategories',
+            component: () => import('@/views/marketing/PosterCategoryView.vue'),
+            meta: {
+              title: '海报分类',
+              breadcrumb: [{ title: '首页' }, { title: '营销管理' }, { title: '海报分类' }],
+            },
+          },
+        ],
+      },
       // 系统管理
       {
         path: 'system',

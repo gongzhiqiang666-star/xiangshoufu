@@ -260,6 +260,11 @@ func (r *GormAgentPolicyRepository) FindByAgentID(agentID int64) ([]*AgentPolicy
 	return policies, err
 }
 
+// Create 创建代理商政策
+func (r *GormAgentPolicyRepository) Create(policy *AgentPolicy) error {
+	return r.db.Create(policy).Error
+}
+
 // 确保实现了接口
 var _ AgentPolicyRepository = (*GormAgentPolicyRepository)(nil)
 

@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../agent/data/models/agent_model.dart';
+import '../../agent/presentation/providers/agent_provider.dart';
+import 'providers/terminal_provider.dart';
 
 /// 终端划拨页面
-class TerminalTransferPage extends StatefulWidget {
+class TerminalTransferPage extends ConsumerStatefulWidget {
   final List<String> selectedSNs;
 
   const TerminalTransferPage({
@@ -11,14 +16,26 @@ class TerminalTransferPage extends StatefulWidget {
   });
 
   @override
-  State<TerminalTransferPage> createState() => _TerminalTransferPageState();
+  ConsumerState<TerminalTransferPage> createState() => _TerminalTransferPageState();
 }
 
-class _TerminalTransferPageState extends State<TerminalTransferPage> {
-  String? _selectedAgentId;
+class _TerminalTransferPageState extends ConsumerState<TerminalTransferPage> {
+  int? _selectedAgentId;
+  String? _selectedAgentName;
   bool _enableCargoDeduction = false;
   double _unitPrice = 50.0;
   final Set<String> _selectedWallets = {'profit'};
+  String _searchKeyword = '';
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // 加载下级代理商列表
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(subordinatesProvider.notifier).loadSubordinates(refresh: true);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,11 +100,17 @@ class _TerminalTransferPageState extends State<TerminalTransferPage> {
   }
 
   Widget _buildAgentSelector() {
-    final agents = [
-      {'id': 'A002', 'name': '李四', 'phone': '139****9999'},
-      {'id': 'A003', 'name': '王五', 'phone': '137****7777'},
-      {'id': 'A004', 'name': '赵六', 'phone': '136****6666'},
-    ];
+    final subordinatesState = ref.watch(subordinatesProvider);
+
+    // 根据搜索关键词过滤代理商列表
+    final filteredAgents = _searchKeyword.isEmpty
+        ? subordinatesState.list
+        : subordinatesState.list.where((agent) {
+            final keyword = _searchKeyword.toLowerCase();
+            return agent.agentName.toLowerCase().contains(keyword) ||
+                agent.agentNo.toLowerCase().contains(keyword) ||
+                agent.contactPhone.contains(keyword);
+          }).toList();
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -119,29 +142,83 @@ class _TerminalTransferPageState extends State<TerminalTransferPage> {
               ),
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             ),
+            onChanged: (value) {
+              setState(() {
+                _searchKeyword = value;
+              });
+            },
           ),
           const SizedBox(height: 12),
-          Text(
-            '直属下级代理商',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '直属下级代理商',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              if (subordinatesState.isLoading)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+            ],
           ),
           const SizedBox(height: 8),
-          ...agents.map((agent) => _buildAgentItem(agent)),
+          if (subordinatesState.error != null)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '加载失败: ${subordinatesState.error}',
+                      style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      ref.read(subordinatesProvider.notifier).loadSubordinates(refresh: true);
+                    },
+                    child: const Text('重试'),
+                  ),
+                ],
+              ),
+            )
+          else if (filteredAgents.isEmpty && !subordinatesState.isLoading)
+            Container(
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: Text(
+                  _searchKeyword.isEmpty ? '暂无直属下级代理商' : '未找到匹配的代理商',
+                  style: TextStyle(color: AppColors.textTertiary),
+                ),
+              ),
+            )
+          else
+            ...filteredAgents.map((agent) => _buildAgentItem(agent)),
         ],
       ),
     );
   }
 
-  Widget _buildAgentItem(Map<String, String> agent) {
-    final isSelected = _selectedAgentId == agent['id'];
+  Widget _buildAgentItem(AgentInfo agent) {
+    final isSelected = _selectedAgentId == agent.id;
 
     return GestureDetector(
       onTap: () {
         setState(() {
-          _selectedAgentId = agent['id'];
+          _selectedAgentId = agent.id;
+          _selectedAgentName = agent.agentName;
         });
       },
       child: Container(
@@ -167,7 +244,7 @@ class _TerminalTransferPageState extends State<TerminalTransferPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${agent['name']} (${agent['id']})',
+                    '${agent.agentName} (${agent.agentNo})',
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
@@ -176,7 +253,7 @@ class _TerminalTransferPageState extends State<TerminalTransferPage> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '手机: ${agent['phone']}',
+                    '手机: ${_maskPhone(agent.contactPhone)}',
                     style: TextStyle(
                       fontSize: 13,
                       color: AppColors.textSecondary,
@@ -197,6 +274,14 @@ class _TerminalTransferPageState extends State<TerminalTransferPage> {
         ),
       ),
     );
+  }
+
+  /// 手机号脱敏显示
+  String _maskPhone(String phone) {
+    if (phone.length >= 11) {
+      return '${phone.substring(0, 3)}****${phone.substring(7)}';
+    }
+    return phone;
   }
 
   Widget _buildCargoDeductionSettings() {
@@ -310,7 +395,7 @@ class _TerminalTransferPageState extends State<TerminalTransferPage> {
       child: Row(
         children: [
           Icon(Icons.warning_amber, color: AppColors.warning, size: 20),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               'APP仅支持划拨给直属下级',
@@ -344,13 +429,117 @@ class _TerminalTransferPageState extends State<TerminalTransferPage> {
         ],
       ),
       child: ElevatedButton(
-        onPressed: _selectedAgentId != null ? _handleTransfer : null,
-        child: const Text('确认划拨'),
+        onPressed: (_selectedAgentId != null && !_isSubmitting) ? _handleTransfer : null,
+        child: _isSubmitting
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+            : const Text('确认划拨'),
       ),
     );
   }
 
-  void _handleTransfer() {
-    // TODO: 执行划拨操作
+  void _handleTransfer() async {
+    if (_selectedAgentId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请选择下级代理商')),
+      );
+      return;
+    }
+
+    // 确认对话框
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认划拨'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('确定要将 ${widget.selectedSNs.length} 台终端划拨给 $_selectedAgentName 吗？'),
+            if (_enableCargoDeduction) ...[
+              const SizedBox(height: 8),
+              Text(
+                '货款代扣: ¥${(_unitPrice * widget.selectedSNs.length).toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('确认'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      // 计算货款金额（分）
+      final goodsPrice = _enableCargoDeduction ? (_unitPrice * 100).toInt() : 0;
+      // 代扣类型: 1=一次性, 2=分期, 3=货款代扣
+      final deductionType = _enableCargoDeduction ? 3 : 1;
+
+      final successCount = await ref.read(terminalDistributeProvider.notifier).batchDistribute(
+        toAgentId: _selectedAgentId!,
+        terminalSns: widget.selectedSNs,
+        channelId: 1, // 默认通道ID，后续可从终端信息获取
+        goodsPrice: goodsPrice,
+        deductionType: deductionType,
+      );
+
+      if (mounted) {
+        if (successCount > 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('划拨成功，共${successCount}台终端'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          // 清空选中状态
+          ref.read(selectedTerminalsProvider.notifier).state = [];
+          // 返回上一页
+          context.pop(true);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('划拨失败，请稍后重试'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('划拨失败: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 }

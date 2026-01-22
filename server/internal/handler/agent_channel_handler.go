@@ -378,19 +378,53 @@ func (h *AgentChannelHandler) InitAgentChannels(c *gin.Context) {
 	})
 }
 
+// GetAllChannels 获取所有可用通道列表
+// @Summary 获取所有可用通道列表
+// @Description 获取系统中所有可用的支付通道列表
+// @Tags 通道管理
+// @Produce json
+// @Security ApiKeyAuth
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/channels [get]
+func (h *AgentChannelHandler) GetAllChannels(c *gin.Context) {
+	channels, err := h.agentChannelService.GetAllChannels()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "获取通道列表失败",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    channels,
+	})
+}
+
 // RegisterAgentChannelRoutes 注册代理商通道路由
 func RegisterAgentChannelRoutes(router *gin.RouterGroup, handler *AgentChannelHandler, authService *service.AuthService) {
-	channels := router.Group("/agent-channels")
+	// 通道列表（需要认证）
+	channels := router.Group("/channels")
 	channels.Use(middleware.AuthMiddleware(authService))
 	{
-		channels.GET("", handler.GetAgentChannels)
-		channels.GET("/enabled", handler.GetEnabledChannels)
-		channels.GET("/stats", handler.GetAgentChannelStats)
-		channels.POST("/enable", handler.EnableChannel)
-		channels.POST("/disable", handler.DisableChannel)
-		channels.POST("/visibility", handler.SetChannelVisibility)
-		channels.POST("/batch-enable", handler.BatchEnableChannels)
-		channels.POST("/batch-disable", handler.BatchDisableChannels)
-		channels.POST("/init", handler.InitAgentChannels)
+		channels.GET("", handler.GetAllChannels)
+	}
+
+	// 代理商通道管理
+	agentChannels := router.Group("/agent-channels")
+	agentChannels.Use(middleware.AuthMiddleware(authService))
+	{
+		agentChannels.GET("", handler.GetAgentChannels)
+		agentChannels.GET("/enabled", handler.GetEnabledChannels)
+		agentChannels.GET("/stats", handler.GetAgentChannelStats)
+		agentChannels.POST("/enable", handler.EnableChannel)
+		agentChannels.POST("/disable", handler.DisableChannel)
+		agentChannels.POST("/visibility", handler.SetChannelVisibility)
+		agentChannels.POST("/batch-enable", handler.BatchEnableChannels)
+		agentChannels.POST("/batch-disable", handler.BatchDisableChannels)
+		agentChannels.POST("/init", handler.InitAgentChannels)
 	}
 }

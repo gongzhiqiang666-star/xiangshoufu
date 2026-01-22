@@ -226,6 +226,7 @@ func main() {
 
 	// 15. 初始化PC端新增Handler
 	authHandler := handler.NewAuthHandler(authService)
+	authHandler.SetAgentService(agentService) // 注入代理商服务用于公开注册接口
 	agentHandler := handler.NewAgentHandler(agentService)
 	walletHandler := handler.NewWalletHandler(walletService)
 	transactionHandler := handler.NewTransactionHandler(transactionRepo)
@@ -333,6 +334,23 @@ func main() {
 	taxChannelService := service.NewTaxChannelService(taxChannelRepo)
 	taxChannelHandler := handler.NewTaxChannelHandler(taxChannelService)
 
+	// 20.5 初始化营销模块（Banner、海报）
+	bannerRepo := repository.NewGormBannerRepository(db)
+	posterRepo := repository.NewGormPosterRepository(db)
+	posterCategoryRepo := repository.NewGormPosterCategoryRepository(db)
+	uploadedFileRepo := repository.NewGormUploadedFileRepository(db)
+
+	// 上传服务配置
+	uploadDir := "./uploads"     // 上传目录
+	uploadBaseURL := "/uploads"  // 访问基础URL
+	uploadService := service.NewUploadService(uploadedFileRepo, uploadDir, uploadBaseURL)
+	bannerService := service.NewBannerService(bannerRepo)
+	posterService := service.NewPosterService(posterRepo, posterCategoryRepo)
+
+	uploadHandler := handler.NewUploadHandler(uploadService)
+	bannerHandler := handler.NewBannerHandler(bannerService)
+	posterHandler := handler.NewPosterHandler(posterService)
+
 	// 21. 初始化政策Handler
 	policyHandler := handler.NewPolicyHandler(policyTemplateRepo, agentPolicyRepo, policyService)
 
@@ -363,6 +381,7 @@ func main() {
 		adminMessageHandler,
 		merchantHandler, terminalHandler, policyHandler, agentChannelHandler,
 		chargingWalletHandler, settlementWalletHandler, taxChannelHandler,
+		uploadHandler, bannerHandler, posterHandler,
 		authService, metricsService, config.SwaggerEnabled,
 	)
 
@@ -587,6 +606,9 @@ func setupRouter(
 	chargingWalletHandler *handler.ChargingWalletHandler,
 	settlementWalletHandler *handler.SettlementWalletHandler,
 	taxChannelHandler *handler.TaxChannelHandler,
+	uploadHandler *handler.UploadHandler,
+	bannerHandler *handler.BannerHandler,
+	posterHandler *handler.PosterHandler,
 	authService *service.AuthService,
 	metricsService *service.MetricsService,
 	swaggerEnabled bool,
@@ -673,6 +695,11 @@ func setupRouter(
 		handler.RegisterChargingWalletRoutes(apiV1, chargingWalletHandler, authService)
 		handler.RegisterSettlementWalletRoutes(apiV1, settlementWalletHandler, authService)
 		handler.RegisterTaxChannelRoutes(apiV1, taxChannelHandler, authService)
+
+		// 注册营销模块路由（Banner、海报、上传）
+		handler.RegisterUploadRoutes(apiV1, uploadHandler, authService)
+		handler.RegisterBannerRoutes(apiV1, bannerHandler, authService)
+		handler.RegisterPosterRoutes(apiV1, posterHandler, authService)
 	}
 
 	// Swagger UI (可通过环境变量关闭)

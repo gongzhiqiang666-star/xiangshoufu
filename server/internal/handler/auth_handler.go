@@ -11,7 +11,8 @@ import (
 
 // AuthHandler 认证处理器
 type AuthHandler struct {
-	authService *service.AuthService
+	authService  *service.AuthService
+	agentService *service.AgentService
 }
 
 // NewAuthHandler 创建认证处理器
@@ -19,6 +20,11 @@ func NewAuthHandler(authService *service.AuthService) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
 	}
+}
+
+// SetAgentService 设置代理商服务（延迟注入，避免循环依赖）
+func (h *AuthHandler) SetAgentService(agentService *service.AgentService) {
+	h.agentService = agentService
 }
 
 // LoginRequest 登录请求
@@ -220,6 +226,69 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	})
 }
 
+// RegisterRequest 公开注册请求
+type RegisterRequest struct {
+	InviteCode   string `json:"invite_code" binding:"required"`
+	AgentName    string `json:"agent_name" binding:"required"`
+	ContactName  string `json:"contact_name" binding:"required"`
+	ContactPhone string `json:"contact_phone" binding:"required"`
+	IDCardNo     string `json:"id_card_no"`
+	Password     string `json:"password" binding:"required,min=6"`
+}
+
+// Register 通过邀请码注册代理商
+// @Summary 通过邀请码注册
+// @Description 使用邀请码自助注册成为代理商，注册后状态为待审核
+// @Tags 认证
+// @Accept json
+// @Produce json
+// @Param request body RegisterRequest true "注册请求"
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/auth/register [post]
+func (h *AuthHandler) Register(c *gin.Context) {
+	if h.agentService == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "服务未初始化",
+		})
+		return
+	}
+
+	var req RegisterRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "参数错误: " + err.Error(),
+		})
+		return
+	}
+
+	// 调用代理商服务进行注册
+	serviceReq := &service.RegisterByInviteCodeRequest{
+		InviteCode:   req.InviteCode,
+		AgentName:    req.AgentName,
+		ContactName:  req.ContactName,
+		ContactPhone: req.ContactPhone,
+		IDCardNo:     req.IDCardNo,
+		Password:     req.Password,
+	}
+
+	agent, err := h.agentService.RegisterByInviteCode(serviceReq)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "注册成功，请等待上级代理商审核",
+		"data":    agent,
+	})
+}
+
 // RegisterAuthRoutes 注册认证路由
 func RegisterAuthRoutes(r *gin.RouterGroup, h *AuthHandler, authService *service.AuthService) {
 	auth := r.Group("/auth")
@@ -227,6 +296,7 @@ func RegisterAuthRoutes(r *gin.RouterGroup, h *AuthHandler, authService *service
 		// 公开接口（无需登录）
 		auth.POST("/login", h.Login)
 		auth.POST("/refresh", h.Refresh)
+		auth.POST("/register", h.Register) // 邀请码注册接口
 
 		// 需要登录的接口
 		authRequired := auth.Group("")
