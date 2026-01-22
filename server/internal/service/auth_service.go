@@ -2,17 +2,18 @@ package service
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"xiangshoufu/internal/models"
 	"xiangshoufu/internal/repository"
 
 	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // AuthConfig 认证配置
