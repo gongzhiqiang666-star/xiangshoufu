@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_spacing.dart';
 
 /// 终端划拨页面
 class TerminalTransferPage extends StatefulWidget {
@@ -27,21 +26,21 @@ class _TerminalTransferPageState extends State<TerminalTransferPage> {
       backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('终端划拨')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.md),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 已选终端
             _buildSelectedTerminals(),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: 16),
 
             // 划拨给
             _buildAgentSelector(),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: 16),
 
             // 货款代扣设置
             _buildCargoDeductionSettings(),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: 16),
 
             // 提示信息
             _buildWarningNotice(),
@@ -54,7 +53,7 @@ class _TerminalTransferPageState extends State<TerminalTransferPage> {
 
   Widget _buildSelectedTerminals() {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -64,7 +63,7 @@ class _TerminalTransferPageState extends State<TerminalTransferPage> {
         children: [
           Text(
             '已选终端: ${widget.selectedSNs.length}台',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
@@ -73,7 +72,7 @@ class _TerminalTransferPageState extends State<TerminalTransferPage> {
           const SizedBox(height: 8),
           Text(
             'SN: ${widget.selectedSNs.join(", ")}',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               color: AppColors.textSecondary,
             ),
@@ -91,7 +90,7 @@ class _TerminalTransferPageState extends State<TerminalTransferPage> {
     ];
 
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -104,7 +103,6 @@ class _TerminalTransferPageState extends State<TerminalTransferPage> {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 12),
@@ -112,7 +110,7 @@ class _TerminalTransferPageState extends State<TerminalTransferPage> {
           TextField(
             decoration: InputDecoration(
               hintText: '搜索直属下级代理商',
-              prefixIcon: const Icon(Icons.search, color: AppColors.textTertiary),
+              prefixIcon: Icon(Icons.search, color: AppColors.textTertiary),
               filled: true,
               fillColor: AppColors.background,
               border: OutlineInputBorder(
@@ -123,7 +121,7 @@ class _TerminalTransferPageState extends State<TerminalTransferPage> {
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             '直属下级代理商',
             style: TextStyle(
               fontSize: 14,
@@ -170,7 +168,7 @@ class _TerminalTransferPageState extends State<TerminalTransferPage> {
                 children: [
                   Text(
                     '${agent['name']} (${agent['id']})',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
                       color: AppColors.textPrimary,
@@ -179,7 +177,7 @@ class _TerminalTransferPageState extends State<TerminalTransferPage> {
                   const SizedBox(height: 2),
                   Text(
                     '手机: ${agent['phone']}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       color: AppColors.textSecondary,
                     ),
@@ -188,7 +186,7 @@ class _TerminalTransferPageState extends State<TerminalTransferPage> {
               ),
             ),
             if (isSelected)
-              const Text(
+              Text(
                 '已选择',
                 style: TextStyle(
                   fontSize: 12,
@@ -203,7 +201,7 @@ class _TerminalTransferPageState extends State<TerminalTransferPage> {
 
   Widget _buildCargoDeductionSettings() {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -211,27 +209,27 @@ class _TerminalTransferPageState extends State<TerminalTransferPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Checkbox(
-                value: _enableCargoDeduction,
-                onChanged: (value) {
-                  setState(() {
-                    _enableCargoDeduction = value ?? false;
-                  });
-                },
-                activeColor: AppColors.primary,
-              ),
-              const Text(
-                '设置货款代扣',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textPrimary,
+            Row(
+              children: [
+                Checkbox(
+                  value: _enableCargoDeduction,
+                  onChanged: (value) {
+                    setState(() {
+                      _enableCargoDeduction = value ?? false;
+                    });
+                  },
+                  activeColor: AppColors.primary,
                 ),
-              ),
-            ],
-          ),
+                Text(
+                  '设置货款代扣',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
           if (_enableCargoDeduction) ...[
             const Divider(),
             const SizedBox(height: 8),
@@ -258,19 +256,19 @@ class _TerminalTransferPageState extends State<TerminalTransferPage> {
               ],
             ),
             const SizedBox(height: 12),
-            Text(
-              '总金额: ¥${(_unitPrice * widget.selectedSNs.length).toStringAsFixed(2)}',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: AppColors.primary,
-              ),
+          Text(
+            '总金额: ¥${(_unitPrice * widget.selectedSNs.length).toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primary,
             ),
-            const SizedBox(height: 16),
-            const Text(
-              '扣款来源:',
-              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '扣款来源:',
+            style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+          ),
             const SizedBox(height: 8),
             _buildWalletCheckbox('分润钱包', 'profit'),
             _buildWalletCheckbox('服务费钱包', 'service'),
@@ -309,7 +307,7 @@ class _TerminalTransferPageState extends State<TerminalTransferPage> {
         color: AppColors.warning.withOpacity(0.1),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: const Row(
+      child: Row(
         children: [
           Icon(Icons.warning_amber, color: AppColors.warning, size: 20),
           SizedBox(width: 8),
@@ -330,8 +328,8 @@ class _TerminalTransferPageState extends State<TerminalTransferPage> {
   Widget _buildBottomBar() {
     return Container(
       padding: EdgeInsets.only(
-        left: AppSpacing.md,
-        right: AppSpacing.md,
+        left: 16,
+        right: 16,
         top: 12,
         bottom: MediaQuery.of(context).padding.bottom + 12,
       ),

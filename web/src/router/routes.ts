@@ -205,6 +205,78 @@ export const privateRoutes: RouteRecordRaw[] = [
           },
         ],
       },
+      // 代扣管理
+      {
+        path: 'deductions',
+        name: 'Deductions',
+        redirect: '/deductions/list',
+        meta: {
+          title: '代扣管理',
+          icon: 'CreditCard',
+        },
+        children: [
+          {
+            path: 'list',
+            name: 'DeductionList',
+            component: () => import('@/views/deductions/DeductionListView.vue'),
+            meta: {
+              title: '代扣列表',
+              breadcrumb: [{ title: '首页' }, { title: '代扣管理' }, { title: '代扣列表' }],
+            },
+          },
+          {
+            path: 'create',
+            name: 'DeductionCreate',
+            component: () => import('@/views/deductions/DeductionCreateView.vue'),
+            meta: {
+              title: '发起代扣',
+              hidden: true,
+              breadcrumb: [{ title: '首页' }, { title: '代扣管理' }, { title: '发起代扣' }],
+            },
+          },
+          {
+            path: ':id',
+            name: 'DeductionDetail',
+            component: () => import('@/views/deductions/DeductionDetailView.vue'),
+            meta: {
+              title: '代扣详情',
+              hidden: true,
+              breadcrumb: [{ title: '首页' }, { title: '代扣管理' }, { title: '代扣详情' }],
+            },
+          },
+        ],
+      },
+      // 货款代扣
+      {
+        path: 'goods-deductions',
+        name: 'GoodsDeductions',
+        redirect: '/goods-deductions/list',
+        meta: {
+          title: '货款代扣',
+          icon: 'ShoppingCart',
+        },
+        children: [
+          {
+            path: 'list',
+            name: 'GoodsDeductionList',
+            component: () => import('@/views/goods-deductions/GoodsDeductionListView.vue'),
+            meta: {
+              title: '货款代扣列表',
+              breadcrumb: [{ title: '首页' }, { title: '货款代扣' }, { title: '货款代扣列表' }],
+            },
+          },
+          {
+            path: ':id',
+            name: 'GoodsDeductionDetail',
+            component: () => import('@/views/goods-deductions/GoodsDeductionDetailView.vue'),
+            meta: {
+              title: '货款代扣详情',
+              hidden: true,
+              breadcrumb: [{ title: '首页' }, { title: '货款代扣' }, { title: '货款代扣详情' }],
+            },
+          },
+        ],
+      },
       // 钱包管理
       {
         path: 'wallets',
