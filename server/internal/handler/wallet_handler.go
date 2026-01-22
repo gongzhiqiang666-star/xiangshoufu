@@ -12,6 +12,7 @@ import (
 // WalletHandler 钱包处理器
 type WalletHandler struct {
 	walletService *service.WalletService
+	auditService  *service.AuditService
 }
 
 // NewWalletHandler 创建钱包处理器
@@ -19,6 +20,11 @@ func NewWalletHandler(walletService *service.WalletService) *WalletHandler {
 	return &WalletHandler{
 		walletService: walletService,
 	}
+}
+
+// SetAuditService 设置审计服务
+func (h *WalletHandler) SetAuditService(auditService *service.AuditService) {
+	h.auditService = auditService
 }
 
 // GetWalletList 获取钱包列表
@@ -166,11 +172,22 @@ func (h *WalletHandler) Withdraw(c *gin.Context) {
 	}
 
 	if err := h.walletService.Withdraw(serviceReq); err != nil {
+		// 记录提现失败审计日志
+		if h.auditService != nil {
+			auditCtx := service.NewAuditContextFromGin(c)
+			h.auditService.LogWithdraw(auditCtx, 0, req.Amount, false, err.Error())
+		}
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
 			"message": err.Error(),
 		})
 		return
+	}
+
+	// 记录提现成功审计日志
+	if h.auditService != nil {
+		auditCtx := service.NewAuditContextFromGin(c)
+		h.auditService.LogWithdraw(auditCtx, 0, req.Amount, true, "")
 	}
 
 	c.JSON(http.StatusOK, gin.H{

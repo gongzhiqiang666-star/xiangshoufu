@@ -13,6 +13,7 @@ import (
 type AuthHandler struct {
 	authService  *service.AuthService
 	agentService *service.AgentService
+	auditService *service.AuditService
 }
 
 // NewAuthHandler 创建认证处理器
@@ -25,6 +26,11 @@ func NewAuthHandler(authService *service.AuthService) *AuthHandler {
 // SetAgentService 设置代理商服务（延迟注入，避免循环依赖）
 func (h *AuthHandler) SetAgentService(agentService *service.AgentService) {
 	h.agentService = agentService
+}
+
+// SetAuditService 设置审计服务
+func (h *AuthHandler) SetAuditService(auditService *service.AuditService) {
+	h.auditService = auditService
 }
 
 // LoginRequest 登录请求
@@ -61,11 +67,40 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	resp, err := h.authService.Login(loginReq)
 	if err != nil {
+		// 记录登录失败审计日志
+		if h.auditService != nil {
+			auditCtx := &service.AuditContext{
+				Username:      req.Username,
+				IP:            c.ClientIP(),
+				UserAgent:     c.GetHeader("User-Agent"),
+				RequestPath:   c.Request.URL.Path,
+				RequestMethod: c.Request.Method,
+			}
+			h.auditService.LogLogin(auditCtx, false, err.Error())
+		}
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"code":    401,
 			"message": err.Error(),
 		})
 		return
+	}
+
+	// 记录登录成功审计日志
+	if h.auditService != nil {
+		agentID := int64(0)
+		if resp.Agent != nil {
+			agentID = resp.Agent.ID
+		}
+		auditCtx := &service.AuditContext{
+			UserID:        resp.User.ID,
+			Username:      resp.User.Username,
+			AgentID:       agentID,
+			IP:            c.ClientIP(),
+			UserAgent:     c.GetHeader("User-Agent"),
+			RequestPath:   c.Request.URL.Path,
+			RequestMethod: c.Request.Method,
+		}
+		h.auditService.LogLogin(auditCtx, true, "")
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -95,6 +130,12 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 
 	if req.RefreshToken != "" {
 		h.authService.Logout(req.RefreshToken)
+	}
+
+	// 记录登出审计日志
+	if h.auditService != nil {
+		auditCtx := service.NewAuditContextFromGin(c)
+		h.auditService.LogLogout(auditCtx)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -213,11 +254,22 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	}
 
 	if err := h.authService.ChangePassword(userID, req.OldPassword, req.NewPassword); err != nil {
+		// 记录密码修改失败审计日志
+		if h.auditService != nil {
+			auditCtx := service.NewAuditContextFromGin(c)
+			h.auditService.LogPasswordChange(auditCtx, false, err.Error())
+		}
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
 			"message": err.Error(),
 		})
 		return
+	}
+
+	// 记录密码修改成功审计日志
+	if h.auditService != nil {
+		auditCtx := service.NewAuditContextFromGin(c)
+		h.auditService.LogPasswordChange(auditCtx, true, "")
 	}
 
 	c.JSON(http.StatusOK, gin.H{

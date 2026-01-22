@@ -91,6 +91,10 @@ func main() {
 	merchantRepo := repository.NewGormMerchantRepository(db)
 	rateStagePolicyRepo := repository.NewGormRateStagePolicyRepository(db)
 	terminalRepo := repository.NewGormTerminalRepository(db) // 提前初始化，供callbackProcessor使用
+	auditLogRepo := repository.NewGormAuditLogRepository(db) // 审计日志仓储
+
+	// 4.1 初始化审计服务（三级等保）
+	auditService := service.NewAuditService(auditLogRepo)
 
 	// 5. 初始化消息服务
 	pushConfig := &service.PushConfig{
@@ -229,8 +233,11 @@ func main() {
 	// 15. 初始化PC端新增Handler
 	authHandler := handler.NewAuthHandler(authService)
 	authHandler.SetAgentService(agentService) // 注入代理商服务用于公开注册接口
+	authHandler.SetAuditService(auditService) // 注入审计服务（三级等保）
 	agentHandler := handler.NewAgentHandler(agentService)
+	agentHandler.SetAuditService(auditService) // 注入审计服务（三级等保）
 	walletHandler := handler.NewWalletHandler(walletService)
+	walletHandler.SetAuditService(auditService) // 注入审计服务（三级等保）
 	transactionHandler := handler.NewTransactionHandler(transactionRepo)
 	profitHandler := handler.NewProfitHandler(profitRepo)
 	dashboardHandler := handler.NewDashboardHandler(transactionRepo, profitRepo, agentRepo, walletRepo)
@@ -641,9 +648,16 @@ func setupRouter(
 	router.Use(middleware.LoggingMiddleware())
 	router.Use(middleware.CORSMiddleware())
 
+	// 安全头部中间件（三级等保）
+	router.Use(middleware.SecurityHeadersMiddleware())
+
 	// 限流中间件（每秒1000个请求，桶容量2000）
 	globalLimiter := middleware.NewRateLimiter(1000, 2000)
 	router.Use(middleware.RateLimitMiddleware(globalLimiter))
+
+	// IP限流中间件（每IP每秒100个请求）
+	ipLimiter := middleware.NewIPRateLimiter(100, 200)
+	router.Use(middleware.IPRateLimitMiddleware(ipLimiter))
 
 	// 健康检查
 	// @Summary 健康检查

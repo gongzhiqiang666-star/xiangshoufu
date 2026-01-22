@@ -13,6 +13,7 @@ import (
 // AgentHandler 代理商处理器
 type AgentHandler struct {
 	agentService *service.AgentService
+	auditService *service.AuditService
 }
 
 // NewAgentHandler 创建代理商处理器
@@ -20,6 +21,11 @@ func NewAgentHandler(agentService *service.AgentService) *AgentHandler {
 	return &AgentHandler{
 		agentService: agentService,
 	}
+}
+
+// SetAuditService 设置审计服务
+func (h *AgentHandler) SetAuditService(auditService *service.AuditService) {
+	h.auditService = auditService
 }
 
 // GetAgentDetail 获取代理商详情
@@ -393,6 +399,12 @@ func (h *AgentHandler) CreateAgent(c *gin.Context) {
 		return
 	}
 
+	// 记录创建代理商审计日志
+	if h.auditService != nil {
+		auditCtx := service.NewAuditContextFromGin(c)
+		h.auditService.LogAgentCreate(auditCtx, agent.ID, agent.AgentName)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "创建成功",
@@ -460,6 +472,22 @@ func (h *AgentHandler) UpdateAgentStatus(c *gin.Context) {
 			"message": err.Error(),
 		})
 		return
+	}
+
+	// 记录代理商状态变更审计日志
+	if h.auditService != nil {
+		auditCtx := service.NewAuditContextFromGin(c)
+		// 获取代理商信息用于审计
+		detail, _ := h.agentService.GetAgentDetail(agentID)
+		agentName := ""
+		if detail != nil {
+			agentName = detail.AgentName
+		}
+		oldStatus := int16(1)
+		if req.Status == 1 {
+			oldStatus = 2
+		}
+		h.auditService.LogAgentStatusChange(auditCtx, agentID, agentName, oldStatus, req.Status)
 	}
 
 	c.JSON(http.StatusOK, gin.H{

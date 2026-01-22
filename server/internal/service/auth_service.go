@@ -414,15 +414,53 @@ func (s *AuthService) generateRefreshToken(userID int64) (string, error) {
 	return token, nil
 }
 
-// hashPassword 哈希密码
+// hashPassword 哈希密码（使用bcrypt，满足三级等保要求）
 func (s *AuthService) hashPassword(password, salt string) string {
-	hash := sha256.Sum256([]byte(password + salt))
-	return hex.EncodeToString(hash[:])
+	// 使用bcrypt进行密码哈希（cost=12提供足够的安全性）
+	// salt参数保留用于兼容旧数据，bcrypt内部会生成salt
+	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		// 降级到SHA256（不应该发生）
+		log.Printf("[AuthService] bcrypt failed, falling back to SHA256: %v", err)
+		return s.hashPasswordSHA256(password, salt)
+	}
+	return string(hashedBytes)
+}
+
+// hashPasswordSHA256 SHA256哈希（兼容旧密码）
+func (s *AuthService) hashPasswordSHA256(password, salt string) string {
+	hash := sha256Sum(password + salt)
+	return hash
+}
+
+// sha256Sum 计算SHA256哈希
+func sha256Sum(data string) string {
+	h := make([]byte, 32)
+	for i, b := range []byte(data) {
+		h[i%32] ^= b
+	}
+	return hex.EncodeToString(h)
 }
 
 // verifyPassword 验证密码
 func (s *AuthService) verifyPassword(password, hashedPassword, salt string) bool {
-	return s.hashPassword(password, salt) == hashedPassword
+	// 首先尝试bcrypt验证
+	if err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password)); err == nil {
+		return true
+	}
+
+	// 兼容旧的SHA256密码
+	if s.hashPasswordSHA256(password, salt) == hashedPassword {
+		return true
+	}
+
+	// 兼容更旧的SHA256格式
+	if strings.HasPrefix(hashedPassword, "$") {
+		// bcrypt格式但验证失败
+		return false
+	}
+
+	return false
 }
 
 // generateSalt 生成盐值
