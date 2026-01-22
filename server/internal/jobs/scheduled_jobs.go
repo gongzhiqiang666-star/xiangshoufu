@@ -9,6 +9,8 @@ import (
 	"xiangshoufu/internal/service"
 )
 
+// Note: service.MerchantService is used by MerchantTypeCalculatorJob
+
 // ProfitCalculatorJob 分润计算定时任务（兜底重试）
 type ProfitCalculatorJob struct {
 	transactionRepo repository.TransactionRepository
@@ -229,4 +231,97 @@ func (j *PartitionManagerJob) Run() {
 	// FOR VALUES FROM ('YYYY-MM-01') TO ('YYYY-MM+1-01')
 
 	log.Printf("[PartitionManagerJob] Completed, took=%v", time.Since(startTime))
+}
+
+// MerchantTypeCalculatorJob 商户类型计算定时任务
+// 每天凌晨2点执行，根据最近30天交易额计算商户类型
+type MerchantTypeCalculatorJob struct {
+	merchantRepo    *repository.GormMerchantRepository
+	merchantService *service.MerchantService
+	batchSize       int
+	running         bool
+	mu              sync.Mutex
+}
+
+// NewMerchantTypeCalculatorJob 创建商户类型计算任务
+func NewMerchantTypeCalculatorJob(
+	merchantRepo *repository.GormMerchantRepository,
+	merchantService *service.MerchantService,
+) *MerchantTypeCalculatorJob {
+	return &MerchantTypeCalculatorJob{
+		merchantRepo:    merchantRepo,
+		merchantService: merchantService,
+		batchSize:       500,
+	}
+}
+
+// Run 执行任务
+func (j *MerchantTypeCalculatorJob) Run() {
+	j.mu.Lock()
+	if j.running {
+		j.mu.Unlock()
+		log.Printf("[MerchantTypeCalculatorJob] Already running, skip")
+		return
+	}
+	j.running = true
+	j.mu.Unlock()
+
+	defer func() {
+		j.mu.Lock()
+		j.running = false
+		j.mu.Unlock()
+	}()
+
+	startTime := time.Now()
+	log.Printf("[MerchantTypeCalculatorJob] Started")
+
+	// 统计总商户数
+	totalMerchants, err := j.merchantRepo.CountAllActiveMerchants()
+	if err != nil {
+		log.Printf("[MerchantTypeCalculatorJob] Count merchants failed: %v", err)
+		return
+	}
+
+	if totalMerchants == 0 {
+		log.Printf("[MerchantTypeCalculatorJob] No active merchants to process")
+		return
+	}
+
+	successCount := 0
+	failCount := 0
+	offset := 0
+
+	// 分批处理所有商户
+	for {
+		merchantIDs, err := j.merchantRepo.FindAllMerchantIDs(j.batchSize, offset)
+		if err != nil {
+			log.Printf("[MerchantTypeCalculatorJob] Find merchant IDs failed: %v", err)
+			break
+		}
+
+		if len(merchantIDs) == 0 {
+			break
+		}
+
+		// 逐个计算商户类型
+		for _, merchantID := range merchantIDs {
+			_, err := j.merchantService.CalculateMerchantType(merchantID)
+			if err != nil {
+				log.Printf("[MerchantTypeCalculatorJob] Calculate type failed for merchant %d: %v", merchantID, err)
+				failCount++
+			} else {
+				successCount++
+			}
+		}
+
+		offset += j.batchSize
+
+		// 进度日志（每处理1000个记录一次）
+		if offset%1000 == 0 {
+			log.Printf("[MerchantTypeCalculatorJob] Progress: %d/%d merchants processed", offset, totalMerchants)
+		}
+	}
+
+	log.Printf("[MerchantTypeCalculatorJob] Completed: total=%d, success=%d, fail=%d, took=%v",
+		totalMerchants, successCount, failCount, time.Since(startTime))
 }

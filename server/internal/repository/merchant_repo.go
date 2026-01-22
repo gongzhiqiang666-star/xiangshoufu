@@ -313,3 +313,28 @@ func (r *GormMerchantRepository) ExportMerchants(params MerchantQueryParams) ([]
 
 	return merchants, nil
 }
+
+// FindAllMerchantIDs 获取所有活跃商户的ID（用于批量计算商户类型）
+func (r *GormMerchantRepository) FindAllMerchantIDs(limit, offset int) ([]int64, error) {
+	var ids []int64
+	if err := r.db.Model(&models.Merchant{}).
+		Where("status = ?", models.MerchantStatusActive).
+		Order("id ASC").
+		Limit(limit).
+		Offset(offset).
+		Pluck("id", &ids).Error; err != nil {
+		return nil, err
+	}
+	return ids, nil
+}
+
+// CountAllActiveMerchants 统计所有活跃商户数量
+func (r *GormMerchantRepository) CountAllActiveMerchants() (int64, error) {
+	var count int64
+	if err := r.db.Model(&models.Merchant{}).
+		Where("status = ?", models.MerchantStatusActive).
+		Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return count, nil
+}

@@ -96,9 +96,17 @@ class AuthService {
     required String oldPassword,
     required String newPassword,
   }) async {
-    await _apiClient.post('/api/v1/auth/change-password', data: {
+    await _apiClient.put('/api/v1/auth/password', data: {
       'old_password': oldPassword,
       'new_password': newPassword,
     });
+    // 密码修改成功后清除令牌，需要重新登录
+    await clearTokens();
+  }
+
+  /// 获取用户资料
+  Future<LoginResponse> getProfile() async {
+    final response = await _apiClient.get('/api/v1/auth/profile');
+    return LoginResponse.fromJson(response.data['data']);
   }
 }

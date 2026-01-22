@@ -370,6 +370,8 @@ func main() {
 		// 新增参数：激活奖励相关
 		terminalRepo, channelRepo, activationRewardService,
 		depositRecordRepo, rewardRecordRepo, walletRepo, simCashbackRecordRepo,
+		// 新增参数：商户类型计算
+		merchantRepo, merchantService,
 	)
 	scheduler.Start()
 
@@ -535,6 +537,9 @@ func setupScheduler(
 	rewardRecordRepo *repository.GormActivationRewardRecordRepository,
 	walletRepo *repository.GormWalletRepository,
 	simCashbackRecordRepo *repository.GormSimCashbackRecordRepository,
+	// 新增参数：商户类型计算
+	merchantRepo *repository.GormMerchantRepository,
+	merchantService *service.MerchantService,
 ) *jobs.Scheduler {
 	scheduler := jobs.NewScheduler()
 
@@ -580,6 +585,10 @@ func setupScheduler(
 	// 流量费返现入账任务（每10分钟）
 	simSettleJob := jobs.NewSimCashbackSettleJob(simCashbackRecordRepo, walletRepo)
 	scheduler.AddJob("sim_cashback_settle", 10*time.Minute, simSettleJob.Run)
+
+	// 商户类型计算任务（每天凌晨3点执行，这里用24小时间隔）
+	merchantTypeJob := jobs.NewMerchantTypeCalculatorJob(merchantRepo, merchantService)
+	scheduler.AddJob("merchant_type_calculator", 24*time.Hour, merchantTypeJob.Run)
 
 	return scheduler
 }

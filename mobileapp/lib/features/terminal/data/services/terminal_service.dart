@@ -350,4 +350,91 @@ class TerminalService {
       throw ApiException(-1, e.message ?? '网络错误');
     }
   }
+
+  /// 批量设置费率
+  /// [terminalSns] 终端SN列表
+  /// [creditRate] 信用卡费率（万分比，如55表示0.55%）
+  Future<Map<String, dynamic>> batchSetRate({
+    required List<String> terminalSns,
+    required int creditRate,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/api/v1/terminals/batch-set-rate',
+        data: {
+          'terminal_sns': terminalSns,
+          'credit_rate': creditRate,
+        },
+      );
+
+      final apiResponse = ApiResponse.fromJson(response.data, null);
+      if (!apiResponse.isSuccess) {
+        throw ApiException(apiResponse.code, apiResponse.message);
+      }
+
+      return apiResponse.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiException(-1, e.message ?? '网络错误');
+    }
+  }
+
+  /// 批量设置流量费
+  /// [terminalSns] 终端SN列表
+  /// [firstSimFee] 首次流量费（分）
+  /// [nonFirstSimFee] 非首次流量费（分）
+  /// [simFeeIntervalDays] 流量费间隔天数
+  Future<Map<String, dynamic>> batchSetSimFee({
+    required List<String> terminalSns,
+    required int firstSimFee,
+    required int nonFirstSimFee,
+    required int simFeeIntervalDays,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/api/v1/terminals/batch-set-sim',
+        data: {
+          'terminal_sns': terminalSns,
+          'first_sim_fee': firstSimFee,
+          'non_first_sim_fee': nonFirstSimFee,
+          'sim_fee_interval_days': simFeeIntervalDays,
+        },
+      );
+
+      final apiResponse = ApiResponse.fromJson(response.data, null);
+      if (!apiResponse.isSuccess) {
+        throw ApiException(apiResponse.code, apiResponse.message);
+      }
+
+      return apiResponse.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiException(-1, e.message ?? '网络错误');
+    }
+  }
+
+  /// 批量设置押金
+  /// [terminalSns] 终端SN列表
+  /// [depositAmount] 押金金额（分，0表示无押金）
+  Future<Map<String, dynamic>> batchSetDeposit({
+    required List<String> terminalSns,
+    required int depositAmount,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/api/v1/terminals/batch-set-deposit',
+        data: {
+          'terminal_sns': terminalSns,
+          'deposit_amount': depositAmount,
+        },
+      );
+
+      final apiResponse = ApiResponse.fromJson(response.data, null);
+      if (!apiResponse.isSuccess) {
+        throw ApiException(apiResponse.code, apiResponse.message);
+      }
+
+      return apiResponse.data as Map<String, dynamic>? ?? {};
+    } on DioException catch (e) {
+      throw ApiException(-1, e.message ?? '网络错误');
+    }
+  }
 }

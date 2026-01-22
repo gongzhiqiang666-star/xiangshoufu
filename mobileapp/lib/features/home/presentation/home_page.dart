@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/format_utils.dart';
 import '../../../router/app_router.dart';
+import '../../marketing/presentation/widgets/banner_carousel.dart';
 
 /// 首页
-class HomePage extends StatefulWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  ConsumerState<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends ConsumerState<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -81,22 +83,15 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  /// 构建Banner轮播
   Widget _buildBanner() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+    return BannerCarousel(
       height: 140,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        gradient: const LinearGradient(
-          colors: [AppColors.primary, AppColors.primaryDark],
-        ),
-      ),
-      child: const Center(
-        child: Text(
-          '欢迎使用享收付',
-          style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-      ),
+      autoPlayInterval: 5000,
+      onInternalLinkTap: (route) {
+        // 处理内部页面跳转
+        context.push(route);
+      },
     );
   }
 

@@ -122,6 +122,35 @@ class AuthNotifier extends StateNotifier<AuthState> {
   void clearError() {
     state = state.copyWith(error: null);
   }
+
+  /// 修改密码
+  Future<bool> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      await _authService.changePassword(
+        oldPassword: oldPassword,
+        newPassword: newPassword,
+      );
+      // 密码修改成功，需要重新登录
+      state = const AuthState(isAuthenticated: false, isLoading: false);
+      return true;
+    } catch (e) {
+      String errorMessage = '修改密码失败';
+      if (e.toString().contains('原密码错误')) {
+        errorMessage = '原密码错误';
+      } else {
+        errorMessage = e.toString().replaceAll('Exception: ', '');
+      }
+      state = state.copyWith(
+        isLoading: false,
+        error: errorMessage,
+      );
+      return false;
+    }
+  }
 }
 
 /// 是否已登录 Provider

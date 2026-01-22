@@ -3,11 +3,13 @@ package service
 import (
 	"errors"
 	"fmt"
+	"log"
 	"strconv"
 	"time"
 
 	"xiangshoufu/internal/models"
 	"xiangshoufu/internal/repository"
+	"xiangshoufu/pkg/crypto"
 )
 
 // MerchantService 商户服务
@@ -127,6 +129,16 @@ func (s *MerchantService) CreateMerchant(req *CreateMerchantRequest) (*models.Me
 		return nil, errors.New("代理商不存在")
 	}
 
+	// 加密身份证号（三级等保要求）
+	encryptedIDCard := req.LegalIDCard
+	if req.LegalIDCard != "" {
+		encryptedIDCard, err = crypto.EncryptIDCard(req.LegalIDCard)
+		if err != nil {
+			log.Printf("[MerchantService] Failed to encrypt ID card: %v", err)
+			return nil, fmt.Errorf("身份证加密失败: %w", err)
+		}
+	}
+
 	merchant := &models.Merchant{
 		MerchantNo:   req.MerchantNo,
 		MerchantName: req.MerchantName,
@@ -134,7 +146,7 @@ func (s *MerchantService) CreateMerchant(req *CreateMerchantRequest) (*models.Me
 		ChannelID:    req.ChannelID,
 		TerminalSN:   req.TerminalSN,
 		LegalName:    req.LegalName,
-		LegalIDCard:  req.LegalIDCard,
+		LegalIDCard:  encryptedIDCard,
 		MCC:          req.MCC,
 		CreditRate:   req.CreditRate,
 		DebitRate:    req.DebitRate,
@@ -220,8 +232,14 @@ func (s *MerchantService) RegisterMerchant(id int64, agentID int64, phone, remar
 		return errors.New("无权登记此商户")
 	}
 
-	// TODO: 对手机号进行加密存储
-	return s.merchantRepo.Register(id, phone, remark)
+	// 对手机号进行加密存储（三级等保要求）
+	encryptedPhone, err := crypto.EncryptPhone(phone)
+	if err != nil {
+		log.Printf("[MerchantService] Failed to encrypt phone: %v", err)
+		return fmt.Errorf("手机号加密失败: %w", err)
+	}
+
+	return s.merchantRepo.Register(id, encryptedPhone, remark)
 }
 
 // UpdateStatus 更新商户状态
@@ -427,15 +445,23 @@ func getOwnerType(isDirect bool) string {
 }
 
 func maskIDCard(idCard string) string {
-	if len(idCard) < 8 {
-		return idCard
+	// 先尝试解密（如果是加密的数据）
+	if crypto.IsEncrypted(idCard) {
+		decrypted, err := crypto.DecryptIDCard(idCard)
+		if err == nil {
+			idCard = decrypted
+		}
 	}
-	return idCard[:4] + "**********" + idCard[len(idCard)-4:]
+	return crypto.MaskIDCard(idCard)
 }
 
 func maskPhone(phone string) string {
-	if len(phone) < 7 {
-		return phone
+	// 先尝试解密（如果是加密的数据）
+	if crypto.IsEncrypted(phone) {
+		decrypted, err := crypto.DecryptPhone(phone)
+		if err == nil {
+			phone = decrypted
+		}
 	}
-	return phone[:3] + "****" + phone[len(phone)-4:]
+	return crypto.MaskPhone(phone)
 }

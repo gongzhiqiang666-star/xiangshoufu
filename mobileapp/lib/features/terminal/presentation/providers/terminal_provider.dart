@@ -349,3 +349,358 @@ final terminalDetailProvider = FutureProvider.family<Terminal, String>((ref, sn)
 
 /// 选中的终端列表
 final selectedTerminalsProvider = StateProvider<List<Terminal>>((ref) => []);
+
+// ==================== 划拨记录列表 ====================
+
+/// 划拨记录列表状态
+class DistributeListState {
+  final List<TerminalDistribute> list;
+  final bool isLoading;
+  final bool isLoadingMore;
+  final bool hasMore;
+  final int currentPage;
+  final String? error;
+
+  DistributeListState({
+    this.list = const [],
+    this.isLoading = false,
+    this.isLoadingMore = false,
+    this.hasMore = true,
+    this.currentPage = 1,
+    this.error,
+  });
+
+  DistributeListState copyWith({
+    List<TerminalDistribute>? list,
+    bool? isLoading,
+    bool? isLoadingMore,
+    bool? hasMore,
+    int? currentPage,
+    String? error,
+  }) {
+    return DistributeListState(
+      list: list ?? this.list,
+      isLoading: isLoading ?? this.isLoading,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      hasMore: hasMore ?? this.hasMore,
+      currentPage: currentPage ?? this.currentPage,
+      error: error,
+    );
+  }
+}
+
+/// 划拨记录列表Notifier
+class DistributeListNotifier extends StateNotifier<DistributeListState> {
+  final TerminalService _service;
+  final String _direction;
+
+  DistributeListNotifier(this._service, this._direction)
+      : super(DistributeListState());
+
+  /// 加载列表
+  Future<void> loadList({bool refresh = false}) async {
+    if (state.isLoading || state.isLoadingMore) return;
+    if (!refresh && !state.hasMore) return;
+
+    final isRefresh = refresh || state.list.isEmpty;
+
+    state = state.copyWith(
+      isLoading: isRefresh,
+      isLoadingMore: !isRefresh,
+      error: null,
+    );
+
+    try {
+      final page = isRefresh ? 1 : state.currentPage + 1;
+      final response = await _service.getDistributeList(
+        direction: _direction,
+        page: page,
+        pageSize: 20,
+      );
+
+      state = state.copyWith(
+        list: isRefresh ? response.list : [...state.list, ...response.list],
+        isLoading: false,
+        isLoadingMore: false,
+        hasMore: response.hasMore,
+        currentPage: page,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        isLoadingMore: false,
+        error: e.toString(),
+      );
+    }
+  }
+
+  /// 刷新
+  Future<void> refresh() => loadList(refresh: true);
+}
+
+/// 我下发的划拨记录
+final sentDistributesProvider =
+    StateNotifierProvider<DistributeListNotifier, DistributeListState>((ref) {
+  final service = ref.watch(terminalServiceProvider);
+  return DistributeListNotifier(service, 'from');
+});
+
+/// 下发给我的划拨记录
+final receivedDistributesProvider =
+    StateNotifierProvider<DistributeListNotifier, DistributeListState>((ref) {
+  final service = ref.watch(terminalServiceProvider);
+  return DistributeListNotifier(service, 'to');
+});
+
+// ==================== 回拨记录列表 ====================
+
+/// 回拨记录列表状态
+class RecallListState {
+  final List<TerminalRecall> list;
+  final bool isLoading;
+  final bool isLoadingMore;
+  final bool hasMore;
+  final int currentPage;
+  final String? error;
+
+  RecallListState({
+    this.list = const [],
+    this.isLoading = false,
+    this.isLoadingMore = false,
+    this.hasMore = true,
+    this.currentPage = 1,
+    this.error,
+  });
+
+  RecallListState copyWith({
+    List<TerminalRecall>? list,
+    bool? isLoading,
+    bool? isLoadingMore,
+    bool? hasMore,
+    int? currentPage,
+    String? error,
+  }) {
+    return RecallListState(
+      list: list ?? this.list,
+      isLoading: isLoading ?? this.isLoading,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      hasMore: hasMore ?? this.hasMore,
+      currentPage: currentPage ?? this.currentPage,
+      error: error,
+    );
+  }
+}
+
+/// 回拨记录列表Notifier
+class RecallListNotifier extends StateNotifier<RecallListState> {
+  final TerminalService _service;
+  final String _direction;
+
+  RecallListNotifier(this._service, this._direction)
+      : super(RecallListState());
+
+  /// 加载列表
+  Future<void> loadList({bool refresh = false}) async {
+    if (state.isLoading || state.isLoadingMore) return;
+    if (!refresh && !state.hasMore) return;
+
+    final isRefresh = refresh || state.list.isEmpty;
+
+    state = state.copyWith(
+      isLoading: isRefresh,
+      isLoadingMore: !isRefresh,
+      error: null,
+    );
+
+    try {
+      final page = isRefresh ? 1 : state.currentPage + 1;
+      final response = await _service.getRecallList(
+        direction: _direction,
+        page: page,
+        pageSize: 20,
+      );
+
+      state = state.copyWith(
+        list: isRefresh ? response.list : [...state.list, ...response.list],
+        isLoading: false,
+        isLoadingMore: false,
+        hasMore: response.hasMore,
+        currentPage: page,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        isLoadingMore: false,
+        error: e.toString(),
+      );
+    }
+  }
+
+  /// 刷新
+  Future<void> refresh() => loadList(refresh: true);
+}
+
+/// 我回拨的记录
+final sentRecallsProvider =
+    StateNotifierProvider<RecallListNotifier, RecallListState>((ref) {
+  final service = ref.watch(terminalServiceProvider);
+  return RecallListNotifier(service, 'from');
+});
+
+/// 回拨给我的记录
+final receivedRecallsProvider =
+    StateNotifierProvider<RecallListNotifier, RecallListState>((ref) {
+  final service = ref.watch(terminalServiceProvider);
+  return RecallListNotifier(service, 'to');
+});
+
+// ==================== 批量设置 ====================
+
+/// 批量设置状态
+class BatchSetState {
+  final bool isSubmitting;
+  final String? error;
+  final int successCount;
+  final int failedCount;
+
+  BatchSetState({
+    this.isSubmitting = false,
+    this.error,
+    this.successCount = 0,
+    this.failedCount = 0,
+  });
+
+  BatchSetState copyWith({
+    bool? isSubmitting,
+    String? error,
+    int? successCount,
+    int? failedCount,
+  }) {
+    return BatchSetState(
+      isSubmitting: isSubmitting ?? this.isSubmitting,
+      error: error,
+      successCount: successCount ?? this.successCount,
+      failedCount: failedCount ?? this.failedCount,
+    );
+  }
+}
+
+/// 批量设置Notifier
+class BatchSetNotifier extends StateNotifier<BatchSetState> {
+  final TerminalService _service;
+  final Ref _ref;
+
+  BatchSetNotifier(this._service, this._ref) : super(BatchSetState());
+
+  /// 批量设置费率
+  Future<bool> batchSetRate({
+    required List<String> terminalSns,
+    required int creditRate,
+  }) async {
+    state = state.copyWith(isSubmitting: true, error: null);
+
+    try {
+      final result = await _service.batchSetRate(
+        terminalSns: terminalSns,
+        creditRate: creditRate,
+      );
+
+      final successCount = result['success_count'] as int? ?? terminalSns.length;
+      final failedCount = result['failed_count'] as int? ?? 0;
+
+      state = state.copyWith(
+        isSubmitting: false,
+        successCount: successCount,
+        failedCount: failedCount,
+      );
+
+      // 刷新终端列表
+      _ref.read(terminalListProvider.notifier).refresh();
+
+      return failedCount == 0;
+    } catch (e) {
+      state = state.copyWith(isSubmitting: false, error: e.toString());
+      return false;
+    }
+  }
+
+  /// 批量设置流量费
+  Future<bool> batchSetSimFee({
+    required List<String> terminalSns,
+    required int firstSimFee,
+    required int nonFirstSimFee,
+    required int simFeeIntervalDays,
+  }) async {
+    state = state.copyWith(isSubmitting: true, error: null);
+
+    try {
+      final result = await _service.batchSetSimFee(
+        terminalSns: terminalSns,
+        firstSimFee: firstSimFee,
+        nonFirstSimFee: nonFirstSimFee,
+        simFeeIntervalDays: simFeeIntervalDays,
+      );
+
+      final successCount = result['success_count'] as int? ?? terminalSns.length;
+      final failedCount = result['failed_count'] as int? ?? 0;
+
+      state = state.copyWith(
+        isSubmitting: false,
+        successCount: successCount,
+        failedCount: failedCount,
+      );
+
+      // 刷新终端列表
+      _ref.read(terminalListProvider.notifier).refresh();
+
+      return failedCount == 0;
+    } catch (e) {
+      state = state.copyWith(isSubmitting: false, error: e.toString());
+      return false;
+    }
+  }
+
+  /// 批量设置押金
+  Future<bool> batchSetDeposit({
+    required List<String> terminalSns,
+    required int depositAmount,
+  }) async {
+    state = state.copyWith(isSubmitting: true, error: null);
+
+    try {
+      final result = await _service.batchSetDeposit(
+        terminalSns: terminalSns,
+        depositAmount: depositAmount,
+      );
+
+      final successCount = result['success_count'] as int? ?? terminalSns.length;
+      final failedCount = result['failed_count'] as int? ?? 0;
+
+      state = state.copyWith(
+        isSubmitting: false,
+        successCount: successCount,
+        failedCount: failedCount,
+      );
+
+      // 刷新终端列表
+      _ref.read(terminalListProvider.notifier).refresh();
+
+      return failedCount == 0;
+    } catch (e) {
+      state = state.copyWith(isSubmitting: false, error: e.toString());
+      return false;
+    }
+  }
+
+  /// 重置状态
+  void reset() {
+    state = BatchSetState();
+  }
+}
+
+/// 批量设置Provider
+final batchSetProvider =
+    StateNotifierProvider<BatchSetNotifier, BatchSetState>((ref) {
+  final service = ref.watch(terminalServiceProvider);
+  return BatchSetNotifier(service, ref);
+});
