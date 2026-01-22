@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/format_utils.dart';
+import '../../../router/app_router.dart';
 
 /// 首页
 class HomePage extends StatefulWidget {
@@ -149,7 +151,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildProfitCard(String title, double amount, Color color, IconData icon) {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -157,26 +159,33 @@ class _HomePageState extends State<HomePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
               Container(
-                width: 32,
-                height: 32,
+                width: 24,
+                height: 24,
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                 ),
-                child: Icon(icon, color: color, size: 18),
+                child: Icon(icon, color: color, size: 14),
               ),
-              const SizedBox(width: 8),
-              Text(title, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Text(
             FormatUtils.formatYuan(amount),
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color),
           ),
         ],
       ),
@@ -185,50 +194,84 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildQuickActions() {
     final actions = [
-      {'icon': Icons.devices, 'label': '终端'},
-      {'icon': Icons.people_outline, 'label': '商户'},
-      {'icon': Icons.analytics_outlined, 'label': '数据'},
-      {'icon': Icons.account_balance_wallet_outlined, 'label': '钱包'},
-      {'icon': Icons.upload_outlined, 'label': '代扣'},
-      {'icon': Icons.image_outlined, 'label': '海报'},
-      {'icon': Icons.notifications_outlined, 'label': '消息'},
-      {'icon': Icons.person_outline, 'label': '我的'},
+      {'icon': Icons.devices, 'label': '终端', 'route': RoutePaths.terminal},
+      {'icon': Icons.people_outline, 'label': '商户', 'route': RoutePaths.merchant},
+      {'icon': Icons.group_add_outlined, 'label': '代理拓展', 'route': RoutePaths.agent},
+      {'icon': Icons.account_balance_wallet_outlined, 'label': '钱包', 'route': RoutePaths.wallet},
+      {'icon': Icons.upload_outlined, 'label': '代扣', 'route': RoutePaths.deduction},
+      {'icon': Icons.image_outlined, 'label': '海报', 'route': RoutePaths.marketing},
+      {'icon': Icons.notifications_outlined, 'label': '消息', 'route': RoutePaths.message},
+      {'icon': Icons.person_outline, 'label': '我的', 'route': RoutePaths.profile},
     ];
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
+        color: Colors.transparent, // Remove background from container
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [ // Move shadow here if needed, or keep in Material elevation
+           BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-      ),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 4,
-          childAspectRatio: 1,
-        ),
-        itemCount: actions.length,
-        itemBuilder: (context, index) {
-          final action = actions[index];
-          return Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.background,
-                  borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 4,
+              childAspectRatio: 0.85,
+            ),
+            itemCount: actions.length,
+            itemBuilder: (context, index) {
+              final action = actions[index];
+              return InkWell(
+                onTap: () {
+                  final route = action['route'] as String;
+                  // 底部导航栏内的路由用go，其他用push
+                  if (route == RoutePaths.terminal ||
+                      route == RoutePaths.wallet ||
+                      route == RoutePaths.profile ||
+                      route == RoutePaths.dataAnalysis) {
+                    context.go(route);
+                  } else {
+                    context.push(route);
+                  }
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(action['icon'] as IconData, color: AppColors.primary, size: 20),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      action['label'] as String,
+                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
-                child: Icon(action['icon'] as IconData, color: AppColors.primary, size: 24),
-              ),
-              const SizedBox(height: 6),
-              Text(action['label'] as String, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-            ],
-          );
-        },
+              );
+            },
+          ),
+        ),
       ),
     );
   }

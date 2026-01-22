@@ -88,6 +88,8 @@ func main() {
 	walletLogRepo := repository.NewGormWalletLogRepository(db)
 	agentRepo := repository.NewGormAgentRepository(db)
 	agentPolicyRepo := repository.NewGormAgentPolicyRepository(db)
+	merchantRepo := repository.NewGormMerchantRepository(db)
+	rateStagePolicyRepo := repository.NewGormRateStagePolicyRepository(db)
 
 	// 5. 初始化消息服务
 	pushConfig := &service.PushConfig{
@@ -107,6 +109,14 @@ func main() {
 		messageService,
 		memQueue,
 	)
+
+	// 6.1 初始化费率阶梯服务并注入到分润服务
+	rateStagingService := service.NewRateStagingService(
+		rateStagePolicyRepo,
+		merchantRepo,
+		agentRepo,
+	)
+	profitService.SetRateStagingService(rateStagingService)
 
 	// 7. 初始化回调处理服务
 	callbackProcessor := service.NewCallbackProcessor(
@@ -135,15 +145,46 @@ func main() {
 		agentRepo,
 	)
 
+	// 8.1 初始化货款代扣相关Repository和Service
+	goodsDeductionRepo := repository.NewGormGoodsDeductionRepository(db)
+	goodsDeductionDetailRepo := repository.NewGormGoodsDeductionDetailRepository(db)
+	goodsDeductionTerminalRepo := repository.NewGormGoodsDeductionTerminalRepository(db)
+	goodsDeductionNotificationRepo := repository.NewGormGoodsDeductionNotificationRepository(db)
+
+	goodsDeductionService := service.NewGoodsDeductionService(
+		goodsDeductionRepo,
+		goodsDeductionDetailRepo,
+		goodsDeductionTerminalRepo,
+		goodsDeductionNotificationRepo,
+		walletRepo,
+		walletLogRepo,
+		agentRepo,
+	)
+
+	// 8.2 将货款代扣服务注入到分润服务（延迟注入，避免循环依赖）
+	profitService.SetGoodsDeductionService(goodsDeductionService)
+
 	// 9. 初始化终端下发相关Repository和Service
 	terminalRepo := repository.NewGormTerminalRepository(db)
 	terminalDistributeRepo := repository.NewGormTerminalDistributeRepository(db)
+	terminalRecallRepo := repository.NewGormTerminalRecallRepository(db)
+	terminalImportRecordRepo := repository.NewGormTerminalImportRecordRepository(db)
 
 	terminalDistributeService := service.NewTerminalDistributeService(
 		terminalRepo,
 		terminalDistributeRepo,
 		agentRepo,
 		deductionService,
+	)
+
+	// 9.1 将货款代扣服务注入到终端划拨服务
+	terminalDistributeService.SetGoodsDeductionService(goodsDeductionService)
+
+	terminalService := service.NewTerminalService(
+		terminalRepo,
+		terminalRecallRepo,
+		terminalImportRecordRepo,
+		agentRepo,
 	)
 
 	// 10. 初始化流量费返现相关Repository和Service
@@ -168,6 +209,7 @@ func main() {
 	deductionHandler := handler.NewDeductionHandler(deductionService)
 	terminalDistributeHandler := handler.NewTerminalDistributeHandler(terminalDistributeService)
 	simCashbackHandler := handler.NewSimCashbackHandler(simCashbackService)
+	goodsDeductionHandler := handler.NewGoodsDeductionHandler(goodsDeductionService)
 
 	// 12. 初始化PC端新增Repository
 	userRepo := repository.NewGormUserRepository(db)
@@ -191,28 +233,136 @@ func main() {
 	dashboardHandler := handler.NewDashboardHandler(transactionRepo, profitRepo, agentRepo, walletRepo)
 	messageHandler := handler.NewMessageHandler(messageRepo)
 
-	// 16. 初始化商户、终端、政策Handler
-	merchantRepo := repository.NewGormMerchantRepository(db)
-	merchantHandler := handler.NewMerchantHandler(merchantRepo, transactionRepo)
-	terminalHandler := handler.NewTerminalHandler(terminalRepo, transactionRepo)
-	policyTemplateRepo := repository.NewGormPolicyTemplateRepository(db)
-	policyHandler := handler.NewPolicyHandler(policyTemplateRepo, agentPolicyRepo)
+	// 15.1 初始化管理端消息Handler
+	adminMessageHandler := handler.NewAdminMessageHandler(messageService, agentRepo)
 
-	// 17. 初始化监控服务
+	// 16. 初始化商户、终端Handler
+	merchantService := service.NewMerchantService(merchantRepo, agentRepo, transactionRepo, terminalRepo)
+	merchantHandler := handler.NewMerchantHandler(merchantRepo, transactionRepo, merchantService)
+	terminalHandler := handler.NewTerminalHandler(terminalRepo, transactionRepo, terminalService)
+
+	// 17. 初始化政策相关Repository
+	policyTemplateRepo := repository.NewGormPolicyTemplateRepository(db)
+	depositPolicyRepo := repository.NewGormDepositCashbackPolicyRepository(db)
+	depositRecordRepo := repository.NewGormDepositCashbackRecordRepository(db)
+	rewardPolicyRepo := repository.NewGormActivationRewardPolicyRepository(db)
+	rewardRecordRepo := repository.NewGormActivationRewardRecordRepository(db)
+	agentDepositPolicyRepo := repository.NewGormAgentDepositCashbackPolicyRepository(db)
+	agentSimPolicyRepo := repository.NewGormAgentSimCashbackPolicyRepository(db)
+	agentRewardPolicyRepo := repository.NewGormAgentActivationRewardPolicyRepository(db)
+	simPolicyRepo := repository.NewGormSimCashbackPolicyRepository(db)
+	channelRepo := repository.NewGormChannelRepository(db)
+
+	// 18. 初始化政策管理服务
+	policyService := service.NewPolicyService(
+		policyTemplateRepo,
+		depositPolicyRepo,
+		simPolicyRepo,
+		rewardPolicyRepo,
+		rateStagePolicyRepo,
+		agentPolicyRepo,
+		agentDepositPolicyRepo,
+		agentSimPolicyRepo,
+		agentRewardPolicyRepo,
+		agentRepo,
+	)
+
+	// 19. 初始化押金返现服务
+	depositCashbackService := service.NewDepositCashbackService(
+		terminalRepo,
+		merchantRepo,
+		depositPolicyRepo,
+		agentDepositPolicyRepo,
+		depositRecordRepo,
+		walletRepo,
+		walletLogRepo,
+		agentRepo,
+		agentPolicyRepo,
+		messageService,
+		memQueue,
+	)
+
+	// 20. 初始化激活奖励服务
+	activationRewardService := service.NewActivationRewardService(
+		terminalRepo,
+		merchantRepo,
+		transactionRepo,
+		rewardPolicyRepo,
+		agentRewardPolicyRepo,
+		rewardRecordRepo,
+		walletRepo,
+		walletLogRepo,
+		agentRepo,
+		agentPolicyRepo,
+		messageService,
+		memQueue,
+	)
+
+	// 20.1 初始化代理商通道服务
+	agentChannelRepo := repository.NewGormAgentChannelRepository(db)
+	agentChannelService := service.NewAgentChannelService(
+		agentChannelRepo,
+		channelRepo,
+		agentRepo,
+	)
+	agentChannelHandler := handler.NewAgentChannelHandler(agentChannelService)
+
+	// 20.2 初始化充值钱包服务
+	chargingWalletRepo := repository.NewGormChargingWalletRepository(db)
+	chargingWalletService := service.NewChargingWalletService(
+		chargingWalletRepo,
+		walletRepo,
+		walletLogRepo,
+		agentRepo,
+	)
+	chargingWalletHandler := handler.NewChargingWalletHandler(chargingWalletService)
+
+	// 20.3 初始化沉淀钱包服务
+	settlementWalletRepo := repository.NewGormSettlementWalletRepository(db)
+	settlementWalletService := service.NewSettlementWalletService(
+		settlementWalletRepo,
+		chargingWalletRepo,
+		walletRepo,
+		walletLogRepo,
+		agentRepo,
+	)
+	settlementWalletHandler := handler.NewSettlementWalletHandler(settlementWalletService)
+
+	// 20.4 初始化税筹通道服务
+	taxChannelRepo := repository.NewGormTaxChannelRepository(db)
+	taxChannelService := service.NewTaxChannelService(taxChannelRepo)
+	taxChannelHandler := handler.NewTaxChannelHandler(taxChannelService)
+
+	// 21. 初始化政策Handler
+	policyHandler := handler.NewPolicyHandler(policyTemplateRepo, agentPolicyRepo, policyService)
+
+	// 添加depositCashbackService到定时任务
+	_ = depositCashbackService // 将在后续定时任务中使用
+
+	// 22. 初始化监控服务
 	metricsService := service.NewMetricsService(messageService, memQueue)
 
-	// 13. 订阅队列消息
+	// 23. 订阅队列消息
 	setupQueueSubscribers(memQueue, callbackProcessor, profitService, messageService)
 
-	// 14. 初始化定时任务
-	scheduler := setupScheduler(metricsService, messageService, transactionRepo, profitService, callbackRepo, callbackProcessor, deductionService, simCashbackService)
+	// 24. 初始化定时任务
+	scheduler := setupScheduler(
+		metricsService, messageService, transactionRepo, profitService,
+		callbackRepo, callbackProcessor, deductionService, simCashbackService,
+		// 新增参数：激活奖励相关
+		terminalRepo, channelRepo, activationRewardService,
+		depositRecordRepo, rewardRecordRepo, walletRepo, simCashbackRecordRepo,
+	)
 	scheduler.Start()
 
 	// 15. 创建HTTP服务器
 	router := setupRouter(
 		callbackHandler, deductionHandler, terminalDistributeHandler, simCashbackHandler,
+		goodsDeductionHandler,
 		authHandler, agentHandler, walletHandler, transactionHandler, profitHandler, dashboardHandler, messageHandler,
-		merchantHandler, terminalHandler, policyHandler,
+		adminMessageHandler,
+		merchantHandler, terminalHandler, policyHandler, agentChannelHandler,
+		chargingWalletHandler, settlementWalletHandler, taxChannelHandler,
 		authService, metricsService, config.SwaggerEnabled,
 	)
 
@@ -358,6 +508,14 @@ func setupScheduler(
 	callbackProcessor *service.CallbackProcessor,
 	deductionService *service.DeductionService,
 	simCashbackService *service.SimCashbackService,
+	// 新增参数：激活奖励相关
+	terminalRepo *repository.GormTerminalRepository,
+	channelRepo *repository.GormChannelRepository,
+	activationRewardService *service.ActivationRewardService,
+	depositRecordRepo *repository.GormDepositCashbackRecordRepository,
+	rewardRecordRepo *repository.GormActivationRewardRecordRepository,
+	walletRepo *repository.GormWalletRepository,
+	simCashbackRecordRepo *repository.GormSimCashbackRecordRepository,
 ) *jobs.Scheduler {
 	scheduler := jobs.NewScheduler()
 
@@ -384,6 +542,26 @@ func setupScheduler(
 	// 每日代扣任务（每24小时执行一次）
 	jobs.SetupDeductionJobs(scheduler, deductionService, simCashbackService)
 
+	// ============================================================
+	// 新增：政策相关定时任务
+	// ============================================================
+
+	// 激活奖励检查任务（每天凌晨2点执行，这里用24小时间隔）
+	rewardCheckJob := jobs.NewRewardCheckJob(terminalRepo, channelRepo, activationRewardService)
+	scheduler.AddJob("reward_check", 24*time.Hour, rewardCheckJob.Run)
+
+	// 押金返现入账任务（每10分钟）
+	depositCashbackJob := jobs.NewDepositCashbackJob(depositRecordRepo, walletRepo)
+	scheduler.AddJob("deposit_cashback_settle", 10*time.Minute, depositCashbackJob.Run)
+
+	// 激活奖励入账任务（每10分钟）
+	rewardSettleJob := jobs.NewActivationRewardSettleJob(rewardRecordRepo, walletRepo)
+	scheduler.AddJob("activation_reward_settle", 10*time.Minute, rewardSettleJob.Run)
+
+	// 流量费返现入账任务（每10分钟）
+	simSettleJob := jobs.NewSimCashbackSettleJob(simCashbackRecordRepo, walletRepo)
+	scheduler.AddJob("sim_cashback_settle", 10*time.Minute, simSettleJob.Run)
+
 	return scheduler
 }
 
@@ -393,6 +571,7 @@ func setupRouter(
 	deductionHandler *handler.DeductionHandler,
 	terminalDistributeHandler *handler.TerminalDistributeHandler,
 	simCashbackHandler *handler.SimCashbackHandler,
+	goodsDeductionHandler *handler.GoodsDeductionHandler,
 	authHandler *handler.AuthHandler,
 	agentHandler *handler.AgentHandler,
 	walletHandler *handler.WalletHandler,
@@ -400,9 +579,14 @@ func setupRouter(
 	profitHandler *handler.ProfitHandler,
 	dashboardHandler *handler.DashboardHandler,
 	messageHandler *handler.MessageHandler,
+	adminMessageHandler *handler.AdminMessageHandler,
 	merchantHandler *handler.MerchantHandler,
 	terminalHandler *handler.TerminalHandler,
 	policyHandler *handler.PolicyHandler,
+	agentChannelHandler *handler.AgentChannelHandler,
+	chargingWalletHandler *handler.ChargingWalletHandler,
+	settlementWalletHandler *handler.SettlementWalletHandler,
+	taxChannelHandler *handler.TaxChannelHandler,
 	authService *service.AuthService,
 	metricsService *service.MetricsService,
 	swaggerEnabled bool,
@@ -413,6 +597,7 @@ func setupRouter(
 	// 全局中间件
 	router.Use(middleware.RecoveryMiddleware())
 	router.Use(middleware.LoggingMiddleware())
+	router.Use(middleware.CORSMiddleware())
 
 	// 限流中间件（每秒1000个请求，桶容量2000）
 	globalLimiter := middleware.NewRateLimiter(1000, 2000)
@@ -462,6 +647,9 @@ func setupRouter(
 		// 注册流量费返现路由
 		handler.RegisterSimCashbackRoutes(apiV1, simCashbackHandler)
 
+		// 注册货款代扣路由
+		handler.RegisterGoodsDeductionRoutes(apiV1, goodsDeductionHandler)
+
 		// 注册PC端新增路由
 		handler.RegisterAgentRoutes(apiV1, agentHandler, authService)
 		handler.RegisterWalletRoutes(apiV1, walletHandler, authService)
@@ -470,10 +658,21 @@ func setupRouter(
 		handler.RegisterDashboardRoutes(apiV1, dashboardHandler, authService)
 		handler.RegisterMessageRoutes(apiV1, messageHandler, authService)
 
+		// 注册管理端消息路由
+		handler.RegisterAdminMessageRoutes(apiV1, adminMessageHandler, authService)
+
 		// 注册商户、终端、政策路由
 		handler.RegisterMerchantRoutes(apiV1, merchantHandler, authService)
 		handler.RegisterTerminalRoutes(apiV1, terminalHandler, authService)
 		handler.RegisterPolicyRoutes(apiV1, policyHandler, authService)
+
+		// 注册代理商通道路由
+		handler.RegisterAgentChannelRoutes(apiV1, agentChannelHandler, authService)
+
+		// 注册钱包相关路由
+		handler.RegisterChargingWalletRoutes(apiV1, chargingWalletHandler, authService)
+		handler.RegisterSettlementWalletRoutes(apiV1, settlementWalletHandler, authService)
+		handler.RegisterTaxChannelRoutes(apiV1, taxChannelHandler, authService)
 	}
 
 	// Swagger UI (可通过环境变量关闭)

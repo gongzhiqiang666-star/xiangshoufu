@@ -7,6 +7,7 @@ export {}
 
 declare module 'vue' {
   export interface GlobalComponents {
+    ActivationRewardEditor: typeof import('./components/Policy/ActivationRewardEditor.vue')['default']
     AgentSelect: typeof import('./components/Common/AgentSelect.vue')['default']
     AmountInput: typeof import('./components/Common/AmountInput.vue')['default']
     AppBreadcrumb: typeof import('./components/Layout/AppBreadcrumb.vue')['default']
@@ -14,12 +15,15 @@ declare module 'vue' {
     AppLayout: typeof import('./components/Layout/AppLayout.vue')['default']
     AppSidebar: typeof import('./components/Layout/AppSidebar.vue')['default']
     ChannelSelect: typeof import('./components/Common/ChannelSelect.vue')['default']
+    DepositCashbackEditor: typeof import('./components/Policy/DepositCashbackEditor.vue')['default']
+    ElAlert: typeof import('element-plus/es')['ElAlert']
     ElAside: typeof import('element-plus/es')['ElAside']
     ElAvatar: typeof import('element-plus/es')['ElAvatar']
     ElBadge: typeof import('element-plus/es')['ElBadge']
     ElBreadcrumb: typeof import('element-plus/es')['ElBreadcrumb']
     ElBreadcrumbItem: typeof import('element-plus/es')['ElBreadcrumbItem']
     ElButton: typeof import('element-plus/es')['ElButton']
+    ElButtonGroup: typeof import('element-plus/es')['ElButtonGroup']
     ElCard: typeof import('element-plus/es')['ElCard']
     ElCheckbox: typeof import('element-plus/es')['ElCheckbox']
     ElCheckboxGroup: typeof import('element-plus/es')['ElCheckboxGroup']
@@ -30,6 +34,7 @@ declare module 'vue' {
     ElDescriptions: typeof import('element-plus/es')['ElDescriptions']
     ElDescriptionsItem: typeof import('element-plus/es')['ElDescriptionsItem']
     ElDialog: typeof import('element-plus/es')['ElDialog']
+    ElDivider: typeof import('element-plus/es')['ElDivider']
     ElDropdown: typeof import('element-plus/es')['ElDropdown']
     ElDropdownItem: typeof import('element-plus/es')['ElDropdownItem']
     ElDropdownMenu: typeof import('element-plus/es')['ElDropdownMenu']
@@ -52,6 +57,8 @@ declare module 'vue' {
     ElRow: typeof import('element-plus/es')['ElRow']
     ElScrollbar: typeof import('element-plus/es')['ElScrollbar']
     ElSelect: typeof import('element-plus/es')['ElSelect']
+    ElSlider: typeof import('element-plus/es')['ElSlider']
+    ElSpace: typeof import('element-plus/es')['ElSpace']
     ElSubMenu: typeof import('element-plus/es')['ElSubMenu']
     ElSwitch: typeof import('element-plus/es')['ElSwitch']
     ElTable: typeof import('element-plus/es')['ElTable']
@@ -65,9 +72,12 @@ declare module 'vue' {
     PageHeader: typeof import('./components/Common/PageHeader.vue')['default']
     PieChart: typeof import('./components/Charts/PieChart.vue')['default']
     ProTable: typeof import('./components/Common/ProTable.vue')['default']
+    RateEditDialog: typeof import('./components/Merchant/RateEditDialog.vue')['default']
+    RateStageEditor: typeof import('./components/Policy/RateStageEditor.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SearchForm: typeof import('./components/Common/SearchForm.vue')['default']
+    SimCashbackEditor: typeof import('./components/Policy/SimCashbackEditor.vue')['default']
     StatCard: typeof import('./components/Common/StatCard.vue')['default']
   }
   export interface ComponentCustomProperties {

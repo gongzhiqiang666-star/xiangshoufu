@@ -7,6 +7,23 @@ import type {
   PaginatedResponse,
 } from '@/types'
 
+// 扩展统计类型
+export interface ExtendedMerchantStats {
+  total_count: number
+  active_count: number
+  pending_count: number
+  disabled_count: number
+  direct_count: number
+  team_count: number
+  today_new_count: number
+  loyal_count: number
+  quality_count: number
+  potential_count: number
+  normal_count: number
+  low_active_count: number
+  inactive_count: number
+}
+
 /**
  * 获取商户列表
  */
@@ -87,4 +104,40 @@ export function updateMerchantRate(
  */
 export function searchMerchants(keyword: string): Promise<Merchant[]> {
   return get<Merchant[]>('/v1/merchants/search', { keyword, limit: 20 })
+}
+
+/**
+ * 获取扩展统计（包含直营/团队、商户类型分布）
+ */
+export function getExtendedMerchantStats(): Promise<ExtendedMerchantStats> {
+  return get<ExtendedMerchantStats>('/v1/merchants/stats/extended')
+}
+
+/**
+ * 导出商户列表
+ */
+export function exportMerchants(params: MerchantQueryParams): Promise<Blob> {
+  // 使用原生fetch获取blob
+  const queryParams = new URLSearchParams()
+  if (params.keyword) queryParams.append('keyword', params.keyword)
+  if (params.merchant_type) queryParams.append('merchant_type', params.merchant_type)
+  if (params.is_direct !== undefined) queryParams.append('is_direct', String(params.is_direct))
+  if (params.status !== undefined) queryParams.append('status', String(params.status))
+
+  return fetch(`/api/v1/merchants/export?${queryParams.toString()}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+    },
+  }).then(res => res.blob())
+}
+
+/**
+ * 更新商户状态
+ */
+export function updateMerchantStatus(
+  merchantId: number,
+  status: number
+): Promise<void> {
+  return put<void>(`/v1/merchants/${merchantId}/status`, { status })
 }

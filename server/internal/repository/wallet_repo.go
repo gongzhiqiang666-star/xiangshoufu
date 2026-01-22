@@ -336,3 +336,71 @@ func (r *GormAgentRepository) FindAllByParentPath(parentID int64, limit, offset 
 	err := query.Order("level ASC, created_at DESC").Limit(limit).Offset(offset).Find(&agents).Error
 	return agents, total, err
 }
+
+// Create 创建代理商
+func (r *GormAgentRepository) Create(agent *AgentFull) error {
+	return r.db.Create(agent).Error
+}
+
+// FindByPhone 根据手机号查找代理商
+func (r *GormAgentRepository) FindByPhone(phone string) (*AgentFull, error) {
+	var agent AgentFull
+	err := r.db.Where("contact_phone = ?", phone).First(&agent).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	return &agent, err
+}
+
+// FindByInviteCode 根据邀请码查找代理商
+func (r *GormAgentRepository) FindByInviteCode(inviteCode string) (*AgentFull, error) {
+	var agent AgentFull
+	err := r.db.Where("invite_code = ?", inviteCode).First(&agent).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	return &agent, err
+}
+
+// GetDailyAgentSequence 获取当日代理商序号
+func (r *GormAgentRepository) GetDailyAgentSequence(dateStr string) int {
+	var count int64
+	pattern := "A" + dateStr + "%"
+	r.db.Model(&AgentFull{}).Where("agent_no LIKE ?", pattern).Count(&count)
+	return int(count) + 1
+}
+
+// IncrementDirectAgentCount 增加直属代理商计数
+func (r *GormAgentRepository) IncrementDirectAgentCount(agentID int64) error {
+	return r.db.Model(&AgentFull{}).
+		Where("id = ?", agentID).
+		Update("direct_agent_count", gorm.Expr("direct_agent_count + 1")).Error
+}
+
+// IncrementTeamAgentCount 增加团队代理商计数
+func (r *GormAgentRepository) IncrementTeamAgentCount(agentID int64) error {
+	return r.db.Model(&AgentFull{}).
+		Where("id = ?", agentID).
+		Update("team_agent_count", gorm.Expr("team_agent_count + 1")).Error
+}
+
+// SearchAgents 全局搜索代理商
+func (r *GormAgentRepository) SearchAgents(keyword string, status *int16, limit, offset int) ([]*AgentFull, int64, error) {
+	query := r.db.Model(&AgentFull{})
+
+	if keyword != "" {
+		query = query.Where("agent_no LIKE ? OR agent_name LIKE ? OR contact_phone LIKE ?",
+			"%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%")
+	}
+
+	if status != nil {
+		query = query.Where("status = ?", *status)
+	}
+
+	var total int64
+	query.Count(&total)
+
+	var agents []*AgentFull
+	err := query.Order("created_at DESC").Limit(limit).Offset(offset).Find(&agents).Error
+	return agents, total, err
+}

@@ -61,7 +61,12 @@
 
       <!-- 费率信息 -->
       <el-card class="detail-card">
-        <template #header>费率信息</template>
+        <template #header>
+          <div class="card-header">
+            <span>费率信息</span>
+            <el-button type="primary" size="small" @click="handleEditRate">修改费率</el-button>
+          </div>
+        </template>
         <el-row :gutter="20">
           <el-col :span="6">
             <div class="rate-item">
@@ -142,15 +147,23 @@
         <el-empty v-if="!recentTransactions.length" description="暂无交易记录" />
       </el-card>
     </div>
+
+    <!-- 费率修改弹窗 -->
+    <RateEditDialog
+      v-model="rateDialogVisible"
+      :merchant="rateDialogMerchant"
+      @success="fetchDetail"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Shop } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import PageHeader from '@/components/Common/PageHeader.vue'
+import RateEditDialog from '@/components/Merchant/RateEditDialog.vue'
 import { getMerchant, getMerchantTerminals, getMerchantTransactions } from '@/api/merchant'
 import { formatAmount } from '@/utils/format'
 
@@ -165,10 +178,24 @@ const detail = ref<any>(null)
 const terminals = ref<any[]>([])
 const recentTransactions = ref<any[]>([])
 
+// 费率修改弹窗
+const rateDialogVisible = ref(false)
+const rateDialogMerchant = computed(() => {
+  if (!detail.value) return null
+  return {
+    id: detail.value.id,
+    merchant_no: detail.value.merchant_no,
+    merchant_name: detail.value.name,
+    credit_rate: detail.value.credit_rate,
+    debit_rate: detail.value.debit_rate,
+  }
+})
+
 // 格式化费率
-function formatRate(rate?: number) {
+function formatRate(rate?: number | string) {
   if (rate === undefined || rate === null) return '0.00'
-  return (rate * 100).toFixed(2)
+  const num = typeof rate === 'string' ? parseFloat(rate) : rate
+  return (num * 100).toFixed(2)
 }
 
 // 获取详情
@@ -177,7 +204,7 @@ async function fetchDetail() {
   try {
     const [merchantData, terminalsData, transactionsData] = await Promise.all([
       getMerchant(Number(route.params.id)),
-      getMerchantTerminals(Number(route.params.id)),
+      getMerchantTerminals(Number(route.params.id)).catch(() => []),
       getMerchantTransactions(Number(route.params.id), { page: 1, page_size: 5 }),
     ])
     detail.value = merchantData
@@ -194,6 +221,11 @@ async function fetchDetail() {
 // 返回列表
 function handleBack() {
   router.push('/merchants/list')
+}
+
+// 修改费率
+function handleEditRate() {
+  rateDialogVisible.value = true
 }
 
 // 查看全部交易

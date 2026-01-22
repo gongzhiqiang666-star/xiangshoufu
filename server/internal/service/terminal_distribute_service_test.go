@@ -98,6 +98,18 @@ func (m *MockTerminalRepository) UpdateSimFeeCount(id int64, count int) error {
 	return nil
 }
 
+func (m *MockTerminalRepository) FindActivatedAfter(channelID int64, activatedAfter time.Time) ([]*models.Terminal, error) {
+	var result []*models.Terminal
+	for _, terminal := range m.terminals {
+		if terminal.ChannelID == channelID && terminal.Status == models.TerminalStatusActivated {
+			if terminal.ActivatedAt != nil && terminal.ActivatedAt.After(activatedAfter) {
+				result = append(result, terminal)
+			}
+		}
+	}
+	return result, nil
+}
+
 // MockTerminalDistributeRepository 模拟终端下发仓库
 type MockTerminalDistributeRepository struct {
 	distributes map[int64]*models.TerminalDistribute

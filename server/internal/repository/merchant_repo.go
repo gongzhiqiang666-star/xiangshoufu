@@ -116,50 +116,200 @@ func (r *GormMerchantRepository) GetMerchantTransStats(merchantID int64, startTi
 	return stats, nil
 }
 
-// GormPolicyTemplateRepository 政策模板仓储
-type GormPolicyTemplateRepository struct {
-	db *gorm.DB
+// ==================== 商户仓储新增方法 ====================
+
+// MerchantQueryParams 商户查询参数
+type MerchantQueryParams struct {
+	AgentID      int64
+	Keyword      string
+	Status       *int16
+	MerchantType string
+	IsDirect     *bool
+	ChannelID    *int64
+	Limit        int
+	Offset       int
 }
 
-// NewGormPolicyTemplateRepository 创建政策模板仓储
-func NewGormPolicyTemplateRepository(db *gorm.DB) *GormPolicyTemplateRepository {
-	return &GormPolicyTemplateRepository{db: db}
+// FindByParams 根据参数查询商户列表（增强版）
+func (r *GormMerchantRepository) FindByParams(params MerchantQueryParams) ([]*models.Merchant, int64, error) {
+	var merchants []*models.Merchant
+	var total int64
+
+	query := r.db.Model(&models.Merchant{}).Where("agent_id = ?", params.AgentID)
+
+	if params.Keyword != "" {
+		query = query.Where("merchant_no LIKE ? OR merchant_name LIKE ? OR terminal_sn LIKE ?",
+			"%"+params.Keyword+"%", "%"+params.Keyword+"%", "%"+params.Keyword+"%")
+	}
+	if params.Status != nil {
+		query = query.Where("status = ?", *params.Status)
+	}
+	if params.MerchantType != "" {
+		query = query.Where("merchant_type = ?", params.MerchantType)
+	}
+	if params.IsDirect != nil {
+		query = query.Where("is_direct = ?", *params.IsDirect)
+	}
+	if params.ChannelID != nil {
+		query = query.Where("channel_id = ?", *params.ChannelID)
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	if err := query.Order("created_at DESC").Limit(params.Limit).Offset(params.Offset).Find(&merchants).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return merchants, total, nil
 }
 
-// FindAll 查询所有模板
-func (r *GormPolicyTemplateRepository) FindAll(channelID *int64, status *int16) ([]*models.PolicyTemplate, error) {
-	var templates []*models.PolicyTemplate
+// Create 创建商户
+func (r *GormMerchantRepository) Create(merchant *models.Merchant) error {
+	return r.db.Create(merchant).Error
+}
 
-	query := r.db.Model(&models.PolicyTemplate{})
+// Update 更新商户
+func (r *GormMerchantRepository) Update(merchant *models.Merchant) error {
+	return r.db.Save(merchant).Error
+}
 
-	if channelID != nil {
-		query = query.Where("channel_id = ?", *channelID)
+// Delete 删除商户（软删除场景下可改为状态变更）
+func (r *GormMerchantRepository) Delete(id int64) error {
+	return r.db.Delete(&models.Merchant{}, id).Error
+}
+
+// UpdateStatus 更新商户状态
+func (r *GormMerchantRepository) UpdateStatus(id int64, status int16) error {
+	return r.db.Model(&models.Merchant{}).Where("id = ?", id).
+		Updates(map[string]interface{}{
+			"status":     status,
+			"updated_at": time.Now(),
+		}).Error
+}
+
+// UpdateRate 更新商户费率
+func (r *GormMerchantRepository) UpdateRate(id int64, creditRate, debitRate string) error {
+	return r.db.Model(&models.Merchant{}).Where("id = ?", id).
+		Updates(map[string]interface{}{
+			"credit_rate": creditRate,
+			"debit_rate":  debitRate,
+			"updated_at":  time.Now(),
+		}).Error
+}
+
+// Register 商户登记（更新登记手机号和备注）
+func (r *GormMerchantRepository) Register(id int64, phone, remark string) error {
+	return r.db.Model(&models.Merchant{}).Where("id = ?", id).
+		Updates(map[string]interface{}{
+			"registered_phone": phone,
+			"register_remark":  remark,
+			"updated_at":       time.Now(),
+		}).Error
+}
+
+// UpdateMerchantType 更新商户类型
+func (r *GormMerchantRepository) UpdateMerchantType(id int64, merchantType string) error {
+	return r.db.Model(&models.Merchant{}).Where("id = ?", id).
+		Updates(map[string]interface{}{
+			"merchant_type": merchantType,
+			"updated_at":    time.Now(),
+		}).Error
+}
+
+// UpdateActivatedAt 更新激活时间
+func (r *GormMerchantRepository) UpdateActivatedAt(id int64, activatedAt time.Time) error {
+	return r.db.Model(&models.Merchant{}).Where("id = ?", id).
+		Updates(map[string]interface{}{
+			"activated_at": activatedAt,
+			"updated_at":   time.Now(),
+		}).Error
+}
+
+// FindByTerminalSN 根据终端SN查询商户
+func (r *GormMerchantRepository) FindByTerminalSN(terminalSN string) (*models.Merchant, error) {
+	var merchant models.Merchant
+	if err := r.db.Where("terminal_sn = ?", terminalSN).First(&merchant).Error; err != nil {
+		return nil, err
 	}
-	if status != nil {
-		query = query.Where("status = ?", *status)
+	return &merchant, nil
+}
+
+// GetExtendedStats 获取扩展统计（包含直营/团队、商户类型分布）
+type ExtendedMerchantStats struct {
+	TotalCount    int64 `json:"total_count"`
+	ActiveCount   int64 `json:"active_count"`
+	PendingCount  int64 `json:"pending_count"`
+	DisabledCount int64 `json:"disabled_count"`
+	DirectCount   int64 `json:"direct_count"`
+	TeamCount     int64 `json:"team_count"`
+	TodayNewCount int64 `json:"today_new_count"`
+	// 商户类型分布
+	LoyalCount     int64 `json:"loyal_count"`
+	QualityCount   int64 `json:"quality_count"`
+	PotentialCount int64 `json:"potential_count"`
+	NormalCount    int64 `json:"normal_count"`
+	LowActiveCount int64 `json:"low_active_count"`
+	InactiveCount  int64 `json:"inactive_count"`
+}
+
+func (r *GormMerchantRepository) GetExtendedStats(agentID int64) (*ExtendedMerchantStats, error) {
+	stats := &ExtendedMerchantStats{}
+
+	baseQuery := r.db.Model(&models.Merchant{}).Where("agent_id = ?", agentID)
+
+	// 基础统计
+	baseQuery.Count(&stats.TotalCount)
+	r.db.Model(&models.Merchant{}).Where("agent_id = ? AND status = 1", agentID).Count(&stats.ActiveCount)
+	r.db.Model(&models.Merchant{}).Where("agent_id = ? AND approve_status = 1", agentID).Count(&stats.PendingCount)
+	r.db.Model(&models.Merchant{}).Where("agent_id = ? AND status = 2", agentID).Count(&stats.DisabledCount)
+
+	// 直营/团队统计
+	r.db.Model(&models.Merchant{}).Where("agent_id = ? AND is_direct = true", agentID).Count(&stats.DirectCount)
+	r.db.Model(&models.Merchant{}).Where("agent_id = ? AND is_direct = false", agentID).Count(&stats.TeamCount)
+
+	// 今日新增
+	today := time.Now().Truncate(24 * time.Hour)
+	r.db.Model(&models.Merchant{}).Where("agent_id = ? AND created_at >= ?", agentID, today).Count(&stats.TodayNewCount)
+
+	// 商户类型分布
+	r.db.Model(&models.Merchant{}).Where("agent_id = ? AND merchant_type = ?", agentID, models.MerchantTypeLoyal).Count(&stats.LoyalCount)
+	r.db.Model(&models.Merchant{}).Where("agent_id = ? AND merchant_type = ?", agentID, models.MerchantTypeQuality).Count(&stats.QualityCount)
+	r.db.Model(&models.Merchant{}).Where("agent_id = ? AND merchant_type = ?", agentID, models.MerchantTypePotential).Count(&stats.PotentialCount)
+	r.db.Model(&models.Merchant{}).Where("agent_id = ? AND merchant_type = ?", agentID, models.MerchantTypeNormal).Count(&stats.NormalCount)
+	r.db.Model(&models.Merchant{}).Where("agent_id = ? AND merchant_type = ?", agentID, models.MerchantTypeLowActive).Count(&stats.LowActiveCount)
+	r.db.Model(&models.Merchant{}).Where("agent_id = ? AND merchant_type = ?", agentID, models.MerchantTypeInactive).Count(&stats.InactiveCount)
+
+	return stats, nil
+}
+
+// ExportMerchants 导出商户数据（不分页）
+func (r *GormMerchantRepository) ExportMerchants(params MerchantQueryParams) ([]*models.Merchant, error) {
+	var merchants []*models.Merchant
+
+	query := r.db.Model(&models.Merchant{}).Where("agent_id = ?", params.AgentID)
+
+	if params.Keyword != "" {
+		query = query.Where("merchant_no LIKE ? OR merchant_name LIKE ?",
+			"%"+params.Keyword+"%", "%"+params.Keyword+"%")
+	}
+	if params.Status != nil {
+		query = query.Where("status = ?", *params.Status)
+	}
+	if params.MerchantType != "" {
+		query = query.Where("merchant_type = ?", params.MerchantType)
+	}
+	if params.IsDirect != nil {
+		query = query.Where("is_direct = ?", *params.IsDirect)
+	}
+	if params.ChannelID != nil {
+		query = query.Where("channel_id = ?", *params.ChannelID)
 	}
 
-	if err := query.Order("channel_id, is_default DESC, created_at DESC").Find(&templates).Error; err != nil {
+	if err := query.Order("created_at DESC").Find(&merchants).Error; err != nil {
 		return nil, err
 	}
 
-	return templates, nil
-}
-
-// FindByID 根据ID查询模板
-func (r *GormPolicyTemplateRepository) FindByID(id int64) (*models.PolicyTemplate, error) {
-	var template models.PolicyTemplate
-	if err := r.db.First(&template, id).Error; err != nil {
-		return nil, err
-	}
-	return &template, nil
-}
-
-// FindDefaultByChannel 查询通道默认模板
-func (r *GormPolicyTemplateRepository) FindDefaultByChannel(channelID int64) (*models.PolicyTemplate, error) {
-	var template models.PolicyTemplate
-	if err := r.db.Where("channel_id = ? AND is_default = true", channelID).First(&template).Error; err != nil {
-		return nil, err
-	}
-	return &template, nil
+	return merchants, nil
 }

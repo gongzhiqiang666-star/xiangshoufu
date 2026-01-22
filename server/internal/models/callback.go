@@ -113,4 +113,55 @@ const (
 	MessageTypeSimCashback  = 4 // 流量返现
 	MessageTypeRefund       = 5 // 退款撤销
 	MessageTypeAnnouncement = 6 // 系统公告
+	MessageTypeNewAgent     = 7 // 新代理注册
+	MessageTypeTransaction  = 8 // 交易通知
 )
+
+// MessageCategory APP端消息分类
+const (
+	MessageCategoryAll         = "all"         // 全部
+	MessageCategoryProfit      = "profit"      // 分润（类型1,2,3,4）
+	MessageCategoryRegister    = "register"    // 注册（类型7）
+	MessageCategoryConsumption = "consumption" // 消费（类型8）
+	MessageCategorySystem      = "system"      // 系统（类型5,6）
+)
+
+// GetMessageTypesByCategory 根据分类获取消息类型列表
+func GetMessageTypesByCategory(category string) []int16 {
+	switch category {
+	case MessageCategoryProfit:
+		return []int16{MessageTypeProfit, MessageTypeActivation, MessageTypeDeposit, MessageTypeSimCashback}
+	case MessageCategoryRegister:
+		return []int16{MessageTypeNewAgent}
+	case MessageCategoryConsumption:
+		return []int16{MessageTypeTransaction}
+	case MessageCategorySystem:
+		return []int16{MessageTypeRefund, MessageTypeAnnouncement}
+	default:
+		return nil // 全部类型
+	}
+}
+
+// GetMessageTypeName 获取消息类型名称
+func GetMessageTypeName(messageType int16) string {
+	switch messageType {
+	case MessageTypeProfit:
+		return "交易分润"
+	case MessageTypeActivation:
+		return "激活奖励"
+	case MessageTypeDeposit:
+		return "押金返现"
+	case MessageTypeSimCashback:
+		return "流量返现"
+	case MessageTypeRefund:
+		return "退款撤销"
+	case MessageTypeAnnouncement:
+		return "系统公告"
+	case MessageTypeNewAgent:
+		return "新代理注册"
+	case MessageTypeTransaction:
+		return "交易通知"
+	default:
+		return "未知类型"
+	}
+}

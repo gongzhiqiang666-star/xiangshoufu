@@ -3,8 +3,10 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"xiangshoufu/internal/middleware"
+	"xiangshoufu/internal/models"
 	"xiangshoufu/internal/repository"
 	"xiangshoufu/internal/service"
 
@@ -25,12 +27,14 @@ func NewMessageHandler(messageRepo *repository.GormMessageRepository) *MessageHa
 
 // GetMessageList 获取消息列表
 // @Summary 获取消息列表
-// @Description 获取当前代理商的消息列表
+// @Description 获取当前代理商的消息列表，支持按类型和分类筛选
 // @Tags 消息中心
 // @Produce json
 // @Security ApiKeyAuth
 // @Param page query int false "页码"
 // @Param page_size query int false "每页数量"
+// @Param type query string false "消息类型ID，多个用逗号分隔（如1,2,3）"
+// @Param category query string false "消息分类（all/profit/register/consumption/system）"
 // @Success 200 {object} map[string]interface{}
 // @Router /api/v1/messages [get]
 func (h *MessageHandler) GetMessageList(c *gin.Context) {
@@ -46,7 +50,40 @@ func (h *MessageHandler) GetMessageList(c *gin.Context) {
 	}
 	offset := (page - 1) * pageSize
 
-	messages, err := h.messageRepo.FindByAgentID(agentID, pageSize, offset)
+	// 解析类型筛选参数
+	var types []int16
+	typeStr := c.Query("type")
+	category := c.Query("category")
+
+	if category != "" && category != "all" {
+		// 按分类获取类型
+		types = models.GetMessageTypesByCategory(category)
+	} else if typeStr != "" {
+		// 按指定类型筛选
+		typeStrs := strings.Split(typeStr, ",")
+		for _, ts := range typeStrs {
+			if t, err := strconv.ParseInt(strings.TrimSpace(ts), 10, 16); err == nil {
+				types = append(types, int16(t))
+			}
+		}
+	}
+
+	var messages []*models.Message
+	var total int64
+	var err error
+
+	if len(types) > 0 {
+		messages, err = h.messageRepo.FindByAgentIDAndTypes(agentID, types, pageSize, offset)
+		if err == nil {
+			total, err = h.messageRepo.CountByAgentIDAndTypes(agentID, types)
+		}
+	} else {
+		messages, err = h.messageRepo.FindByAgentID(agentID, pageSize, offset)
+		if err == nil {
+			total, err = h.messageRepo.CountByAgentIDAndTypes(agentID, nil)
+		}
+	}
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
@@ -63,7 +100,9 @@ func (h *MessageHandler) GetMessageList(c *gin.Context) {
 			"title":        m.Title,
 			"content":      m.Content,
 			"message_type": m.MessageType,
+			"type_name":    models.GetMessageTypeName(m.MessageType),
 			"is_read":      m.IsRead,
+			"expire_at":    m.ExpireAt,
 			"created_at":   m.CreatedAt,
 		})
 	}
@@ -73,6 +112,7 @@ func (h *MessageHandler) GetMessageList(c *gin.Context) {
 		"message": "success",
 		"data": gin.H{
 			"list":      list,
+			"total":     total,
 			"page":      page,
 			"page_size": pageSize,
 		},
@@ -104,6 +144,103 @@ func (h *MessageHandler) GetUnreadCount(c *gin.Context) {
 		"message": "success",
 		"data": gin.H{
 			"count": len(messages),
+		},
+	})
+}
+
+// GetMessageStats 获取消息分类统计
+// @Summary 获取消息分类统计
+// @Description 获取当前代理商的消息分类统计信息
+// @Tags 消息中心
+// @Produce json
+// @Security ApiKeyAuth
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/messages/stats [get]
+func (h *MessageHandler) GetMessageStats(c *gin.Context) {
+	agentID := middleware.GetCurrentAgentID(c)
+
+	stats, err := h.messageRepo.GetStatsByAgentID(agentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "查询失败: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"total":             stats.Total,
+			"unread_total":      stats.UnreadTotal,
+			"profit_count":      stats.ProfitCount,
+			"register_count":    stats.RegisterCount,
+			"consumption_count": stats.ConsumptionCount,
+			"system_count":      stats.SystemCount,
+		},
+	})
+}
+
+// GetMessageDetail 获取消息详情
+// @Summary 获取消息详情
+// @Description 获取消息详情并自动标记为已读
+// @Tags 消息中心
+// @Produce json
+// @Security ApiKeyAuth
+// @Param id path int true "消息ID"
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/messages/{id} [get]
+func (h *MessageHandler) GetMessageDetail(c *gin.Context) {
+	agentID := middleware.GetCurrentAgentID(c)
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "无效的ID",
+		})
+		return
+	}
+
+	message, err := h.messageRepo.FindByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"code":    404,
+			"message": "消息不存在",
+		})
+		return
+	}
+
+	// 验证消息归属
+	if message.AgentID != agentID {
+		c.JSON(http.StatusForbidden, gin.H{
+			"code":    403,
+			"message": "无权查看此消息",
+		})
+		return
+	}
+
+	// 自动标记为已读
+	if !message.IsRead {
+		_ = h.messageRepo.MarkAsRead(id)
+		message.IsRead = true
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"id":           message.ID,
+			"title":        message.Title,
+			"content":      message.Content,
+			"message_type": message.MessageType,
+			"type_name":    models.GetMessageTypeName(message.MessageType),
+			"is_read":      message.IsRead,
+			"related_id":   message.RelatedID,
+			"related_type": message.RelatedType,
+			"expire_at":    message.ExpireAt,
+			"created_at":   message.CreatedAt,
 		},
 	})
 }
@@ -167,6 +304,44 @@ func (h *MessageHandler) MarkAllAsRead(c *gin.Context) {
 	})
 }
 
+// GetMessageTypes 获取消息类型列表
+// @Summary 获取消息类型列表
+// @Description 获取所有消息类型及分类信息
+// @Tags 消息中心
+// @Produce json
+// @Security ApiKeyAuth
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/messages/types [get]
+func (h *MessageHandler) GetMessageTypes(c *gin.Context) {
+	types := []gin.H{
+		{"value": models.MessageTypeProfit, "label": "交易分润", "category": "profit"},
+		{"value": models.MessageTypeActivation, "label": "激活奖励", "category": "profit"},
+		{"value": models.MessageTypeDeposit, "label": "押金返现", "category": "profit"},
+		{"value": models.MessageTypeSimCashback, "label": "流量返现", "category": "profit"},
+		{"value": models.MessageTypeRefund, "label": "退款撤销", "category": "system"},
+		{"value": models.MessageTypeAnnouncement, "label": "系统公告", "category": "system"},
+		{"value": models.MessageTypeNewAgent, "label": "新代理注册", "category": "register"},
+		{"value": models.MessageTypeTransaction, "label": "交易通知", "category": "consumption"},
+	}
+
+	categories := []gin.H{
+		{"value": "all", "label": "全部"},
+		{"value": "profit", "label": "分润"},
+		{"value": "register", "label": "注册"},
+		{"value": "consumption", "label": "消费"},
+		{"value": "system", "label": "系统"},
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"types":      types,
+			"categories": categories,
+		},
+	})
+}
+
 // RegisterMessageRoutes 注册消息中心路由
 func RegisterMessageRoutes(r *gin.RouterGroup, h *MessageHandler, authService *service.AuthService) {
 	messages := r.Group("/messages")
@@ -174,6 +349,9 @@ func RegisterMessageRoutes(r *gin.RouterGroup, h *MessageHandler, authService *s
 	{
 		messages.GET("", h.GetMessageList)
 		messages.GET("/unread-count", h.GetUnreadCount)
+		messages.GET("/stats", h.GetMessageStats)
+		messages.GET("/types", h.GetMessageTypes)
+		messages.GET("/:id", h.GetMessageDetail)
 		messages.PUT("/:id/read", h.MarkAsRead)
 		messages.PUT("/read-all", h.MarkAllAsRead)
 	}

@@ -2,7 +2,7 @@
   <div class="policy-form-view">
     <PageHeader
       :title="isEdit ? '编辑政策模板' : '新建政策模板'"
-      :sub-title="isEdit ? `模板ID: ${route.params.id}` : '创建新的政策模板'"
+      :sub-title="isEdit ? `模板ID: ${route.params.id}` : '创建新的政策模板（包含4块政策配置）'"
     >
       <template #extra>
         <el-button @click="handleBack">返回</el-button>
@@ -25,8 +25,8 @@
           <div class="section-title">基本信息</div>
           <el-row :gutter="24">
             <el-col :span="12">
-              <el-form-item label="模板名称" prop="name">
-                <el-input v-model="form.name" placeholder="请输入模板名称" />
+              <el-form-item label="模板名称" prop="template_name">
+                <el-input v-model="form.template_name" placeholder="请输入模板名称" />
               </el-form-item>
             </el-col>
             <el-col :span="12">
@@ -53,9 +53,12 @@
           </el-row>
         </div>
 
-        <!-- 费率配置 -->
+        <!-- 1. 成本（费率配置） -->
         <div class="form-section">
-          <div class="section-title">费率配置</div>
+          <div class="section-title">
+            <span>1. 成本配置（费率）</span>
+            <el-tag type="success" size="small">分润钱包</el-tag>
+          </div>
           <el-row :gutter="24">
             <el-col :span="8">
               <el-form-item label="贷记卡费率" prop="credit_rate">
@@ -99,9 +102,9 @@
           </el-row>
           <el-row :gutter="24">
             <el-col :span="8">
-              <el-form-item label="云闪付费率" prop="qrcode_rate">
+              <el-form-item label="云闪付费率" prop="unionpay_rate">
                 <el-input-number
-                  v-model="form.qrcode_rate"
+                  v-model="form.unionpay_rate"
                   :min="0"
                   :max="100"
                   :precision="4"
@@ -112,9 +115,22 @@
               </el-form-item>
             </el-col>
             <el-col :span="8">
-              <el-form-item label="扫码费率" prop="scan_rate">
+              <el-form-item label="微信扫码费率" prop="wechat_rate">
                 <el-input-number
-                  v-model="form.scan_rate"
+                  v-model="form.wechat_rate"
+                  :min="0"
+                  :max="100"
+                  :precision="4"
+                  :step="0.01"
+                  style="width: 160px"
+                />
+                <span class="form-unit">%</span>
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="支付宝费率" prop="alipay_rate">
+                <el-input-number
+                  v-model="form.alipay_rate"
                   :min="0"
                   :max="100"
                   :precision="4"
@@ -127,92 +143,40 @@
           </el-row>
         </div>
 
-        <!-- 分润配置 -->
+        <!-- 2. 押金返现配置 -->
         <div class="form-section">
           <div class="section-title">
-            分润配置
-            <el-button type="primary" link :icon="Plus" @click="addProfitRule">
-              添加规则
-            </el-button>
+            <span>2. 押金返现配置</span>
+            <el-tag type="info" size="small">服务费钱包</el-tag>
           </div>
-
-          <el-table :data="form.profit_rules" border>
-            <el-table-column prop="level" label="代理层级" width="120" align="center">
-              <template #default="{ row, $index }">
-                <el-select v-model="row.level" placeholder="选择层级" size="small">
-                  <el-option label="一级代理" :value="1" />
-                  <el-option label="二级代理" :value="2" />
-                  <el-option label="三级代理" :value="3" />
-                </el-select>
-              </template>
-            </el-table-column>
-            <el-table-column prop="profit_type" label="分润类型" width="140" align="center">
-              <template #default="{ row }">
-                <el-select v-model="row.profit_type" placeholder="选择类型" size="small">
-                  <el-option label="固定金额" value="fixed" />
-                  <el-option label="费率差" value="rate_diff" />
-                  <el-option label="交易比例" value="percentage" />
-                </el-select>
-              </template>
-            </el-table-column>
-            <el-table-column prop="profit_value" label="分润值" width="160" align="center">
-              <template #default="{ row }">
-                <el-input-number
-                  v-model="row.profit_value"
-                  :min="0"
-                  :precision="4"
-                  :step="0.01"
-                  size="small"
-                  style="width: 120px"
-                />
-              </template>
-            </el-table-column>
-            <el-table-column prop="min_amount" label="最小交易额" width="140" align="center">
-              <template #default="{ row }">
-                <el-input-number
-                  v-model="row.min_amount"
-                  :min="0"
-                  :precision="2"
-                  size="small"
-                  style="width: 120px"
-                />
-              </template>
-            </el-table-column>
-            <el-table-column prop="max_amount" label="最大交易额" width="140" align="center">
-              <template #default="{ row }">
-                <el-input-number
-                  v-model="row.max_amount"
-                  :min="0"
-                  :precision="2"
-                  size="small"
-                  style="width: 120px"
-                />
-              </template>
-            </el-table-column>
-            <el-table-column prop="remark" label="备注" min-width="150">
-              <template #default="{ row }">
-                <el-input v-model="row.remark" placeholder="备注" size="small" />
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="80" align="center" fixed="right">
-              <template #default="{ $index }">
-                <el-button type="danger" link @click="removeProfitRule($index)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
+          <DepositCashbackEditor v-model="form.deposit_cashbacks" />
         </div>
 
-        <!-- 备注信息 -->
+        <!-- 3. 流量卡返现配置 -->
         <div class="form-section">
-          <div class="section-title">备注信息</div>
-          <el-form-item label="模板说明" prop="description">
-            <el-input
-              v-model="form.description"
-              type="textarea"
-              :rows="3"
-              placeholder="请输入模板说明"
-            />
-          </el-form-item>
+          <div class="section-title">
+            <span>3. 流量卡返现配置</span>
+            <el-tag type="info" size="small">服务费钱包</el-tag>
+          </div>
+          <SimCashbackEditor v-model="form.sim_cashback" />
+        </div>
+
+        <!-- 4. 激活奖励配置 -->
+        <div class="form-section">
+          <div class="section-title">
+            <span>4. 激活奖励配置</span>
+            <el-tag type="warning" size="small">奖励钱包</el-tag>
+          </div>
+          <ActivationRewardEditor v-model="form.activation_rewards" />
+        </div>
+
+        <!-- 5. 费率阶梯配置（可选） -->
+        <div class="form-section">
+          <div class="section-title">
+            <span>5. 费率阶梯配置（代理商调价）</span>
+            <el-tag size="small">可选</el-tag>
+          </div>
+          <RateStageEditor v-model="form.rate_stages" />
         </div>
       </el-form>
     </el-card>
@@ -222,12 +186,17 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import PageHeader from '@/components/Common/PageHeader.vue'
 import ChannelSelect from '@/components/Common/ChannelSelect.vue'
-import { getPolicyTemplate, createPolicyTemplate, updatePolicyTemplate } from '@/api/policy'
+import {
+  DepositCashbackEditor,
+  SimCashbackEditor,
+  ActivationRewardEditor,
+  RateStageEditor,
+} from '@/components/Policy'
+import { getPolicyTemplateDetail, createPolicyTemplate, updatePolicyTemplate } from '@/api/policy'
 
 const route = useRoute()
 const router = useRouter()
@@ -242,34 +211,70 @@ const submitting = ref(false)
 // 表单引用
 const formRef = ref<FormInstance>()
 
-// 分润规则类型
-interface ProfitRule {
-  level: number
-  profit_type: 'fixed' | 'rate_diff' | 'percentage'
-  profit_value: number
-  min_amount: number
-  max_amount: number
-  remark: string
+// 押金返现类型
+interface DepositCashbackItem {
+  deposit_amount: number
+  cashback_amount: number
+}
+
+// 流量卡返现类型
+interface SimCashbackConfig {
+  first_time_cashback: number
+  second_time_cashback: number
+  third_plus_cashback: number
+  sim_fee_amount?: number
+}
+
+// 激活奖励类型
+interface ActivationRewardItem {
+  reward_name: string
+  min_register_days: number
+  max_register_days: number
+  target_amount: number
+  reward_amount: number
+  priority: number
+}
+
+// 费率阶梯类型
+interface RateStageItem {
+  stage_name: string
+  apply_to: number
+  min_days: number
+  max_days: number
+  credit_rate_delta: number
+  debit_rate_delta: number
+  unionpay_rate_delta: number
+  wechat_rate_delta: number
+  alipay_rate_delta: number
+  priority: number
 }
 
 // 表单数据
 const form = reactive({
-  name: '',
+  template_name: '',
   channel_id: undefined as number | undefined,
   status: 1,
   is_default: false,
+  // 1. 成本（费率）
   credit_rate: 0.6,
   debit_rate: 0.6,
   debit_cap: 20,
-  qrcode_rate: 0.38,
-  scan_rate: 0.38,
-  profit_rules: [] as ProfitRule[],
-  description: '',
+  unionpay_rate: 0.38,
+  wechat_rate: 0.38,
+  alipay_rate: 0.38,
+  // 2. 押金返现
+  deposit_cashbacks: [] as DepositCashbackItem[],
+  // 3. 流量卡返现
+  sim_cashback: null as SimCashbackConfig | null,
+  // 4. 激活奖励
+  activation_rewards: [] as ActivationRewardItem[],
+  // 5. 费率阶梯
+  rate_stages: [] as RateStageItem[],
 })
 
 // 表单验证规则
 const rules: FormRules = {
-  name: [
+  template_name: [
     { required: true, message: '请输入模板名称', trigger: 'blur' },
     { min: 2, max: 50, message: '名称长度为2-50个字符', trigger: 'blur' },
   ],
@@ -282,26 +287,6 @@ const rules: FormRules = {
   debit_rate: [
     { required: true, message: '请输入借记卡费率', trigger: 'blur' },
   ],
-  debit_cap: [
-    { required: true, message: '请输入借记卡封顶', trigger: 'blur' },
-  ],
-}
-
-// 添加分润规则
-function addProfitRule() {
-  form.profit_rules.push({
-    level: 1,
-    profit_type: 'rate_diff',
-    profit_value: 0,
-    min_amount: 0,
-    max_amount: 0,
-    remark: '',
-  })
-}
-
-// 删除分润规则
-function removeProfitRule(index: number) {
-  form.profit_rules.splice(index, 1)
 }
 
 // 获取模板详情
@@ -310,19 +295,22 @@ async function fetchDetail() {
 
   loading.value = true
   try {
-    const data = await getPolicyTemplate(Number(route.params.id))
+    const data = await getPolicyTemplateDetail(Number(route.params.id))
     Object.assign(form, {
-      name: data.name,
+      template_name: data.template_name,
       channel_id: data.channel_id,
       status: data.status,
       is_default: data.is_default,
-      credit_rate: data.credit_rate * 100,
-      debit_rate: data.debit_rate * 100,
-      debit_cap: data.debit_cap,
-      qrcode_rate: (data.qrcode_rate || 0) * 100,
-      scan_rate: (data.scan_rate || 0) * 100,
-      profit_rules: data.profit_rules || [],
-      description: data.description || '',
+      credit_rate: parseFloat(data.credit_rate) || 0,
+      debit_rate: parseFloat(data.debit_rate) || 0,
+      debit_cap: parseFloat(data.debit_cap) || 0,
+      unionpay_rate: parseFloat(data.unionpay_rate) || 0,
+      wechat_rate: parseFloat(data.wechat_rate) || 0,
+      alipay_rate: parseFloat(data.alipay_rate) || 0,
+      deposit_cashbacks: data.deposit_cashbacks || [],
+      sim_cashback: data.sim_cashback || null,
+      activation_rewards: data.activation_rewards || [],
+      rate_stages: data.rate_stages || [],
     })
   } catch (error) {
     console.error('Fetch policy template error:', error)
@@ -345,11 +333,19 @@ async function handleSubmit() {
   submitting.value = true
   try {
     const submitData = {
-      ...form,
-      credit_rate: form.credit_rate / 100,
-      debit_rate: form.debit_rate / 100,
-      qrcode_rate: form.qrcode_rate / 100,
-      scan_rate: form.scan_rate / 100,
+      template_name: form.template_name,
+      channel_id: form.channel_id,
+      is_default: form.is_default,
+      credit_rate: String(form.credit_rate),
+      debit_rate: String(form.debit_rate),
+      debit_cap: String(form.debit_cap),
+      unionpay_rate: String(form.unionpay_rate),
+      wechat_rate: String(form.wechat_rate),
+      alipay_rate: String(form.alipay_rate),
+      deposit_cashbacks: form.deposit_cashbacks,
+      sim_cashback: form.sim_cashback,
+      activation_rewards: form.activation_rewards,
+      rate_stages: form.rate_stages,
     }
 
     if (isEdit.value) {
@@ -378,11 +374,11 @@ onMounted(() => {
 }
 
 .form-card {
-  margin-top: $spacing-md;
+  margin-top: 16px;
 }
 
 .form-section {
-  margin-bottom: $spacing-xl;
+  margin-bottom: 32px;
 
   &:last-child {
     margin-bottom: 0;
@@ -391,24 +387,24 @@ onMounted(() => {
   .section-title {
     font-size: 16px;
     font-weight: 600;
-    color: $text-primary;
-    margin-bottom: $spacing-md;
-    padding-bottom: $spacing-sm;
-    border-bottom: 1px solid $border-color;
+    color: #303133;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #ebeef5;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 12px;
   }
 }
 
 .form-unit {
-  margin-left: $spacing-sm;
-  color: $text-secondary;
+  margin-left: 8px;
+  color: #909399;
 }
 
 .form-tip {
-  margin-left: $spacing-md;
+  margin-left: 16px;
   font-size: 12px;
-  color: $text-placeholder;
+  color: #c0c4cc;
 }
 </style>

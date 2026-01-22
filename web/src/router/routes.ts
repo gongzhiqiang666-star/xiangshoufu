@@ -50,6 +50,16 @@ export const privateRoutes: RouteRecordRaw[] = [
             },
           },
           {
+            path: 'create',
+            name: 'AgentCreate',
+            component: () => import('@/views/agents/AgentFormView.vue'),
+            meta: {
+              title: '新增代理',
+              hidden: true,
+              breadcrumb: [{ title: '首页' }, { title: '代理管理' }, { title: '新增代理' }],
+            },
+          },
+          {
             path: ':id',
             name: 'AgentDetail',
             component: () => import('@/views/agents/AgentDetailView.vue'),
@@ -57,6 +67,16 @@ export const privateRoutes: RouteRecordRaw[] = [
               title: '代理详情',
               hidden: true,
               breadcrumb: [{ title: '首页' }, { title: '代理管理' }, { title: '代理详情' }],
+            },
+          },
+          {
+            path: ':id/edit',
+            name: 'AgentEdit',
+            component: () => import('@/views/agents/AgentFormView.vue'),
+            meta: {
+              title: '编辑代理',
+              hidden: true,
+              breadcrumb: [{ title: '首页' }, { title: '代理管理' }, { title: '编辑代理' }],
             },
           },
         ],
@@ -205,6 +225,33 @@ export const privateRoutes: RouteRecordRaw[] = [
             },
           },
           {
+            path: 'charging',
+            name: 'ChargingWallet',
+            component: () => import('@/views/wallets/ChargingWalletView.vue'),
+            meta: {
+              title: '充值钱包',
+              breadcrumb: [{ title: '首页' }, { title: '钱包管理' }, { title: '充值钱包' }],
+            },
+          },
+          {
+            path: 'settlement',
+            name: 'SettlementWallet',
+            component: () => import('@/views/wallets/SettlementWalletView.vue'),
+            meta: {
+              title: '沉淀钱包',
+              breadcrumb: [{ title: '首页' }, { title: '钱包管理' }, { title: '沉淀钱包' }],
+            },
+          },
+          {
+            path: 'tax-channels',
+            name: 'TaxChannels',
+            component: () => import('@/views/wallets/TaxChannelView.vue'),
+            meta: {
+              title: '税筹通道',
+              breadcrumb: [{ title: '首页' }, { title: '钱包管理' }, { title: '税筹通道' }],
+            },
+          },
+          {
             path: ':id/logs',
             name: 'WalletLogs',
             component: () => import('@/views/wallets/WalletLogsView.vue'),
@@ -295,7 +342,59 @@ export const privateRoutes: RouteRecordRaw[] = [
               breadcrumb: [{ title: '首页' }, { title: '系统管理' }, { title: '操作日志' }],
             },
           },
+          {
+            path: 'messages',
+            name: 'MessageManagement',
+            component: () => import('@/views/messages/MessageListView.vue'),
+            meta: {
+              title: '消息管理',
+              breadcrumb: [{ title: '首页' }, { title: '系统管理' }, { title: '消息管理' }],
+            },
+          },
+          {
+            path: 'messages/send',
+            name: 'SendMessage',
+            component: () => import('@/views/messages/SendMessageView.vue'),
+            meta: {
+              title: '发送消息',
+              hidden: true,
+              breadcrumb: [{ title: '首页' }, { title: '系统管理' }, { title: '消息管理' }, { title: '发送消息' }],
+            },
+          },
         ],
+      },
+      // 个人中心
+      {
+        path: 'profile',
+        name: 'Profile',
+        component: () => import('@/views/profile/ProfileView.vue'),
+        meta: {
+          title: '个人中心',
+          hidden: true,
+          breadcrumb: [{ title: '首页' }, { title: '个人中心' }],
+        },
+      },
+      // 修改密码
+      {
+        path: 'change-password',
+        name: 'ChangePassword',
+        component: () => import('@/views/profile/ChangePasswordView.vue'),
+        meta: {
+          title: '修改密码',
+          hidden: true,
+          breadcrumb: [{ title: '首页' }, { title: '修改密码' }],
+        },
+      },
+      // 消息中心
+      {
+        path: 'messages',
+        name: 'Messages',
+        component: () => import('@/views/profile/MessagesView.vue'),
+        meta: {
+          title: '消息中心',
+          hidden: true,
+          breadcrumb: [{ title: '首页' }, { title: '消息中心' }],
+        },
       },
     ],
   },

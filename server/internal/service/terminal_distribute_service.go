@@ -15,10 +15,11 @@ import (
 // - Q16: 跨级下发时系统自动按层级生成A→B→C的货款代扣链
 // - Q29: APP不能跨级，PC可以跨级（保留整个层级关系）
 type TerminalDistributeService struct {
-	terminalRepo     repository.TerminalRepository
-	distributeRepo   repository.TerminalDistributeRepository
-	agentRepo        repository.AgentRepository
-	deductionService *DeductionService
+	terminalRepo          repository.TerminalRepository
+	distributeRepo        repository.TerminalDistributeRepository
+	agentRepo             repository.AgentRepository
+	deductionService      *DeductionService
+	goodsDeductionService *GoodsDeductionService // 货款代扣服务
 }
 
 // NewTerminalDistributeService 创建终端下发服务
@@ -36,19 +37,32 @@ func NewTerminalDistributeService(
 	}
 }
 
+// SetGoodsDeductionService 设置货款代扣服务（延迟注入，避免循环依赖）
+func (s *TerminalDistributeService) SetGoodsDeductionService(gds *GoodsDeductionService) {
+	s.goodsDeductionService = gds
+}
+
 // DistributeTerminalRequest 终端下发请求
 type DistributeTerminalRequest struct {
-	FromAgentID      int64  `json:"from_agent_id"`     // 下发方代理商ID
-	ToAgentID        int64  `json:"to_agent_id"`       // 接收方代理商ID
-	TerminalSN       string `json:"terminal_sn"`       // 终端SN
-	ChannelID        int64  `json:"channel_id"`        // 通道ID
-	GoodsPrice       int64  `json:"goods_price"`       // 货款金额（分）
-	DeductionType    int16  `json:"deduction_type"`    // 1:一次性付款 2:分期代扣
-	DeductionPeriods int    `json:"deduction_periods"` // 分期期数（分期代扣时必填）
-	Source           int16  `json:"source"`            // 1:APP 2:PC
-	Remark           string `json:"remark"`            // 备注
-	CreatedBy        int64  `json:"created_by"`        // 创建人
+	FromAgentID      int64  `json:"from_agent_id"`      // 下发方代理商ID
+	ToAgentID        int64  `json:"to_agent_id"`        // 接收方代理商ID
+	TerminalSN       string `json:"terminal_sn"`        // 终端SN
+	ChannelID        int64  `json:"channel_id"`         // 通道ID
+	GoodsPrice       int64  `json:"goods_price"`        // 货款金额（分）
+	DeductionType    int16  `json:"deduction_type"`     // 1:一次性付款 2:分期代扣 3:货款代扣（实时）
+	DeductionPeriods int    `json:"deduction_periods"`  // 分期期数（分期代扣时必填）
+	DeductionSource  int16  `json:"deduction_source"`   // 货款代扣来源: 1=分润 2=服务费 3=两者（货款代扣时必填）
+	Source           int16  `json:"source"`             // 1:APP 2:PC
+	Remark           string `json:"remark"`             // 备注
+	CreatedBy        int64  `json:"created_by"`         // 创建人
 }
+
+// 代扣类型常量
+const (
+	DistributeDeductionTypeOnce        int16 = 1 // 一次性付款
+	DistributeDeductionTypeInstallment int16 = 2 // 分期代扣
+	DistributeDeductionTypeRealtime    int16 = 3 // 货款代扣（实时扣款）
+)
 
 // DistributeTerminal 终端下发
 func (s *TerminalDistributeService) DistributeTerminal(req *DistributeTerminalRequest) (*models.TerminalDistribute, error) {
@@ -172,16 +186,26 @@ func (s *TerminalDistributeService) ConfirmDistribute(distributeID int64, confir
 	}
 
 	// 3. 处理货款代扣
-	if distribute.GoodsPrice > 0 && distribute.DeductionType == models.TerminalDistributeDeductionInstallment {
-		if distribute.IsCrossLevel {
-			// 跨级下发：生成代扣链（Q16规则）
-			if err := s.createDeductionChainForCrossLevel(distribute, confirmedBy); err != nil {
-				log.Printf("[TerminalDistributeService] Create deduction chain failed: %v", err)
+	if distribute.GoodsPrice > 0 {
+		switch distribute.DeductionType {
+		case DistributeDeductionTypeRealtime:
+			// 货款代扣（实时扣款）- 使用新的GoodsDeductionService
+			if err := s.createGoodsDeductionForDistribute(distribute, terminal, confirmedBy); err != nil {
+				log.Printf("[TerminalDistributeService] Create goods deduction failed: %v", err)
+				// 货款代扣创建失败不阻塞终端下发
 			}
-		} else {
-			// 非跨级下发：直接生成代扣计划
-			if err := s.createDeductionPlanForDistribute(distribute, confirmedBy); err != nil {
-				log.Printf("[TerminalDistributeService] Create deduction plan failed: %v", err)
+		case DistributeDeductionTypeInstallment:
+			// 分期代扣 - 使用原有的DeductionService
+			if distribute.IsCrossLevel {
+				// 跨级下发：生成代扣链（Q16规则）
+				if err := s.createDeductionChainForCrossLevel(distribute, confirmedBy); err != nil {
+					log.Printf("[TerminalDistributeService] Create deduction chain failed: %v", err)
+				}
+			} else {
+				// 非跨级下发：直接生成代扣计划
+				if err := s.createDeductionPlanForDistribute(distribute, confirmedBy); err != nil {
+					log.Printf("[TerminalDistributeService] Create deduction plan failed: %v", err)
+				}
 			}
 		}
 	}
@@ -251,6 +275,49 @@ func (s *TerminalDistributeService) createDeductionPlanForDistribute(distribute 
 	// 更新下发记录的代扣计划ID
 	distribute.DeductionPlanID = &plan.ID
 	return s.distributeRepo.Update(distribute)
+}
+
+// createGoodsDeductionForDistribute 为终端下发创建货款代扣（实时扣款）
+func (s *TerminalDistributeService) createGoodsDeductionForDistribute(distribute *models.TerminalDistribute, terminal *models.Terminal, createdBy int64) error {
+	if s.goodsDeductionService == nil {
+		return fmt.Errorf("货款代扣服务未初始化")
+	}
+
+	// 获取扣款来源，默认两者都扣
+	deductionSource := int16(3) // 默认: 分润+服务费
+	if distribute.DeductionSource > 0 {
+		deductionSource = distribute.DeductionSource
+	}
+
+	// 创建货款代扣请求
+	req := &models.CreateGoodsDeductionRequest{
+		ToAgentID:       distribute.ToAgentID,
+		UnitPrice:       distribute.GoodsPrice,
+		DeductionSource: deductionSource,
+		Terminals: []models.CreateGoodsDeductionTerminal{
+			{
+				TerminalID: terminal.ID,
+				TerminalSN: terminal.TerminalSN,
+				UnitPrice:  distribute.GoodsPrice,
+			},
+		},
+		Remark:       fmt.Sprintf("终端划拨货款代扣 - %s", distribute.TerminalSN),
+		DistributeID: &distribute.ID,
+	}
+
+	deduction, err := s.goodsDeductionService.CreateGoodsDeduction(req, distribute.FromAgentID, createdBy)
+	if err != nil {
+		return fmt.Errorf("创建货款代扣失败: %w", err)
+	}
+
+	// 更新下发记录的货款代扣ID
+	distribute.GoodsDeductionID = &deduction.ID
+	if err := s.distributeRepo.Update(distribute); err != nil {
+		log.Printf("[TerminalDistributeService] Update distribute goods_deduction_id failed: %v", err)
+	}
+
+	log.Printf("[TerminalDistributeService] Created goods deduction %d for distribute %d", deduction.ID, distribute.ID)
+	return nil
 }
 
 // RejectDistribute 拒绝终端下发

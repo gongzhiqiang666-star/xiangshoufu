@@ -60,3 +60,29 @@ export interface AgentQueryParams {
   page?: number
   page_size?: number
 }
+
+// 代理商通道配置
+export interface AgentChannel {
+  id: number
+  agent_id: number
+  channel_id: number
+  is_enabled: boolean
+  is_visible: boolean
+  enabled_at: string | null
+  disabled_at: string | null
+  enabled_by: number | null
+  disabled_by: number | null
+  remark: string
+  created_at: string
+  updated_at: string
+  // 关联字段
+  channel_code: string
+  channel_name: string
+}
+
+// 代理商通道统计
+export interface AgentChannelStats {
+  total_channels: number
+  enabled_channels: number
+  visible_channels: number
+}

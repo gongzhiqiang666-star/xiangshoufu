@@ -18,6 +18,7 @@ type TerminalRepository interface {
 	UpdateOwner(id int64, newOwnerID int64) error
 	UpdateStatus(id int64, status int16) error
 	UpdateSimFeeCount(id int64, count int) error
+	FindActivatedAfter(channelID int64, activatedAfter time.Time) ([]*models.Terminal, error)
 }
 
 // TerminalDistributeRepository 终端下发仓库接口
@@ -47,6 +48,7 @@ type SimCashbackRecordRepository interface {
 	FindByDeviceFeeID(deviceFeeID int64) ([]*models.SimCashbackRecord, error)
 	FindByAgent(agentID int64, limit, offset int) ([]*models.SimCashbackRecord, int64, error)
 	UpdateWalletStatus(id int64, status int16) error
+	FindPending(limit int) ([]*models.SimCashbackRecord, error)
 }
 
 // GormTerminalRepository GORM实现
@@ -133,6 +135,15 @@ func (r *GormTerminalRepository) UpdateSimFeeCount(id int64, count int) error {
 }
 
 var _ TerminalRepository = (*GormTerminalRepository)(nil)
+
+// FindActivatedAfter 查找指定通道在某时间后激活的终端
+func (r *GormTerminalRepository) FindActivatedAfter(channelID int64, activatedAfter time.Time) ([]*models.Terminal, error) {
+	var terminals []*models.Terminal
+	err := r.db.Where("channel_id = ? AND status = ? AND activated_at >= ?",
+		channelID, models.TerminalStatusActivated, activatedAfter).
+		Find(&terminals).Error
+	return terminals, err
+}
 
 // CountByOwnerAndStatus 按代理商和状态统计终端数量
 func (r *GormTerminalRepository) CountByOwnerAndStatus(ownerAgentID int64, status int16, count *int64) error {
@@ -324,4 +335,237 @@ func (r *GormSimCashbackRecordRepository) UpdateWalletStatus(id int64, status in
 		}).Error
 }
 
+func (r *GormSimCashbackRecordRepository) FindPending(limit int) ([]*models.SimCashbackRecord, error) {
+	var records []*models.SimCashbackRecord
+	err := r.db.Where("wallet_status = 0").
+		Order("created_at ASC").
+		Limit(limit).
+		Find(&records).Error
+	return records, err
+}
+
 var _ SimCashbackRecordRepository = (*GormSimCashbackRecordRepository)(nil)
+
+// TerminalRecallRepository 终端回拨仓库接口
+type TerminalRecallRepository interface {
+	Create(recall *models.TerminalRecall) error
+	Update(recall *models.TerminalRecall) error
+	FindByID(id int64) (*models.TerminalRecall, error)
+	FindByRecallNo(recallNo string) (*models.TerminalRecall, error)
+	FindByFromAgent(fromAgentID int64, status []int16, limit, offset int) ([]*models.TerminalRecall, int64, error)
+	FindByToAgent(toAgentID int64, status []int16, limit, offset int) ([]*models.TerminalRecall, int64, error)
+	UpdateStatus(id int64, status int16, confirmedBy *int64) error
+}
+
+// GormTerminalRecallRepository GORM实现
+type GormTerminalRecallRepository struct {
+	db *gorm.DB
+}
+
+func NewGormTerminalRecallRepository(db *gorm.DB) *GormTerminalRecallRepository {
+	return &GormTerminalRecallRepository{db: db}
+}
+
+func (r *GormTerminalRecallRepository) Create(recall *models.TerminalRecall) error {
+	return r.db.Create(recall).Error
+}
+
+func (r *GormTerminalRecallRepository) Update(recall *models.TerminalRecall) error {
+	return r.db.Save(recall).Error
+}
+
+func (r *GormTerminalRecallRepository) FindByID(id int64) (*models.TerminalRecall, error) {
+	var recall models.TerminalRecall
+	err := r.db.First(&recall, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &recall, nil
+}
+
+func (r *GormTerminalRecallRepository) FindByRecallNo(recallNo string) (*models.TerminalRecall, error) {
+	var recall models.TerminalRecall
+	err := r.db.Where("recall_no = ?", recallNo).First(&recall).Error
+	if err != nil {
+		return nil, err
+	}
+	return &recall, nil
+}
+
+func (r *GormTerminalRecallRepository) FindByFromAgent(fromAgentID int64, status []int16, limit, offset int) ([]*models.TerminalRecall, int64, error) {
+	var recalls []*models.TerminalRecall
+	var total int64
+
+	query := r.db.Model(&models.TerminalRecall{}).Where("from_agent_id = ?", fromAgentID)
+	if len(status) > 0 {
+		query = query.Where("status IN ?", status)
+	}
+
+	err := query.Count(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	err = query.Order("created_at DESC").Limit(limit).Offset(offset).Find(&recalls).Error
+	return recalls, total, err
+}
+
+func (r *GormTerminalRecallRepository) FindByToAgent(toAgentID int64, status []int16, limit, offset int) ([]*models.TerminalRecall, int64, error) {
+	var recalls []*models.TerminalRecall
+	var total int64
+
+	query := r.db.Model(&models.TerminalRecall{}).Where("to_agent_id = ?", toAgentID)
+	if len(status) > 0 {
+		query = query.Where("status IN ?", status)
+	}
+
+	err := query.Count(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	err = query.Order("created_at DESC").Limit(limit).Offset(offset).Find(&recalls).Error
+	return recalls, total, err
+}
+
+func (r *GormTerminalRecallRepository) UpdateStatus(id int64, status int16, confirmedBy *int64) error {
+	now := time.Now()
+	updates := map[string]interface{}{
+		"status":       status,
+		"confirmed_at": &now,
+	}
+	if confirmedBy != nil {
+		updates["confirmed_by"] = confirmedBy
+	}
+	return r.db.Model(&models.TerminalRecall{}).Where("id = ?", id).Updates(updates).Error
+}
+
+var _ TerminalRecallRepository = (*GormTerminalRecallRepository)(nil)
+
+// TerminalImportRecordRepository 终端入库记录仓库接口
+type TerminalImportRecordRepository interface {
+	Create(record *models.TerminalImportRecord) error
+	FindByID(id int64) (*models.TerminalImportRecord, error)
+	FindByOwner(ownerAgentID int64, limit, offset int) ([]*models.TerminalImportRecord, int64, error)
+}
+
+// GormTerminalImportRecordRepository GORM实现
+type GormTerminalImportRecordRepository struct {
+	db *gorm.DB
+}
+
+func NewGormTerminalImportRecordRepository(db *gorm.DB) *GormTerminalImportRecordRepository {
+	return &GormTerminalImportRecordRepository{db: db}
+}
+
+func (r *GormTerminalImportRecordRepository) Create(record *models.TerminalImportRecord) error {
+	return r.db.Create(record).Error
+}
+
+func (r *GormTerminalImportRecordRepository) FindByID(id int64) (*models.TerminalImportRecord, error) {
+	var record models.TerminalImportRecord
+	err := r.db.First(&record, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &record, nil
+}
+
+func (r *GormTerminalImportRecordRepository) FindByOwner(ownerAgentID int64, limit, offset int) ([]*models.TerminalImportRecord, int64, error) {
+	var records []*models.TerminalImportRecord
+	var total int64
+
+	query := r.db.Model(&models.TerminalImportRecord{}).Where("owner_agent_id = ?", ownerAgentID)
+	err := query.Count(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	err = query.Order("created_at DESC").Limit(limit).Offset(offset).Find(&records).Error
+	return records, total, err
+}
+
+var _ TerminalImportRecordRepository = (*GormTerminalImportRecordRepository)(nil)
+
+// CountActivatedByDate 按日期统计激活终端数量
+func (r *GormTerminalRepository) CountActivatedByDate(ownerAgentID int64, startDate, endDate time.Time) (int64, error) {
+	var count int64
+	err := r.db.Model(&models.Terminal{}).
+		Where("owner_agent_id = ? AND status = ? AND activated_at >= ? AND activated_at < ?",
+			ownerAgentID, models.TerminalStatusActivated, startDate, endDate).
+		Count(&count).Error
+	return count, err
+}
+
+// BatchCreate 批量创建终端
+func (r *GormTerminalRepository) BatchCreate(terminals []*models.Terminal) error {
+	if len(terminals) == 0 {
+		return nil
+	}
+	return r.db.CreateInBatches(terminals, 100).Error
+}
+
+// FindBySNs 批量查询终端
+func (r *GormTerminalRepository) FindBySNs(sns []string) ([]*models.Terminal, error) {
+	var terminals []*models.Terminal
+	err := r.db.Where("terminal_sn IN ?", sns).Find(&terminals).Error
+	return terminals, err
+}
+
+// ========== 终端政策相关 ==========
+
+// FindPolicyBySN 查询终端政策
+func (r *GormTerminalRepository) FindPolicyBySN(sn string) (*models.TerminalPolicy, error) {
+	var policy models.TerminalPolicy
+	err := r.db.Where("terminal_sn = ?", sn).First(&policy).Error
+	if err != nil {
+		return nil, err
+	}
+	return &policy, nil
+}
+
+// SavePolicy 保存终端政策（创建或更新）
+func (r *GormTerminalRepository) SavePolicy(policy *models.TerminalPolicy) error {
+	if policy.ID == 0 {
+		return r.db.Create(policy).Error
+	}
+	return r.db.Save(policy).Error
+}
+
+// FindPoliciesByAgent 查询代理商的所有终端政策
+func (r *GormTerminalRepository) FindPoliciesByAgent(agentID int64, limit, offset int) ([]*models.TerminalPolicy, int64, error) {
+	var policies []*models.TerminalPolicy
+	var total int64
+
+	query := r.db.Model(&models.TerminalPolicy{}).Where("agent_id = ?", agentID)
+	err := query.Count(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	err = query.Order("updated_at DESC").Limit(limit).Offset(offset).Find(&policies).Error
+	return policies, total, err
+}
+
+// FindUnsyncedPolicies 查询未同步的政策
+func (r *GormTerminalRepository) FindUnsyncedPolicies(limit int) ([]*models.TerminalPolicy, error) {
+	var policies []*models.TerminalPolicy
+	err := r.db.Where("is_synced = ?", false).
+		Order("updated_at ASC").
+		Limit(limit).
+		Find(&policies).Error
+	return policies, err
+}
+
+// UpdatePolicySyncStatus 更新政策同步状态
+func (r *GormTerminalRepository) UpdatePolicySyncStatus(id int64, isSynced bool, syncError string) error {
+	now := time.Now()
+	updates := map[string]interface{}{
+		"is_synced":  isSynced,
+		"sync_error": syncError,
+	}
+	if isSynced {
+		updates["synced_at"] = &now
+	}
+	return r.db.Model(&models.TerminalPolicy{}).Where("id = ?", id).Updates(updates).Error
+}
