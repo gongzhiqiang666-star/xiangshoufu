@@ -223,3 +223,29 @@ func (s *AgentChannelService) GetAgentChannelStats(agentID int64) (*AgentChannel
 
 	return stats, nil
 }
+
+// ChannelInfo 通道基本信息（用于选择器）
+type ChannelInfo struct {
+	ID          int64  `json:"id"`
+	ChannelCode string `json:"channel_code"`
+	ChannelName string `json:"channel_name"`
+}
+
+// GetAllChannels 获取所有可用通道列表
+func (s *AgentChannelService) GetAllChannels() ([]*ChannelInfo, error) {
+	channels, err := s.channelRepo.FindAllActive()
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*ChannelInfo, len(channels))
+	for i, ch := range channels {
+		result[i] = &ChannelInfo{
+			ID:          ch.ID,
+			ChannelCode: ch.ChannelCode,
+			ChannelName: ch.ChannelName,
+		}
+	}
+
+	return result, nil
+}

@@ -1,4 +1,4 @@
-import request from '@/utils/request'
+import { get, post, put, del } from './request'
 import type {
   Poster,
   PosterCategory,
@@ -15,89 +15,52 @@ import type {
 
 // 获取分类列表
 export function getPosterCategories(params?: PosterCategoryListRequest) {
-  return request<PosterCategory[]>({
-    url: '/api/v1/admin/poster-categories',
-    method: 'get',
-    params
-  })
+  return get<PosterCategory[]>('/api/v1/admin/poster-categories', params)
 }
 
 // 创建分类
 export function createPosterCategory(data: PosterCategoryCreateRequest) {
-  return request<PosterCategory>({
-    url: '/api/v1/admin/poster-categories',
-    method: 'post',
-    data
-  })
+  return post<PosterCategory>('/api/v1/admin/poster-categories', data)
 }
 
 // 更新分类
 export function updatePosterCategory(id: number, data: PosterCategoryUpdateRequest) {
-  return request<PosterCategory>({
-    url: `/api/v1/admin/poster-categories/${id}`,
-    method: 'put',
-    data
-  })
+  return put<PosterCategory>(`/api/v1/admin/poster-categories/${id}`, data)
 }
 
 // 删除分类
 export function deletePosterCategory(id: number) {
-  return request({
-    url: `/api/v1/admin/poster-categories/${id}`,
-    method: 'delete'
-  })
+  return del(`/api/v1/admin/poster-categories/${id}`)
 }
 
 // ========== 海报管理 ==========
 
 // 获取海报列表
 export function getPosterList(params: PosterListRequest) {
-  return request<{ data: Poster[]; total: number }>({
-    url: '/api/v1/admin/posters',
-    method: 'get',
-    params
-  })
+  return get<{ data: Poster[]; total: number }>('/api/v1/admin/posters', params)
 }
 
 // 获取海报详情
 export function getPosterDetail(id: number) {
-  return request<Poster>({
-    url: `/api/v1/admin/posters/${id}`,
-    method: 'get'
-  })
+  return get<Poster>(`/api/v1/admin/posters/${id}`)
 }
 
 // 创建海报
 export function createPoster(data: PosterCreateRequest) {
-  return request<Poster>({
-    url: '/api/v1/admin/posters',
-    method: 'post',
-    data
-  })
+  return post<Poster>('/api/v1/admin/posters', data)
 }
 
 // 更新海报
 export function updatePoster(id: number, data: PosterUpdateRequest) {
-  return request<Poster>({
-    url: `/api/v1/admin/posters/${id}`,
-    method: 'put',
-    data
-  })
+  return put<Poster>(`/api/v1/admin/posters/${id}`, data)
 }
 
 // 删除海报
 export function deletePoster(id: number) {
-  return request({
-    url: `/api/v1/admin/posters/${id}`,
-    method: 'delete'
-  })
+  return del(`/api/v1/admin/posters/${id}`)
 }
 
 // 批量导入海报
 export function batchImportPosters(data: PosterBatchImportRequest) {
-  return request<{ imported_count: number }>({
-    url: '/api/v1/admin/posters/batch-import',
-    method: 'post',
-    data
-  })
+  return post<{ imported_count: number }>('/api/v1/admin/posters/batch-import', data)
 }

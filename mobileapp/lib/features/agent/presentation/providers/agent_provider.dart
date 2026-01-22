@@ -27,6 +27,12 @@ final teamStatsProvider = FutureProvider<TeamStats>((ref) async {
   return service.getTeamStats();
 });
 
+/// 代理商详情（按ID查询）
+final agentDetailProvider = FutureProvider.family<AgentDetail, int>((ref, agentId) async {
+  final service = ref.watch(agentServiceProvider);
+  return service.getAgentDetail(agentId);
+});
+
 /// 下级代理商列表状态
 class SubordinatesState {
   final List<AgentInfo> list;

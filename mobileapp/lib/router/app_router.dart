@@ -20,6 +20,7 @@ import '../features/wallet/presentation/settlement_wallet_page.dart';
 import '../features/wallet/presentation/charging_wallet_page.dart';
 import '../features/wallet/presentation/issue_reward_page.dart';
 import '../features/agent/presentation/agent_page.dart';
+import '../features/agent/presentation/agent_detail_page.dart';
 import '../features/agent/presentation/agent_channels_page.dart';
 import '../features/policy/presentation/my_policy_page.dart';
 import '../features/policy/presentation/subordinate_policy_page.dart';
@@ -284,6 +285,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: RoutePaths.agent,
         name: 'agent',
         builder: (context, state) => const AgentPage(),
+      ),
+      GoRoute(
+        path: RoutePaths.agentDetail,
+        name: 'agentDetail',
+        builder: (context, state) {
+          final idStr = state.pathParameters['id'] ?? '0';
+          final agentId = int.tryParse(idStr) ?? 0;
+          return AgentDetailPage(agentId: agentId);
+        },
       ),
       GoRoute(
         path: RoutePaths.agentChannels,

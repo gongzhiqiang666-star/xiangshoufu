@@ -3,6 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:dio/dio.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -861,9 +865,63 @@ class _AgentPageState extends ConsumerState<AgentPage>
   }
 
   void _saveQRCode(InviteCodeInfo inviteCode) async {
-    // TODO: 实际保存二维码到相册
-    // 需要使用 image_gallery_saver 或类似插件
-    _showSnackBar('二维码已保存到相册');
+    final qrCodeUrl = inviteCode.qrCodeUrl;
+    if (qrCodeUrl == null || qrCodeUrl.isEmpty) {
+      _showSnackBar('二维码尚未生成，请稍后再试');
+      return;
+    }
+
+    try {
+      // 显示加载提示
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              ),
+              SizedBox(width: 12),
+              Text('正在保存...'),
+            ],
+          ),
+          duration: Duration(seconds: 5),
+        ),
+      );
+
+      // 下载图片
+      final response = await Dio().get(
+        qrCodeUrl,
+        options: Options(responseType: ResponseType.bytes),
+      );
+
+      // 保存到相册
+      final result = await ImageGallerySaver.saveImage(
+        Uint8List.fromList(response.data),
+        quality: 100,
+        name: 'invite_qrcode_${DateTime.now().millisecondsSinceEpoch}',
+      );
+
+      // 隐藏加载提示
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      }
+
+      if (result['isSuccess'] == true) {
+        _showSnackBar('二维码已保存到相册');
+      } else {
+        _showSnackBar('保存失败，请检查相册权限');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        _showSnackBar('保存失败：${e.toString()}');
+      }
+    }
   }
 
   void _shareQRCode(InviteCodeInfo inviteCode) async {
