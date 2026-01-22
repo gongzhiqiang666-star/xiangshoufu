@@ -512,6 +512,33 @@ export const privateRoutes: RouteRecordRaw[] = [
               breadcrumb: [{ title: '首页' }, { title: '系统管理' }, { title: '消息管理' }, { title: '发送消息' }],
             },
           },
+          {
+            path: 'jobs',
+            name: 'JobList',
+            component: () => import('@/views/system/JobListView.vue'),
+            meta: {
+              title: '定时任务',
+              breadcrumb: [{ title: '首页' }, { title: '系统管理' }, { title: '定时任务' }],
+            },
+          },
+          {
+            path: 'job-logs',
+            name: 'JobLogList',
+            component: () => import('@/views/system/JobLogListView.vue'),
+            meta: {
+              title: '执行日志',
+              breadcrumb: [{ title: '首页' }, { title: '系统管理' }, { title: '执行日志' }],
+            },
+          },
+          {
+            path: 'alert-configs',
+            name: 'AlertConfigList',
+            component: () => import('@/views/system/AlertConfigView.vue'),
+            meta: {
+              title: '告警配置',
+              breadcrumb: [{ title: '首页' }, { title: '系统管理' }, { title: '告警配置' }],
+            },
+          },
         ],
       },
       // 个人中心

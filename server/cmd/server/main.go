@@ -354,6 +354,16 @@ func main() {
 	posterCategoryRepo := repository.NewGormPosterCategoryRepository(db)
 	uploadedFileRepo := repository.NewGormUploadedFileRepository(db)
 
+	// 20.6 初始化定时任务管理模块（任务配置、执行日志、告警）
+	jobConfigRepo := repository.NewGormJobConfigRepository(db)
+	jobLogRepo := repository.NewGormJobExecutionLogRepository(db)
+	alertConfigRepo := repository.NewGormAlertConfigRepository(db)
+	alertLogRepo := repository.NewGormAlertLogRepository(db)
+	jobFailCounterRepo := repository.NewGormJobFailCounterRepository(db)
+
+	// 20.7 初始化告警服务
+	alertService := service.NewAlertService(alertConfigRepo, alertLogRepo, jobFailCounterRepo)
+
 	// 上传服务配置
 	uploadDir := "./uploads"     // 上传目录
 	uploadBaseURL := "/uploads"  // 访问基础URL
@@ -364,6 +374,10 @@ func main() {
 	uploadHandler := handler.NewUploadHandler(uploadService)
 	bannerHandler := handler.NewBannerHandler(bannerService)
 	posterHandler := handler.NewPosterHandler(posterService)
+
+	// 20.8 初始化任务管理和告警Handler
+	jobHandler := handler.NewJobHandler(jobConfigRepo, jobLogRepo)
+	alertHandler := handler.NewAlertHandler(alertConfigRepo, alertLogRepo, alertService)
 
 	// 21. 初始化政策Handler
 	policyHandler := handler.NewPolicyHandler(policyTemplateRepo, agentPolicyRepo, policyService)
@@ -400,6 +414,7 @@ func main() {
 		merchantHandler, terminalHandler, policyHandler, agentChannelHandler,
 		chargingWalletHandler, settlementWalletHandler, taxChannelHandler,
 		uploadHandler, bannerHandler, posterHandler,
+		jobHandler, alertHandler, // 新增：任务管理和告警Handler
 		authService, metricsService, config.SwaggerEnabled,
 	)
 
@@ -636,6 +651,8 @@ func setupRouter(
 	uploadHandler *handler.UploadHandler,
 	bannerHandler *handler.BannerHandler,
 	posterHandler *handler.PosterHandler,
+	jobHandler *handler.JobHandler,
+	alertHandler *handler.AlertHandler,
 	authService *service.AuthService,
 	metricsService *service.MetricsService,
 	swaggerEnabled bool,
@@ -734,6 +751,14 @@ func setupRouter(
 		handler.RegisterUploadRoutes(apiV1, uploadHandler, authService)
 		handler.RegisterBannerRoutes(apiV1, bannerHandler, authService)
 		handler.RegisterPosterRoutes(apiV1, posterHandler, authService)
+
+		// 注册任务管理和告警配置路由（管理端）
+		adminGroup := apiV1.Group("/admin")
+		adminGroup.Use(middleware.AuthMiddleware(authService))
+		{
+			jobHandler.RegisterRoutes(adminGroup)
+			alertHandler.RegisterRoutes(adminGroup)
+		}
 	}
 
 	// Swagger UI (可通过环境变量关闭)
