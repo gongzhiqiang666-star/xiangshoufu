@@ -217,22 +217,30 @@ class AgentWalletConfigModel {
 /// 充值钱包汇总
 class ChargingWalletSummaryModel {
   final int balance;
-  final int totalIssued;
+  final int totalIssued; // 手动发放奖励总额
+  final int totalAutoReward; // 系统自动奖励总额
+  final int totalReward; // 奖励总金额（手动+自动）
 
   ChargingWalletSummaryModel({
     required this.balance,
     required this.totalIssued,
+    required this.totalAutoReward,
+    required this.totalReward,
   });
 
   factory ChargingWalletSummaryModel.fromJson(Map<String, dynamic> json) {
     return ChargingWalletSummaryModel(
       balance: json['balance'] ?? 0,
       totalIssued: json['total_issued'] ?? 0,
+      totalAutoReward: json['total_auto_reward'] ?? 0,
+      totalReward: json['total_reward'] ?? 0,
     );
   }
 
   double get balanceYuan => balance / 100;
   double get totalIssuedYuan => totalIssued / 100;
+  double get totalAutoRewardYuan => totalAutoReward / 100;
+  double get totalRewardYuan => totalReward / 100;
 }
 
 /// 沉淀钱包汇总

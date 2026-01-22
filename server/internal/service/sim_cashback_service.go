@@ -157,10 +157,34 @@ func (s *SimCashbackService) ProcessSimFee(deviceFee *models.DeviceFee) error {
 		}
 	}
 
-	// 8. 批量更新钱包余额
+	// 8. 批量更新钱包余额并创建流水记录
 	if len(walletUpdates) > 0 {
 		if err := s.walletRepo.BatchUpdateBalance(walletUpdates); err != nil {
 			return fmt.Errorf("批量更新钱包余额失败: %w", err)
+		}
+
+		// P1修复：创建钱包流水记录
+		now := time.Now()
+		for _, record := range cashbackRecords {
+			wallet, err := s.walletRepo.FindByAgentAndType(record.AgentID, record.ChannelID, models.WalletTypeService)
+			if err != nil || wallet == nil {
+				continue
+			}
+
+			walletLog := &repository.WalletLog{
+				WalletID:      wallet.ID,
+				AgentID:       record.AgentID,
+				WalletType:    models.WalletTypeService,
+				LogType:       WalletLogTypeCashback,
+				Amount:        record.ActualCashback,
+				BalanceBefore: wallet.Balance - record.ActualCashback, // 入账前余额
+				BalanceAfter:  wallet.Balance,                         // 入账后余额
+				RefType:       "sim_cashback",
+				RefID:         record.ID,
+				Remark:        fmt.Sprintf("流量费返现入账，终端%s，%s，金额%.2f元", record.TerminalSN, getTierName(record.CashbackTier), float64(record.ActualCashback)/100),
+				CreatedAt:     now,
+			}
+			s.walletLogRepo.Create(walletLog)
 		}
 
 		// 更新返现记录状态为已入账

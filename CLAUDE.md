@@ -6,6 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 收享付 (ShouXiangFu) - An agent profit-sharing management system that processes payment channel callbacks from multiple payment providers. The system handles transaction callbacks, calculates profit sharing across agent hierarchies, and manages wallets.
 
+## 重要
+每次代码改造后，需要将改造的内容同步给 业务逻辑梳理.md 文件中， 不要同步详细设计，而是改造后的的业务流程，维护到对应模块下面
+
 ## Project Structure
 
 ```

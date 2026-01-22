@@ -166,13 +166,14 @@ func (s *WalletService) GetWalletLogs(agentID int64, req *GetWalletLogsRequest) 
 
 // 钱包流水类型
 const (
-	WalletLogTypeProfitIn     int16 = 1 // 分润入账
-	WalletLogTypeWithdrawFreeze int16 = 2 // 提现冻结
-	WalletLogTypeWithdrawSuccess int16 = 3 // 提现成功
-	WalletLogTypeWithdrawReturn int16 = 4 // 提现退回
-	WalletLogTypeAdjust       int16 = 5 // 调账
-	WalletLogTypeDeduction    int16 = 6 // 代扣
-	WalletLogTypeCashback     int16 = 7 // 返现
+	WalletLogTypeProfitIn        int16 = 1  // 分润入账
+	WalletLogTypeWithdrawFreeze  int16 = 2  // 提现冻结
+	WalletLogTypeWithdrawSuccess int16 = 3  // 提现成功
+	WalletLogTypeWithdrawReturn  int16 = 4  // 提现退回
+	WalletLogTypeAdjust          int16 = 5  // 调账
+	WalletLogTypeDeduction       int16 = 6  // 代扣
+	WalletLogTypeCashback        int16 = 7  // 返现（押金/流量费）
+	WalletLogTypeActivationReward int16 = 11 // 激活奖励入账
 )
 
 // getWalletTypeNameStr 获取钱包类型名称
@@ -206,6 +207,14 @@ func getLogTypeName(logType int16) string {
 		return "代扣"
 	case WalletLogTypeCashback:
 		return "返现"
+	case WalletLogTypeChargingDeposit:
+		return "充值钱包充值"
+	case WalletLogTypeChargingRewardOut:
+		return "奖励发放"
+	case WalletLogTypeChargingRewardIn:
+		return "收到奖励"
+	case WalletLogTypeActivationReward:
+		return "激活奖励"
 	default:
 		return "未知"
 	}

@@ -16,6 +16,9 @@ import '../features/data_analysis/presentation/data_analysis_page.dart';
 import '../features/profit/presentation/profit_page.dart';
 import '../features/wallet/presentation/wallet_page.dart';
 import '../features/wallet/presentation/withdraw_page.dart';
+import '../features/wallet/presentation/settlement_wallet_page.dart';
+import '../features/wallet/presentation/charging_wallet_page.dart';
+import '../features/wallet/presentation/issue_reward_page.dart';
 import '../features/agent/presentation/agent_page.dart';
 import '../features/agent/presentation/agent_channels_page.dart';
 import '../features/policy/presentation/my_policy_page.dart';
@@ -66,6 +69,9 @@ class RoutePaths {
   static const String withdraw = '/wallet/withdraw';
   static const String walletFlow = '/wallet/flow';
   static const String withdrawRecord = '/wallet/withdraw-record';
+  static const String chargingWallet = '/wallet/charging';
+  static const String settlementWallet = '/wallet/settlement';
+  static const String issueReward = '/wallet/issue-reward';
 
   // 代理拓展
   static const String agent = '/agent';
@@ -256,6 +262,21 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           final walletId = state.extra as String? ?? '';
           return WithdrawPage(walletId: walletId);
         },
+      ),
+      GoRoute(
+        path: RoutePaths.chargingWallet,
+        name: 'chargingWallet',
+        builder: (context, state) => const ChargingWalletPage(),
+      ),
+      GoRoute(
+        path: RoutePaths.settlementWallet,
+        name: 'settlementWallet',
+        builder: (context, state) => const SettlementWalletPage(),
+      ),
+      GoRoute(
+        path: RoutePaths.issueReward,
+        name: 'issueReward',
+        builder: (context, state) => const IssueRewardPage(),
       ),
 
       // ==================== 代理拓展 ====================

@@ -187,4 +187,19 @@ func (r *GormChargingWalletRepository) GetTotalRewardsIssuedByAgent(agentID int6
 	return total, err
 }
 
+// GetTotalAutoRewardsForDownline 获取系统自动发放给下级的激活奖励总额
+// 查询activation_reward_records表，统计该代理商作为上级（source_agent_id）产生的奖励
+// 这代表系统自动发放给该代理商直属下级的激活奖励总额
+func (r *GormChargingWalletRepository) GetTotalAutoRewardsForDownline(agentID int64) (int64, error) {
+	var total int64
+	// 从激活奖励记录中查询该代理商作为级差来源的记录总额
+	// source_agent_id 表示奖励的级差来源是哪个下级代理商
+	// 这里我们需要查询 agent_id 对应的直接下级的奖励
+	err := r.db.Model(&models.ActivationRewardRecord{}).
+		Where("source_agent_id = ? AND wallet_status = 1", agentID).
+		Select("COALESCE(SUM(actual_reward), 0)").
+		Scan(&total).Error
+	return total, err
+}
+
 var _ ChargingWalletRepository = (*GormChargingWalletRepository)(nil)

@@ -217,26 +217,20 @@ func (s *ActivationRewardService) CheckAndProcessReward(req *TerminalRewardCheck
 		}
 	}
 
-	// 10. 批量创建奖励记录
+	// 10. 批量创建奖励记录（wallet_status=0，待定时任务入账）
+	// P1修复：CheckAndProcessReward只创建记录，由定时任务ProcessPendingRewards统一入账
+	// 避免并发场景下的重复入账风险
 	if len(rewardRecords) > 0 {
 		if err := s.rewardRecordRepo.BatchCreate(rewardRecords); err != nil {
 			return fmt.Errorf("批量创建激活奖励记录失败: %w", err)
 		}
+		log.Printf("[ActivationRewardService] Created %d reward records (pending wallet entry)", len(rewardRecords))
 	}
 
-	// 11. 批量更新钱包余额
-	if len(walletUpdates) > 0 {
-		if err := s.walletRepo.BatchUpdateBalance(walletUpdates); err != nil {
-			return fmt.Errorf("批量更新钱包余额失败: %w", err)
-		}
+	// 注意：钱包余额更新由 ProcessPendingRewards 定时任务统一处理
+	// 这里不再直接更新钱包，避免重复入账风险
 
-		// 更新奖励记录状态为已入账
-		for _, record := range rewardRecords {
-			s.rewardRecordRepo.UpdateWalletStatus(record.ID, 1)
-		}
-	}
-
-	// 12. 发送奖励通知
+	// 11. 发送奖励通知（通知已创建记录，实际入账由定时任务完成）
 	s.sendRewardNotifications(rewardRecords, matchedPolicy.RewardName)
 
 	log.Printf("[ActivationRewardService] Processed reward: terminal=%s, policy=%s, records=%d",
@@ -428,4 +422,85 @@ func (s *ActivationRewardService) BatchCheckTerminalRewards(channelID int64, che
 func (s *ActivationRewardService) getTerminalTradeAmount(terminalSN string) (int64, error) {
 	// 调用交易仓库获取终端累计交易量
 	return s.transactionRepo.GetTerminalTotalTradeAmount(terminalSN)
+}
+
+// ProcessPendingRewards 处理待入账的激活奖励记录（定时任务调用）
+// P1修复：统一处理钱包入账，避免CheckAndProcessReward并发导致的重复入账
+func (s *ActivationRewardService) ProcessPendingRewards() error {
+	log.Printf("[ActivationRewardService] Starting ProcessPendingRewards...")
+
+	// 1. 获取所有待入账的奖励记录
+	pendingRecords, err := s.rewardRecordRepo.FindPendingRecords(1000)
+	if err != nil {
+		return fmt.Errorf("查询待入账记录失败: %w", err)
+	}
+
+	if len(pendingRecords) == 0 {
+		log.Printf("[ActivationRewardService] No pending records to process")
+		return nil
+	}
+
+	log.Printf("[ActivationRewardService] Found %d pending records", len(pendingRecords))
+
+	// 2. 按钱包分组汇总金额
+	walletUpdates := make(map[int64]int64) // walletID -> 总奖励金额
+	recordWalletMap := make(map[int64]int64) // recordID -> walletID
+
+	for _, record := range pendingRecords {
+		wallet, err := s.walletRepo.FindByAgentAndType(record.AgentID, record.ChannelID, models.WalletTypeReward)
+		if err != nil || wallet == nil {
+			log.Printf("[ActivationRewardService] Wallet not found for agent %d, channel %d", record.AgentID, record.ChannelID)
+			continue
+		}
+
+		walletUpdates[wallet.ID] += record.ActualReward
+		recordWalletMap[record.ID] = wallet.ID
+	}
+
+	// 3. 批量更新钱包余额
+	if len(walletUpdates) > 0 {
+		if err := s.walletRepo.BatchUpdateBalance(walletUpdates); err != nil {
+			return fmt.Errorf("批量更新钱包余额失败: %w", err)
+		}
+	}
+
+	// 4. 创建钱包流水记录并更新记录状态
+	now := time.Now()
+	processedCount := 0
+	for _, record := range pendingRecords {
+		walletID, ok := recordWalletMap[record.ID]
+		if !ok {
+			continue
+		}
+
+		wallet, err := s.walletRepo.FindByAgentAndType(record.AgentID, record.ChannelID, models.WalletTypeReward)
+		if err != nil || wallet == nil {
+			continue
+		}
+
+		// 创建流水记录
+		walletLog := &repository.WalletLog{
+			WalletID:      walletID,
+			AgentID:       record.AgentID,
+			WalletType:    models.WalletTypeReward,
+			LogType:       WalletLogTypeActivationReward,
+			Amount:        record.ActualReward,
+			BalanceBefore: wallet.Balance - record.ActualReward, // 入账前余额（近似值）
+			BalanceAfter:  wallet.Balance,                       // 入账后余额
+			RefType:       "activation_reward",
+			RefID:         record.ID,
+			Remark:        fmt.Sprintf("激活奖励入账，终端%s，金额%.2f元", record.TerminalSN, float64(record.ActualReward)/100),
+			CreatedAt:     now,
+		}
+		s.walletLogRepo.Create(walletLog)
+
+		// 更新记录状态为已入账
+		s.rewardRecordRepo.UpdateWalletStatus(record.ID, 1)
+		processedCount++
+	}
+
+	log.Printf("[ActivationRewardService] ProcessPendingRewards completed: processed=%d/%d",
+		processedCount, len(pendingRecords))
+
+	return nil
 }
