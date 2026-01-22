@@ -20,6 +20,8 @@ type CallbackProcessor struct {
 	transactionRepo repository.TransactionRepository
 	deviceFeeRepo   repository.DeviceFeeRepository
 	rateChangeRepo  repository.RateChangeRepository
+	merchantRepo    repository.MerchantRepository
+	terminalRepo    repository.TerminalRepository
 	profitService   *ProfitService
 	queue           async.MessageQueue
 }
@@ -31,6 +33,8 @@ func NewCallbackProcessor(
 	transactionRepo repository.TransactionRepository,
 	deviceFeeRepo repository.DeviceFeeRepository,
 	rateChangeRepo repository.RateChangeRepository,
+	merchantRepo repository.MerchantRepository,
+	terminalRepo repository.TerminalRepository,
 	profitService *ProfitService,
 	queue async.MessageQueue,
 ) *CallbackProcessor {
@@ -40,6 +44,8 @@ func NewCallbackProcessor(
 		transactionRepo: transactionRepo,
 		deviceFeeRepo:   deviceFeeRepo,
 		rateChangeRepo:  rateChangeRepo,
+		merchantRepo:    merchantRepo,
+		terminalRepo:    terminalRepo,
 		profitService:   profitService,
 		queue:           queue,
 	}
@@ -225,7 +231,28 @@ func (p *CallbackProcessor) processMerchantIncome(adapter channel.ChannelAdapter
 		return fmt.Errorf("parse merchant income failed: %w", err)
 	}
 
-	// TODO: 更新商户表状态
+	// 更新商户表审核状态
+	if p.merchantRepo != nil && unified.MerchantNo != "" {
+		merchant, err := p.merchantRepo.FindByMerchantNo(unified.MerchantNo)
+		if err == nil && merchant != nil {
+			// 根据审核状态更新商户审核状态
+			var newStatus int16
+			switch unified.ApproveStatus {
+			case 1: // 审核通过
+				newStatus = models.MerchantApproveStatusApproved
+			case 2: // 审核拒绝
+				newStatus = models.MerchantApproveStatusRejected
+			default:
+				newStatus = models.MerchantApproveStatusPending
+			}
+			if err := p.merchantRepo.UpdateApproveStatus(merchant.ID, newStatus); err != nil {
+				log.Printf("[CallbackProcessor] Update merchant approve status failed: %v", err)
+			} else {
+				log.Printf("[CallbackProcessor] Merchant %s approve status updated to %d", unified.MerchantNo, newStatus)
+			}
+		}
+	}
+
 	log.Printf("[CallbackProcessor] Merchant income: %s, status: %d", unified.MerchantNo, unified.ApproveStatus)
 	return nil
 }
@@ -237,7 +264,28 @@ func (p *CallbackProcessor) processTerminalBind(adapter channel.ChannelAdapter, 
 		return fmt.Errorf("parse terminal bind failed: %w", err)
 	}
 
-	// TODO: 更新终端表状态
+	// 更新终端表状态
+	if p.terminalRepo != nil && unified.TerminalSN != "" {
+		terminal, err := p.terminalRepo.FindBySN(unified.TerminalSN)
+		if err == nil && terminal != nil {
+			// 根据绑定状态更新终端状态
+			var newStatus int16
+			switch unified.BindStatus {
+			case 1: // 绑定成功
+				newStatus = models.TerminalStatusActivated
+			case 2: // 解绑
+				newStatus = models.TerminalStatusAllocated
+			default:
+				newStatus = terminal.Status // 保持原状态
+			}
+			if err := p.terminalRepo.UpdateStatus(terminal.ID, newStatus); err != nil {
+				log.Printf("[CallbackProcessor] Update terminal status failed: %v", err)
+			} else {
+				log.Printf("[CallbackProcessor] Terminal %s status updated to %d", unified.TerminalSN, newStatus)
+			}
+		}
+	}
+
 	log.Printf("[CallbackProcessor] Terminal bind: %s, status: %d", unified.TerminalSN, unified.BindStatus)
 	return nil
 }

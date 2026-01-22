@@ -168,7 +168,7 @@ func (h *SimCashbackHandler) GetCashbackTiers(c *gin.Context) {
 // @Router /api/v1/sim-cashback/records/{id} [get]
 func (h *SimCashbackHandler) GetCashbackRecordDetail(c *gin.Context) {
 	idStr := c.Param("id")
-	_, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
@@ -177,11 +177,38 @@ func (h *SimCashbackHandler) GetCashbackRecordDetail(c *gin.Context) {
 		return
 	}
 
-	// TODO: 实现获取详情逻辑
+	agentID := getCurrentAgentID(c)
+	record, err := h.simCashbackService.GetCashbackRecordByID(id, agentID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"code":    404,
+			"message": "记录不存在或无权访问",
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "success",
-		"data":    nil,
+		"data": gin.H{
+			"id":              record.ID,
+			"terminal_sn":     record.TerminalSN,
+			"channel_id":      record.ChannelID,
+			"agent_id":        record.AgentID,
+			"sim_fee_count":   record.SimFeeCount,
+			"sim_fee_amount":  record.SimFeeAmount,
+			"cashback_tier":   record.CashbackTier,
+			"tier_name":       getCashbackTierName(record.CashbackTier),
+			"self_cashback":   record.SelfCashback,
+			"upper_cashback":  record.UpperCashback,
+			"actual_cashback": record.ActualCashback,
+			"source_agent_id": record.SourceAgentID,
+			"wallet_type":     record.WalletType,
+			"wallet_status":   record.WalletStatus,
+			"status_name":     getWalletStatusName(record.WalletStatus),
+			"created_at":      record.CreatedAt,
+			"processed_at":    record.ProcessedAt,
+		},
 	})
 }
 

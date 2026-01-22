@@ -282,6 +282,19 @@ func (s *SimCashbackService) GetCashbackRecords(agentID int64, limit, offset int
 	return s.recordRepo.FindByAgent(agentID, limit, offset)
 }
 
+// GetCashbackRecordByID 获取单条返现记录（带权限校验）
+func (s *SimCashbackService) GetCashbackRecordByID(id int64, agentID int64) (*models.SimCashbackRecord, error) {
+	record, err := s.recordRepo.FindByID(id)
+	if err != nil {
+		return nil, err
+	}
+	// 权限校验：只能查看自己的记录
+	if record.AgentID != agentID {
+		return nil, fmt.Errorf("无权访问该记录")
+	}
+	return record, nil
+}
+
 // GetCashbackStats 获取返现统计
 type CashbackStats struct {
 	TotalCashback      int64 `json:"total_cashback"`       // 总返现金额

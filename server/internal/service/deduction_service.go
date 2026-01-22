@@ -446,6 +446,30 @@ func (s *DeductionService) CancelDeductionPlan(planID int64) error {
 	return s.planRepo.UpdateStatus(planID, models.DeductionPlanStatusCancelled)
 }
 
+// DeductionPlanDetail 代扣计划详情（包含扣款记录）
+type DeductionPlanDetail struct {
+	Plan    *models.DeductionPlan    `json:"plan"`
+	Records []*models.DeductionRecord `json:"records"`
+}
+
+// GetPlanByID 获取代扣计划详情（包含扣款记录）
+func (s *DeductionService) GetPlanByID(planID int64) (*DeductionPlanDetail, error) {
+	plan, err := s.planRepo.FindByID(planID)
+	if err != nil || plan == nil {
+		return nil, fmt.Errorf("代扣计划不存在: %d", planID)
+	}
+
+	records, err := s.recordRepo.FindByPlanID(planID)
+	if err != nil {
+		records = []*models.DeductionRecord{} // 如果查询失败，返回空列表
+	}
+
+	return &DeductionPlanDetail{
+		Plan:    plan,
+		Records: records,
+	}, nil
+}
+
 // CreateDeductionChainRequest 创建代扣链请求
 type CreateDeductionChainRequest struct {
 	DistributeID int64   `json:"distribute_id"` // 终端下发记录ID

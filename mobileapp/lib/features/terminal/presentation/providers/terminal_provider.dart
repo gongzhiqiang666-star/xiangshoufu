@@ -393,8 +393,9 @@ class DistributeListState {
 class DistributeListNotifier extends StateNotifier<DistributeListState> {
   final TerminalService _service;
   final String _direction;
+  final Ref _ref;
 
-  DistributeListNotifier(this._service, this._direction)
+  DistributeListNotifier(this._service, this._direction, this._ref)
       : super(DistributeListState());
 
   /// 加载列表
@@ -436,20 +437,74 @@ class DistributeListNotifier extends StateNotifier<DistributeListState> {
 
   /// 刷新
   Future<void> refresh() => loadList(refresh: true);
+
+  /// 确认划拨
+  Future<bool> confirmDistribute(int id) async {
+    try {
+      await _service.confirmDistribute(id);
+      // 刷新列表
+      await refresh();
+      // 同时刷新另一个Tab的数据
+      if (_direction == 'from') {
+        _ref.read(receivedDistributesProvider.notifier).refresh();
+      } else {
+        _ref.read(sentDistributesProvider.notifier).refresh();
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// 拒绝划拨
+  Future<bool> rejectDistribute(int id) async {
+    try {
+      await _service.rejectDistribute(id);
+      // 刷新列表
+      await refresh();
+      // 同时刷新另一个Tab的数据
+      if (_direction == 'from') {
+        _ref.read(receivedDistributesProvider.notifier).refresh();
+      } else {
+        _ref.read(sentDistributesProvider.notifier).refresh();
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// 取消划拨
+  Future<bool> cancelDistribute(int id) async {
+    try {
+      await _service.cancelDistribute(id);
+      // 刷新列表
+      await refresh();
+      // 同时刷新另一个Tab的数据
+      if (_direction == 'from') {
+        _ref.read(receivedDistributesProvider.notifier).refresh();
+      } else {
+        _ref.read(sentDistributesProvider.notifier).refresh();
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
 }
 
 /// 我下发的划拨记录
 final sentDistributesProvider =
     StateNotifierProvider<DistributeListNotifier, DistributeListState>((ref) {
   final service = ref.watch(terminalServiceProvider);
-  return DistributeListNotifier(service, 'from');
+  return DistributeListNotifier(service, 'from', ref);
 });
 
 /// 下发给我的划拨记录
 final receivedDistributesProvider =
     StateNotifierProvider<DistributeListNotifier, DistributeListState>((ref) {
   final service = ref.watch(terminalServiceProvider);
-  return DistributeListNotifier(service, 'to');
+  return DistributeListNotifier(service, 'to', ref);
 });
 
 // ==================== 回拨记录列表 ====================
@@ -495,8 +550,9 @@ class RecallListState {
 class RecallListNotifier extends StateNotifier<RecallListState> {
   final TerminalService _service;
   final String _direction;
+  final Ref _ref;
 
-  RecallListNotifier(this._service, this._direction)
+  RecallListNotifier(this._service, this._direction, this._ref)
       : super(RecallListState());
 
   /// 加载列表
@@ -538,20 +594,74 @@ class RecallListNotifier extends StateNotifier<RecallListState> {
 
   /// 刷新
   Future<void> refresh() => loadList(refresh: true);
+
+  /// 确认回拨
+  Future<bool> confirmRecall(int id) async {
+    try {
+      await _service.confirmRecall(id);
+      // 刷新列表
+      await refresh();
+      // 同时刷新另一个Tab的数据
+      if (_direction == 'from') {
+        _ref.read(receivedRecallsProvider.notifier).refresh();
+      } else {
+        _ref.read(sentRecallsProvider.notifier).refresh();
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// 拒绝回拨
+  Future<bool> rejectRecall(int id) async {
+    try {
+      await _service.rejectRecall(id);
+      // 刷新列表
+      await refresh();
+      // 同时刷新另一个Tab的数据
+      if (_direction == 'from') {
+        _ref.read(receivedRecallsProvider.notifier).refresh();
+      } else {
+        _ref.read(sentRecallsProvider.notifier).refresh();
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// 取消回拨
+  Future<bool> cancelRecall(int id) async {
+    try {
+      await _service.cancelRecall(id);
+      // 刷新列表
+      await refresh();
+      // 同时刷新另一个Tab的数据
+      if (_direction == 'from') {
+        _ref.read(receivedRecallsProvider.notifier).refresh();
+      } else {
+        _ref.read(sentRecallsProvider.notifier).refresh();
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
 }
 
 /// 我回拨的记录
 final sentRecallsProvider =
     StateNotifierProvider<RecallListNotifier, RecallListState>((ref) {
   final service = ref.watch(terminalServiceProvider);
-  return RecallListNotifier(service, 'from');
+  return RecallListNotifier(service, 'from', ref);
 });
 
 /// 回拨给我的记录
 final receivedRecallsProvider =
     StateNotifierProvider<RecallListNotifier, RecallListState>((ref) {
   final service = ref.watch(terminalServiceProvider);
-  return RecallListNotifier(service, 'to');
+  return RecallListNotifier(service, 'to', ref);
 });
 
 // ==================== 批量设置 ====================

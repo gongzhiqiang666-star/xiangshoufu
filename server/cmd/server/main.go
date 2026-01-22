@@ -90,6 +90,7 @@ func main() {
 	agentPolicyRepo := repository.NewGormAgentPolicyRepository(db)
 	merchantRepo := repository.NewGormMerchantRepository(db)
 	rateStagePolicyRepo := repository.NewGormRateStagePolicyRepository(db)
+	terminalRepo := repository.NewGormTerminalRepository(db) // 提前初始化，供callbackProcessor使用
 
 	// 5. 初始化消息服务
 	pushConfig := &service.PushConfig{
@@ -125,6 +126,8 @@ func main() {
 		transactionRepo,
 		deviceFeeRepo,
 		rateChangeRepo,
+		merchantRepo,
+		terminalRepo,
 		profitService,
 		memQueue,
 	)
@@ -165,7 +168,6 @@ func main() {
 	profitService.SetGoodsDeductionService(goodsDeductionService)
 
 	// 9. 初始化终端下发相关Repository和Service
-	terminalRepo := repository.NewGormTerminalRepository(db)
 	terminalDistributeRepo := repository.NewGormTerminalDistributeRepository(db)
 	terminalRecallRepo := repository.NewGormTerminalRecallRepository(db)
 	terminalImportRecordRepo := repository.NewGormTerminalImportRecordRepository(db)
@@ -253,6 +255,11 @@ func main() {
 	agentRewardPolicyRepo := repository.NewGormAgentActivationRewardPolicyRepository(db)
 	simPolicyRepo := repository.NewGormSimCashbackPolicyRepository(db)
 	channelRepo := repository.NewGormChannelRepository(db)
+
+	// 17.1 延迟注入仓储到商户Handler（避免循环依赖）
+	merchantHandler.SetAgentRepo(agentRepo)
+	merchantHandler.SetChannelRepo(channelRepo)
+	merchantHandler.SetTerminalRepo(terminalRepo)
 
 	// 18. 初始化政策管理服务
 	policyService := service.NewPolicyService(
@@ -372,6 +379,8 @@ func main() {
 		depositRecordRepo, rewardRecordRepo, walletRepo, simCashbackRecordRepo,
 		// 新增参数：商户类型计算
 		merchantRepo, merchantService,
+		// 新增参数：流量费返现
+		deviceFeeRepo,
 	)
 	scheduler.Start()
 
@@ -540,6 +549,8 @@ func setupScheduler(
 	// 新增参数：商户类型计算
 	merchantRepo *repository.GormMerchantRepository,
 	merchantService *service.MerchantService,
+	// 新增参数：流量费返现
+	deviceFeeRepo *repository.GormDeviceFeeRepository,
 ) *jobs.Scheduler {
 	scheduler := jobs.NewScheduler()
 
@@ -564,7 +575,7 @@ func setupScheduler(
 	scheduler.AddJob("partition_manager", 24*time.Hour, partitionJob.Run)
 
 	// 每日代扣任务（每24小时执行一次）
-	jobs.SetupDeductionJobs(scheduler, deductionService, simCashbackService)
+	jobs.SetupDeductionJobs(scheduler, deductionService, simCashbackService, deviceFeeRepo)
 
 	// ============================================================
 	// 新增：政策相关定时任务

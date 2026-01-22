@@ -17,6 +17,9 @@ type MerchantHandler struct {
 	merchantRepo    *repository.GormMerchantRepository
 	transactionRepo *repository.GormTransactionRepository
 	merchantService *service.MerchantService
+	agentRepo       *repository.GormAgentRepository
+	channelRepo     *repository.GormChannelRepository
+	terminalRepo    *repository.GormTerminalRepository
 }
 
 // NewMerchantHandler 创建商户处理器
@@ -30,6 +33,21 @@ func NewMerchantHandler(
 		transactionRepo: transactionRepo,
 		merchantService: merchantService,
 	}
+}
+
+// SetAgentRepo 设置代理商仓储（延迟注入，避免循环依赖）
+func (h *MerchantHandler) SetAgentRepo(agentRepo *repository.GormAgentRepository) {
+	h.agentRepo = agentRepo
+}
+
+// SetChannelRepo 设置通道仓储
+func (h *MerchantHandler) SetChannelRepo(channelRepo *repository.GormChannelRepository) {
+	h.channelRepo = channelRepo
+}
+
+// SetTerminalRepo 设置终端仓储
+func (h *MerchantHandler) SetTerminalRepo(terminalRepo *repository.GormTerminalRepository) {
+	h.terminalRepo = terminalRepo
 }
 
 // GetMerchantList 获取商户列表
@@ -188,6 +206,41 @@ func (h *MerchantHandler) GetMerchantDetail(c *gin.Context) {
 	updatedAt := merchant.UpdatedAt.Format("2006-01-02 15:04:05")
 	updatedAtStr = &updatedAt
 
+	// 获取代理商信息
+	var agentName *string
+	var agentLevel *int
+	if h.agentRepo != nil {
+		if agent, err := h.agentRepo.FindByID(merchant.AgentID); err == nil && agent != nil {
+			agentName = &agent.AgentName
+			agentLevel = &agent.Level
+		}
+	}
+
+	// 获取通道信息
+	var channelName *string
+	if h.channelRepo != nil {
+		if channel, err := h.channelRepo.FindByID(merchant.ChannelID); err == nil && channel != nil {
+			channelName = &channel.ChannelName
+		}
+	}
+
+	// 获取本月交易统计
+	var monthAmount, monthCount *int64
+	now := time.Now()
+	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	if stats, err := h.merchantRepo.GetMerchantTransStats(merchant.ID, &monthStart, &now); err == nil && stats != nil {
+		monthAmount = &stats.TotalAmount
+		monthCount = &stats.TotalCount
+	}
+
+	// 获取终端数量
+	var terminalCount *int64
+	if h.terminalRepo != nil {
+		if count, err := h.terminalRepo.CountByMerchantNo(merchant.MerchantNo); err == nil {
+			terminalCount = &count
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "success",
@@ -196,10 +249,10 @@ func (h *MerchantHandler) GetMerchantDetail(c *gin.Context) {
 			"merchant_no":     merchant.MerchantNo,
 			"merchant_name":   merchant.MerchantName,
 			"agent_id":        merchant.AgentID,
-			"agent_name":      nil, // TODO: 从代理商表获取
-			"agent_level":     nil, // TODO: 从代理商表获取
+			"agent_name":      agentName,
+			"agent_level":     agentLevel,
 			"channel_id":      merchant.ChannelID,
-			"channel_name":    nil, // TODO: 从通道表获取
+			"channel_name":    channelName,
 			"terminal_sn":     merchant.TerminalSN,
 			"status":          merchant.Status,
 			"status_name":     getMerchantStatusName(merchant.Status),
@@ -215,9 +268,9 @@ func (h *MerchantHandler) GetMerchantDetail(c *gin.Context) {
 			"activated_at":    activatedAtStr,
 			"registered_phone": maskPhone(merchant.RegisteredPhone),
 			"register_remark": merchant.RegisterRemark,
-			"month_amount":    nil, // TODO: 从交易统计获取
-			"month_count":     nil, // TODO: 从交易统计获取
-			"terminal_count":  nil, // TODO: 从终端表获取
+			"month_amount":    monthAmount,
+			"month_count":     monthCount,
+			"terminal_count":  terminalCount,
 			"created_at":      createdAtStr,
 			"updated_at":      updatedAtStr,
 		},

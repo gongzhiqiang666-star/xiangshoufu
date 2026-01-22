@@ -235,4 +235,5 @@ type AgentPolicy struct {
 type MerchantRepository interface {
 	FindByID(id int64) (*models.Merchant, error)
 	FindByMerchantNo(merchantNo string) (*models.Merchant, error)
+	UpdateApproveStatus(id int64, status int16) error
 }

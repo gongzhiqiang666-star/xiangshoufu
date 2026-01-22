@@ -230,6 +230,24 @@ func (r *GormAgentRepository) FindAncestors(agentID int64) ([]*Agent, error) {
 	return ancestors, err
 }
 
+// GetAllAgentIDs 获取所有活跃代理商的ID（用于消息广播）
+func (r *GormAgentRepository) GetAllAgentIDs() ([]int64, error) {
+	var ids []int64
+	err := r.db.Model(&Agent{}).
+		Where("status = ?", 1). // 只获取活跃状态的代理商
+		Pluck("id", &ids).Error
+	return ids, err
+}
+
+// GetAgentIDsByLevel 获取指定层级的所有活跃代理商ID（用于消息广播）
+func (r *GormAgentRepository) GetAgentIDsByLevel(level int) ([]int64, error) {
+	var ids []int64
+	err := r.db.Model(&Agent{}).
+		Where("level = ? AND status = ?", level, 1). // 指定层级且活跃
+		Pluck("id", &ids).Error
+	return ids, err
+}
+
 // 确保实现了接口
 var _ AgentRepository = (*GormAgentRepository)(nil)
 

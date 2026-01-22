@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"xiangshoufu/internal/repository"
 	"xiangshoufu/internal/service"
 )
 
@@ -54,16 +55,17 @@ func (j *DeductionJob) Run() {
 // SimCashbackJob 流量费返现定时任务（兜底处理未返现的流量费）
 type SimCashbackJob struct {
 	simCashbackService *service.SimCashbackService
-	deviceFeeRepo      interface{} // 应该是 repository.DeviceFeeRepository
+	deviceFeeRepo      repository.DeviceFeeRepository
 	batchSize          int
 	running            bool
 	mu                 sync.Mutex
 }
 
 // NewSimCashbackJob 创建流量费返现任务
-func NewSimCashbackJob(simCashbackService *service.SimCashbackService) *SimCashbackJob {
+func NewSimCashbackJob(simCashbackService *service.SimCashbackService, deviceFeeRepo repository.DeviceFeeRepository) *SimCashbackJob {
 	return &SimCashbackJob{
 		simCashbackService: simCashbackService,
+		deviceFeeRepo:      deviceFeeRepo,
 		batchSize:          100,
 	}
 }
@@ -87,17 +89,31 @@ func (j *SimCashbackJob) Run() {
 	startTime := time.Now()
 	log.Printf("[SimCashbackJob] Started")
 
-	// TODO: 查询待返现的流量费记录并处理
-	// pendingFees, err := j.deviceFeeRepo.FindPendingCashback(j.batchSize)
-	// for _, fee := range pendingFees {
-	//     j.simCashbackService.ProcessSimFee(fee)
-	// }
+	// 查询待返现的流量费记录并处理
+	if j.deviceFeeRepo != nil {
+		pendingFees, err := j.deviceFeeRepo.FindPendingCashback(j.batchSize)
+		if err != nil {
+			log.Printf("[SimCashbackJob] Find pending cashback failed: %v", err)
+		} else {
+			successCount := 0
+			failCount := 0
+			for _, fee := range pendingFees {
+				if err := j.simCashbackService.ProcessSimFee(fee); err != nil {
+					log.Printf("[SimCashbackJob] Process fee %d failed: %v", fee.ID, err)
+					failCount++
+				} else {
+					successCount++
+				}
+			}
+			log.Printf("[SimCashbackJob] Processed %d fees, success=%d, fail=%d", len(pendingFees), successCount, failCount)
+		}
+	}
 
 	log.Printf("[SimCashbackJob] Completed, took=%v", time.Since(startTime))
 }
 
 // SetupDeductionJobs 设置代扣相关的定时任务
-func SetupDeductionJobs(scheduler *Scheduler, deductionService *service.DeductionService, simCashbackService *service.SimCashbackService) {
+func SetupDeductionJobs(scheduler *Scheduler, deductionService *service.DeductionService, simCashbackService *service.SimCashbackService, deviceFeeRepo repository.DeviceFeeRepository) {
 	// 每日代扣任务 - 每天执行（通过24小时间隔模拟）
 	// 实际生产环境建议使用cron表达式调度，每天8:00执行
 	deductionJob := NewDeductionJob(deductionService)
@@ -105,7 +121,7 @@ func SetupDeductionJobs(scheduler *Scheduler, deductionService *service.Deductio
 
 	// 流量费返现兜底任务 - 每10分钟执行
 	if simCashbackService != nil {
-		simCashbackJob := NewSimCashbackJob(simCashbackService)
+		simCashbackJob := NewSimCashbackJob(simCashbackService, deviceFeeRepo)
 		scheduler.AddJob("sim_cashback_fallback", 10*time.Minute, simCashbackJob.Run)
 	}
 

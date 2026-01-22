@@ -102,12 +102,62 @@ func (h *DeductionHandler) GetDeductionPlan(c *gin.Context) {
 		return
 	}
 
-	// TODO: 从repository获取计划详情
+	detail, err := h.deductionService.GetPlanByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"code":    404,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	// 转换代扣记录为前端友好格式
+	records := make([]gin.H, 0, len(detail.Records))
+	for _, r := range detail.Records {
+		records = append(records, gin.H{
+			"id":           r.ID,
+			"period_num":   r.PeriodNum,
+			"amount":       r.Amount,
+			"amount_yuan":  float64(r.Amount) / 100,
+			"status":       r.Status,
+			"status_name":  DeductionRecordStatusDesc(r.Status),
+			"scheduled_at": r.ScheduledAt,
+			"executed_at":  r.DeductedAt,
+			"fail_reason":  r.FailReason,
+		})
+	}
+
+	plan := detail.Plan
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "success",
 		"data": gin.H{
-			"id": id,
+			"plan": gin.H{
+				"id":               plan.ID,
+				"plan_no":          plan.PlanNo,
+				"deductor_id":      plan.DeductorID,
+				"deductee_id":      plan.DeducteeID,
+				"plan_type":        plan.PlanType,
+				"plan_type_name":   DeductionPlanTypeDesc(plan.PlanType),
+				"total_amount":     plan.TotalAmount,
+				"total_amount_yuan": float64(plan.TotalAmount) / 100,
+				"deducted_amount":  plan.DeductedAmount,
+				"deducted_yuan":    float64(plan.DeductedAmount) / 100,
+				"remaining_amount": plan.RemainingAmount,
+				"remaining_yuan":   float64(plan.RemainingAmount) / 100,
+				"total_periods":    plan.TotalPeriods,
+				"current_period":   plan.CurrentPeriod,
+				"period_amount":    plan.PeriodAmount,
+				"period_yuan":      float64(plan.PeriodAmount) / 100,
+				"status":           plan.Status,
+				"status_name":      DeductionPlanStatusDesc(plan.Status),
+				"related_type":     plan.RelatedType,
+				"related_id":       plan.RelatedID,
+				"remark":           plan.Remark,
+				"created_at":       plan.CreatedAt,
+				"updated_at":       plan.UpdatedAt,
+			},
+			"records": records,
 		},
 	})
 }
@@ -329,6 +379,22 @@ func DeductionPlanStatusDesc(status int16) string {
 		return "已暂停"
 	case models.DeductionPlanStatusCancelled:
 		return "已取消"
+	default:
+		return "未知状态"
+	}
+}
+
+// DeductionRecordStatusDesc 代扣记录状态描述
+func DeductionRecordStatusDesc(status int16) string {
+	switch status {
+	case models.DeductionRecordStatusPending:
+		return "待扣款"
+	case models.DeductionRecordStatusSuccess:
+		return "扣款成功"
+	case models.DeductionRecordStatusFailed:
+		return "扣款失败"
+	case models.DeductionRecordStatusPartialSuccess:
+		return "部分成功"
 	default:
 		return "未知状态"
 	}

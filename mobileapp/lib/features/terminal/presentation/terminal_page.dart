@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../router/app_router.dart';
 import '../../agent/presentation/providers/agent_provider.dart';
 import '../domain/models/terminal.dart';
 import 'providers/terminal_provider.dart';
@@ -56,6 +57,34 @@ class _TerminalPageState extends ConsumerState<TerminalPage>
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('终端管理'),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) => _handleMenuAction(value),
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'distribute_list',
+                child: Row(
+                  children: [
+                    Icon(Icons.send, size: 20, color: AppColors.textSecondary),
+                    SizedBox(width: 8),
+                    Text('划拨记录'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'recall_list',
+                child: Row(
+                  children: [
+                    Icon(Icons.undo, size: 20, color: AppColors.textSecondary),
+                    SizedBox(width: 8),
+                    Text('回拨记录'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(48),
           child: Container(
@@ -374,32 +403,61 @@ class _TerminalPageState extends ConsumerState<TerminalPage>
               offset: const Offset(0, -2))
         ],
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           if (selectedTerminals.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Text(
-                '已选${selectedTerminals.length}台',
-                style: const TextStyle(
-                    color: AppColors.primary, fontWeight: FontWeight.w500),
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '已选${selectedTerminals.length}台',
+                    style: const TextStyle(
+                        color: AppColors.primary, fontWeight: FontWeight.w500),
+                  ),
+                  TextButton(
+                    onPressed: () =>
+                        ref.read(selectedTerminalsProvider.notifier).state = [],
+                    child: const Text('清空选择'),
+                  ),
+                ],
               ),
             ),
-          Expanded(
-              child: OutlinedButton(
-            onPressed: selectedTerminals.isEmpty
-                ? null
-                : () => _handleBatchRecall(selectedTerminals),
-            child: const Text('批量回拨'),
-          )),
-          const SizedBox(width: 12),
-          Expanded(
-              child: ElevatedButton(
-            onPressed: selectedTerminals.isEmpty
-                ? null
-                : () => _navigateToTransfer(selectedTerminals),
-            child: const Text('批量划拨'),
-          )),
+          Row(
+            children: [
+              // 批量设置按钮
+              IconButton(
+                onPressed: selectedTerminals.isEmpty
+                    ? null
+                    : () => _showBatchSetMenu(selectedTerminals),
+                icon: Icon(
+                  Icons.settings,
+                  color: selectedTerminals.isEmpty
+                      ? AppColors.textTertiary
+                      : AppColors.primary,
+                ),
+                tooltip: '批量设置',
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                  child: OutlinedButton(
+                onPressed: selectedTerminals.isEmpty
+                    ? null
+                    : () => _handleBatchRecall(selectedTerminals),
+                child: const Text('批量回拨'),
+              )),
+              const SizedBox(width: 12),
+              Expanded(
+                  child: ElevatedButton(
+                onPressed: selectedTerminals.isEmpty
+                    ? null
+                    : () => _navigateToTransfer(selectedTerminals),
+                child: const Text('批量划拨'),
+              )),
+            ],
+          ),
         ],
       ),
     );
@@ -524,6 +582,73 @@ class _TerminalPageState extends ConsumerState<TerminalPage>
           ),
         );
       },
+    );
+  }
+
+  /// 处理菜单操作
+  void _handleMenuAction(String action) {
+    switch (action) {
+      case 'distribute_list':
+        context.push(RoutePaths.terminalDistributeList);
+        break;
+      case 'recall_list':
+        context.push(RoutePaths.terminalRecallList);
+        break;
+    }
+  }
+
+  /// 显示批量设置菜单
+  void _showBatchSetMenu(List<Terminal> terminals) {
+    final snList = terminals.map((t) => t.terminalSn).toList();
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              child: const Text(
+                '批量设置',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.percent),
+              title: const Text('设置费率'),
+              subtitle: const Text('设置终端信用卡费率'),
+              onTap: () {
+                Navigator.pop(context);
+                context.push(RoutePaths.terminalBatchSetRate, extra: snList);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.sim_card),
+              title: const Text('设置流量费'),
+              subtitle: const Text('设置流量费金额和收费周期'),
+              onTap: () {
+                Navigator.pop(context);
+                context.push(RoutePaths.terminalBatchSetSim, extra: snList);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.account_balance_wallet),
+              title: const Text('设置押金'),
+              subtitle: const Text('设置终端激活押金'),
+              onTap: () {
+                Navigator.pop(context);
+                context.push(RoutePaths.terminalBatchSetDeposit, extra: snList);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
     );
   }
 }

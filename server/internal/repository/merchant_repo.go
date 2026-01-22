@@ -189,6 +189,15 @@ func (r *GormMerchantRepository) UpdateStatus(id int64, status int16) error {
 		}).Error
 }
 
+// UpdateApproveStatus 更新商户审核状态
+func (r *GormMerchantRepository) UpdateApproveStatus(id int64, status int16) error {
+	return r.db.Model(&models.Merchant{}).Where("id = ?", id).
+		Updates(map[string]interface{}{
+			"approve_status": status,
+			"updated_at":     time.Now(),
+		}).Error
+}
+
 // UpdateRate 更新商户费率
 func (r *GormMerchantRepository) UpdateRate(id int64, creditRate, debitRate string) error {
 	return r.db.Model(&models.Merchant{}).Where("id = ?", id).

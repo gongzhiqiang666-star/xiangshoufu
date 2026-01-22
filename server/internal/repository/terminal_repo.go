@@ -45,6 +45,7 @@ type SimCashbackPolicyRepository interface {
 type SimCashbackRecordRepository interface {
 	Create(record *models.SimCashbackRecord) error
 	BatchCreate(records []*models.SimCashbackRecord) error
+	FindByID(id int64) (*models.SimCashbackRecord, error)
 	FindByDeviceFeeID(deviceFeeID int64) ([]*models.SimCashbackRecord, error)
 	FindByAgent(agentID int64, limit, offset int) ([]*models.SimCashbackRecord, int64, error)
 	UpdateWalletStatus(id int64, status int16) error
@@ -150,6 +151,15 @@ func (r *GormTerminalRepository) CountByOwnerAndStatus(ownerAgentID int64, statu
 	return r.db.Model(&models.Terminal{}).
 		Where("owner_agent_id = ? AND status = ?", ownerAgentID, status).
 		Count(count).Error
+}
+
+// CountByMerchantNo 按商户号统计终端数量
+func (r *GormTerminalRepository) CountByMerchantNo(merchantNo string) (int64, error) {
+	var count int64
+	err := r.db.Model(&models.Terminal{}).
+		Where("merchant_no = ?", merchantNo).
+		Count(&count).Error
+	return count, err
 }
 
 // GormTerminalDistributeRepository GORM实现
@@ -302,6 +312,15 @@ func (r *GormSimCashbackRecordRepository) BatchCreate(records []*models.SimCashb
 		return nil
 	}
 	return r.db.CreateInBatches(records, 100).Error
+}
+
+func (r *GormSimCashbackRecordRepository) FindByID(id int64) (*models.SimCashbackRecord, error) {
+	var record models.SimCashbackRecord
+	err := r.db.First(&record, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &record, nil
 }
 
 func (r *GormSimCashbackRecordRepository) FindByDeviceFeeID(deviceFeeID int64) ([]*models.SimCashbackRecord, error) {

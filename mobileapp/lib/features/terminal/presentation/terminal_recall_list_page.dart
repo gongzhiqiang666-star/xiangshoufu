@@ -5,17 +5,16 @@ import '../../../core/theme/app_spacing.dart';
 import '../domain/models/terminal.dart';
 import 'providers/terminal_provider.dart';
 
-/// 划拨记录列表页面
-class TerminalDistributeListPage extends ConsumerStatefulWidget {
-  const TerminalDistributeListPage({super.key});
+/// 回拨记录列表页面
+class TerminalRecallListPage extends ConsumerStatefulWidget {
+  const TerminalRecallListPage({super.key});
 
   @override
-  ConsumerState<TerminalDistributeListPage> createState() =>
-      _TerminalDistributeListPageState();
+  ConsumerState<TerminalRecallListPage> createState() =>
+      _TerminalRecallListPageState();
 }
 
-class _TerminalDistributeListPageState
-    extends ConsumerState<TerminalDistributeListPage>
+class _TerminalRecallListPageState extends ConsumerState<TerminalRecallListPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
@@ -26,8 +25,8 @@ class _TerminalDistributeListPageState
 
     // 加载数据
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(sentDistributesProvider.notifier).loadList(refresh: true);
-      ref.read(receivedDistributesProvider.notifier).loadList(refresh: true);
+      ref.read(sentRecallsProvider.notifier).loadList(refresh: true);
+      ref.read(receivedRecallsProvider.notifier).loadList(refresh: true);
     });
   }
 
@@ -42,7 +41,7 @@ class _TerminalDistributeListPageState
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('划拨记录'),
+        title: const Text('回拨记录'),
         centerTitle: true,
         bottom: TabBar(
           controller: _tabController,
@@ -50,27 +49,27 @@ class _TerminalDistributeListPageState
           unselectedLabelColor: AppColors.textSecondary,
           indicatorColor: AppColors.primary,
           tabs: const [
-            Tab(text: '我下发的'),
-            Tab(text: '下发给我的'),
+            Tab(text: '我回拨的'),
+            Tab(text: '回拨给我的'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          _SentDistributesTab(),
-          _ReceivedDistributesTab(),
+          _SentRecallsTab(),
+          _ReceivedRecallsTab(),
         ],
       ),
     );
   }
 }
 
-/// 我下发的 Tab
-class _SentDistributesTab extends ConsumerWidget {
+/// 我回拨的 Tab
+class _SentRecallsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(sentDistributesProvider);
+    final state = ref.watch(sentRecallsProvider);
 
     if (state.isLoading && state.list.isEmpty) {
       return const Center(child: CircularProgressIndicator());
@@ -80,17 +79,17 @@ class _SentDistributesTab extends ConsumerWidget {
       return _buildErrorWidget(
         context,
         state.error!,
-        () => ref.read(sentDistributesProvider.notifier).loadList(refresh: true),
+        () => ref.read(sentRecallsProvider.notifier).loadList(refresh: true),
       );
     }
 
     if (state.list.isEmpty) {
-      return _buildEmptyWidget('暂无下发记录');
+      return _buildEmptyWidget('暂无回拨记录');
     }
 
     return RefreshIndicator(
       onRefresh: () async {
-        await ref.read(sentDistributesProvider.notifier).loadList(refresh: true);
+        await ref.read(sentRecallsProvider.notifier).loadList(refresh: true);
       },
       child: NotificationListener<ScrollNotification>(
         onNotification: (notification) {
@@ -99,7 +98,7 @@ class _SentDistributesTab extends ConsumerWidget {
                   notification.metrics.maxScrollExtent - 100 &&
               state.hasMore &&
               !state.isLoadingMore) {
-            ref.read(sentDistributesProvider.notifier).loadList();
+            ref.read(sentRecallsProvider.notifier).loadList();
           }
           return false;
         },
@@ -116,9 +115,9 @@ class _SentDistributesTab extends ConsumerWidget {
               );
             }
 
-            final distribute = state.list[index];
-            return _DistributeCard(
-              distribute: distribute,
+            final recall = state.list[index];
+            return _RecallCard(
+              recall: recall,
               isSent: true,
             );
           },
@@ -128,11 +127,11 @@ class _SentDistributesTab extends ConsumerWidget {
   }
 }
 
-/// 下发给我的 Tab
-class _ReceivedDistributesTab extends ConsumerWidget {
+/// 回拨给我的 Tab
+class _ReceivedRecallsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(receivedDistributesProvider);
+    final state = ref.watch(receivedRecallsProvider);
 
     if (state.isLoading && state.list.isEmpty) {
       return const Center(child: CircularProgressIndicator());
@@ -142,7 +141,7 @@ class _ReceivedDistributesTab extends ConsumerWidget {
       return _buildErrorWidget(
         context,
         state.error!,
-        () => ref.read(receivedDistributesProvider.notifier).loadList(refresh: true),
+        () => ref.read(receivedRecallsProvider.notifier).loadList(refresh: true),
       );
     }
 
@@ -152,7 +151,7 @@ class _ReceivedDistributesTab extends ConsumerWidget {
 
     return RefreshIndicator(
       onRefresh: () async {
-        await ref.read(receivedDistributesProvider.notifier).loadList(refresh: true);
+        await ref.read(receivedRecallsProvider.notifier).loadList(refresh: true);
       },
       child: NotificationListener<ScrollNotification>(
         onNotification: (notification) {
@@ -161,7 +160,7 @@ class _ReceivedDistributesTab extends ConsumerWidget {
                   notification.metrics.maxScrollExtent - 100 &&
               state.hasMore &&
               !state.isLoadingMore) {
-            ref.read(receivedDistributesProvider.notifier).loadList();
+            ref.read(receivedRecallsProvider.notifier).loadList();
           }
           return false;
         },
@@ -178,9 +177,9 @@ class _ReceivedDistributesTab extends ConsumerWidget {
               );
             }
 
-            final distribute = state.list[index];
-            return _DistributeCard(
-              distribute: distribute,
+            final recall = state.list[index];
+            return _RecallCard(
+              recall: recall,
               isSent: false,
             );
           },
@@ -190,13 +189,13 @@ class _ReceivedDistributesTab extends ConsumerWidget {
   }
 }
 
-/// 划拨记录卡片
-class _DistributeCard extends ConsumerWidget {
-  final TerminalDistribute distribute;
+/// 回拨记录卡片
+class _RecallCard extends ConsumerWidget {
+  final TerminalRecall recall;
   final bool isSent;
 
-  const _DistributeCard({
-    required this.distribute,
+  const _RecallCard({
+    required this.recall,
     required this.isSent,
   });
 
@@ -224,14 +223,14 @@ class _DistributeCard extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '单号: ${distribute.distributeNo}',
+                '单号: ${recall.recallNo}',
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                   color: AppColors.textPrimary,
                 ),
               ),
-              _buildStatusChip(distribute.status),
+              _buildStatusChip(recall.status),
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -239,38 +238,33 @@ class _DistributeCard extends ConsumerWidget {
           const SizedBox(height: AppSpacing.sm),
 
           // 终端SN
-          _buildInfoRow('终端SN', distribute.terminalSn),
+          _buildInfoRow('终端SN', recall.terminalSn),
 
           // 代理商信息
           if (isSent)
-            _buildInfoRow('接收方', '代理商ID: ${distribute.toAgentId}')
+            _buildInfoRow('接收方', '代理商ID: ${recall.toAgentId}')
           else
-            _buildInfoRow('发起方', '代理商ID: ${distribute.fromAgentId}'),
-
-          // 货款
-          _buildInfoRow(
-            '货款',
-            '¥${(distribute.goodsPrice / 100).toStringAsFixed(2)}',
-          ),
-
-          // 扣款方式
-          _buildInfoRow(
-            '扣款方式',
-            distribute.deductionType == 1 ? '一次性扣款' : '分期扣款',
-          ),
+            _buildInfoRow('发起方', '代理商ID: ${recall.fromAgentId}'),
 
           // 时间
           _buildInfoRow(
             '创建时间',
-            distribute.createdAt.toLocal().toString().substring(0, 16),
+            recall.createdAt.toLocal().toString().substring(0, 16),
           ),
 
+          // 确认时间
+          if (recall.confirmedAt != null)
+            _buildInfoRow(
+              '确认时间',
+              recall.confirmedAt!.toLocal().toString().substring(0, 16),
+            ),
+
           // 备注
-          if (distribute.remark != null && distribute.remark!.isNotEmpty)
-            _buildInfoRow('备注', distribute.remark!),
+          if (recall.remark != null && recall.remark!.isNotEmpty)
+            _buildInfoRow('备注', recall.remark!),
 
           // 操作按钮 - 只在待确认状态显示
-          if (distribute.status == 1) ...[
+          if (recall.status == 1) ...[
             const SizedBox(height: AppSpacing.sm),
             const Divider(height: 1),
             const SizedBox(height: AppSpacing.sm),
@@ -284,7 +278,7 @@ class _DistributeCard extends ConsumerWidget {
   /// 构建操作按钮
   Widget _buildActionButtons(BuildContext context, WidgetRef ref) {
     if (isSent) {
-      // 我下发的 - 显示取消按钮
+      // 我回拨的 - 显示取消按钮
       return Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
@@ -300,7 +294,7 @@ class _DistributeCard extends ConsumerWidget {
         ],
       );
     } else {
-      // 下发给我的 - 显示确认和拒绝按钮
+      // 回拨给我的 - 显示确认和拒绝按钮
       return Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
@@ -333,8 +327,8 @@ class _DistributeCard extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('确认划拨'),
-        content: Text('确认接收终端 ${distribute.terminalSn} 吗？'),
+        title: const Text('确认回拨'),
+        content: Text('确认接收回拨终端 ${recall.terminalSn} 吗？'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -360,8 +354,8 @@ class _DistributeCard extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('拒绝划拨'),
-        content: Text('确认拒绝接收终端 ${distribute.terminalSn} 吗？'),
+        title: const Text('拒绝回拨'),
+        content: Text('确认拒绝接收回拨终端 ${recall.terminalSn} 吗？'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -387,8 +381,8 @@ class _DistributeCard extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('取消划拨'),
-        content: Text('确认取消划拨终端 ${distribute.terminalSn} 吗？'),
+        title: const Text('取消回拨'),
+        content: Text('确认取消回拨终端 ${recall.terminalSn} 吗？'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -411,7 +405,6 @@ class _DistributeCard extends ConsumerWidget {
 
   /// 处理确认操作
   Future<void> _handleConfirm(BuildContext context, WidgetRef ref) async {
-    // 显示loading
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -419,15 +412,13 @@ class _DistributeCard extends ConsumerWidget {
     );
 
     final success = await ref
-        .read(receivedDistributesProvider.notifier)
-        .confirmDistribute(distribute.id);
+        .read(receivedRecallsProvider.notifier)
+        .confirmRecall(recall.id);
 
-    // 关闭loading
     if (context.mounted) {
       Navigator.of(context).pop();
     }
 
-    // 显示结果
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -447,8 +438,8 @@ class _DistributeCard extends ConsumerWidget {
     );
 
     final success = await ref
-        .read(receivedDistributesProvider.notifier)
-        .rejectDistribute(distribute.id);
+        .read(receivedRecallsProvider.notifier)
+        .rejectRecall(recall.id);
 
     if (context.mounted) {
       Navigator.of(context).pop();
@@ -473,8 +464,8 @@ class _DistributeCard extends ConsumerWidget {
     );
 
     final success = await ref
-        .read(sentDistributesProvider.notifier)
-        .cancelDistribute(distribute.id);
+        .read(sentRecallsProvider.notifier)
+        .cancelRecall(recall.id);
 
     if (context.mounted) {
       Navigator.of(context).pop();

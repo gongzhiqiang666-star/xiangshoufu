@@ -300,19 +300,21 @@ func (h *AdminMessageHandler) GetMessageTypes(c *gin.Context) {
 	})
 }
 
-// getAllAgentIDs 获取所有代理商ID（简化实现）
+// getAllAgentIDs 获取所有代理商ID
 func (h *AdminMessageHandler) getAllAgentIDs() ([]int64, error) {
-	// 这里需要调用代理商仓库获取所有代理商ID
-	// 简化实现：返回空列表，实际需要从数据库查询
-	// TODO: 实现从agentRepo获取所有代理商ID
+	// 调用代理商仓库获取所有活跃代理商ID
+	if agentRepo, ok := h.agentRepo.(*repository.GormAgentRepository); ok {
+		return agentRepo.GetAllAgentIDs()
+	}
 	return []int64{}, nil
 }
 
-// getAgentIDsByLevel 根据层级获取代理商ID（简化实现）
+// getAgentIDsByLevel 根据层级获取代理商ID
 func (h *AdminMessageHandler) getAgentIDsByLevel(level int) ([]int64, error) {
-	// 这里需要调用代理商仓库获取指定层级的代理商ID
-	// 简化实现：返回空列表，实际需要从数据库查询
-	// TODO: 实现从agentRepo获取指定层级的代理商ID
+	// 调用代理商仓库获取指定层级的代理商ID
+	if agentRepo, ok := h.agentRepo.(*repository.GormAgentRepository); ok {
+		return agentRepo.GetAgentIDsByLevel(level)
+	}
 	return []int64{}, nil
 }
 

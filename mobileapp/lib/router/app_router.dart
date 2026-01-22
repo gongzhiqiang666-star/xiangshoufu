@@ -9,6 +9,11 @@ import '../features/terminal/presentation/terminal_page.dart';
 import '../features/terminal/presentation/terminal_transfer_page.dart';
 import '../features/terminal/presentation/terminal_detail_page.dart';
 import '../features/terminal/presentation/terminal_recall_page.dart';
+import '../features/terminal/presentation/terminal_distribute_list_page.dart';
+import '../features/terminal/presentation/terminal_recall_list_page.dart';
+import '../features/terminal/presentation/terminal_batch_set_rate_page.dart';
+import '../features/terminal/presentation/terminal_batch_set_sim_page.dart';
+import '../features/terminal/presentation/terminal_batch_set_deposit_page.dart';
 import '../features/cargo_deduction/presentation/cargo_deduction_page.dart';
 import '../features/merchant/presentation/merchant_page.dart';
 import '../features/merchant/presentation/merchant_detail_page.dart';
@@ -55,6 +60,11 @@ class RoutePaths {
   static const String terminalTransfer = '/terminal/transfer';
   static const String terminalRecall = '/terminal/recall';
   static const String terminalDetail = '/terminal/:id';
+  static const String terminalDistributeList = '/terminal/distribute-list';
+  static const String terminalRecallList = '/terminal/recall-list';
+  static const String terminalBatchSetRate = '/terminal/batch-set-rate';
+  static const String terminalBatchSetSim = '/terminal/batch-set-sim';
+  static const String terminalBatchSetDeposit = '/terminal/batch-set-deposit';
 
   // 货款代扣
   static const String cargoDeduction = '/cargo-deduction';
@@ -222,6 +232,40 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final id = state.pathParameters['id'] ?? '';
           return TerminalDetailPage(terminalId: id);
+        },
+      ),
+      GoRoute(
+        path: RoutePaths.terminalDistributeList,
+        name: 'terminalDistributeList',
+        builder: (context, state) => const TerminalDistributeListPage(),
+      ),
+      GoRoute(
+        path: RoutePaths.terminalRecallList,
+        name: 'terminalRecallList',
+        builder: (context, state) => const TerminalRecallListPage(),
+      ),
+      GoRoute(
+        path: RoutePaths.terminalBatchSetRate,
+        name: 'terminalBatchSetRate',
+        builder: (context, state) {
+          final snList = state.extra as List<String>? ?? [];
+          return TerminalBatchSetRatePage(selectedSNs: snList);
+        },
+      ),
+      GoRoute(
+        path: RoutePaths.terminalBatchSetSim,
+        name: 'terminalBatchSetSim',
+        builder: (context, state) {
+          final snList = state.extra as List<String>? ?? [];
+          return TerminalBatchSetSimPage(selectedSNs: snList);
+        },
+      ),
+      GoRoute(
+        path: RoutePaths.terminalBatchSetDeposit,
+        name: 'terminalBatchSetDeposit',
+        builder: (context, state) {
+          final snList = state.extra as List<String>? ?? [];
+          return TerminalBatchSetDepositPage(selectedSNs: snList);
         },
       ),
 

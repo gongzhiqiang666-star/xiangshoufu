@@ -114,7 +114,7 @@ func (s *WithdrawService) CreateWithdraw(req *CreateWithdrawRequest) (*models.Wi
 	// 7. 获取税筹通道配置
 	var taxChannelID *int64
 	var taxFee, fixedFee int64
-	taxChannel, err := s.taxChannelRepo.FindByChannelAndWallet(wallet.ChannelID, wallet.WalletType)
+	taxChannel, err := s.taxChannelRepo.GetTaxChannelForWithdrawal(wallet.ChannelID, wallet.WalletType)
 	if err == nil && taxChannel != nil {
 		taxChannelID = &taxChannel.ID
 		// 计算税费和固定费用
@@ -150,7 +150,7 @@ func (s *WithdrawService) CreateWithdraw(req *CreateWithdrawRequest) (*models.Wi
 		ActualAmount: actualAmount,
 		BankName:     agent.BankName,
 		BankAccount:  encryptedAccount,
-		AccountName:  agent.AccountName,
+		AccountName:  agent.ContactName,
 		Status:       models.WithdrawStatusPending,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
