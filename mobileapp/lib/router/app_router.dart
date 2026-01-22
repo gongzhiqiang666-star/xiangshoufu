@@ -21,6 +21,9 @@ import '../features/agent/presentation/agent_channels_page.dart';
 import '../features/policy/presentation/my_policy_page.dart';
 import '../features/policy/presentation/subordinate_policy_page.dart';
 import '../features/deduction/presentation/deduction_page.dart';
+import '../features/deduction/presentation/deduction_detail_page.dart';
+import '../features/goods_deduction/presentation/goods_deduction_page.dart';
+import '../features/goods_deduction/presentation/goods_deduction_detail_page.dart';
 import '../features/marketing/presentation/marketing_page.dart';
 import '../features/message/presentation/message_page.dart';
 import '../features/profile/presentation/profile_page.dart';
@@ -77,6 +80,11 @@ class RoutePaths {
 
   // 代扣管理
   static const String deduction = '/deduction';
+  static const String deductionDetail = '/deduction/:id';
+
+  // 货款代扣（新版）
+  static const String goodsDeduction = '/goods-deduction';
+  static const String goodsDeductionDetail = '/goods-deduction/:id';
 
   // 营销海报
   static const String marketing = '/marketing';
@@ -310,6 +318,33 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: RoutePaths.deduction,
         name: 'deduction',
         builder: (context, state) => const DeductionPage(),
+      ),
+      GoRoute(
+        path: RoutePaths.deductionDetail,
+        name: 'deductionDetail',
+        builder: (context, state) {
+          final idStr = state.pathParameters['id'] ?? '0';
+          final id = int.tryParse(idStr) ?? 0;
+          return DeductionDetailPage(id: id);
+        },
+      ),
+
+      // ==================== 货款代扣 ====================
+      GoRoute(
+        path: RoutePaths.goodsDeduction,
+        name: 'goodsDeduction',
+        builder: (context, state) => const GoodsDeductionPage(),
+      ),
+      GoRoute(
+        path: RoutePaths.goodsDeductionDetail,
+        name: 'goodsDeductionDetail',
+        builder: (context, state) {
+          final idStr = state.pathParameters['id'] ?? '0';
+          final id = int.tryParse(idStr) ?? 0;
+          final extra = state.extra as Map<String, dynamic>?;
+          final isSent = extra?['isSent'] as bool? ?? true;
+          return GoodsDeductionDetailPage(id: id, isSent: isSent);
+        },
       ),
 
       // ==================== 营销海报 ====================
