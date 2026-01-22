@@ -1,10 +1,15 @@
 package jobs
 
 import (
+	"encoding/json"
+	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
+	"gorm.io/gorm"
 	"xiangshoufu/internal/repository"
 	"xiangshoufu/internal/service"
 )
@@ -184,53 +189,221 @@ func (j *MessageCleanupJob) Run() {
 
 // DataArchiverJob 数据归档定时任务
 type DataArchiverJob struct {
-	callbackRepo  repository.RawCallbackRepository
+	callbackRepo  *repository.GormRawCallbackRepository
 	archivePath   string
 	retentionDays int
+	batchSize     int
+	running       bool
+	mu            sync.Mutex
 }
 
 // NewDataArchiverJob 创建数据归档任务
-func NewDataArchiverJob(callbackRepo repository.RawCallbackRepository, archivePath string) *DataArchiverJob {
+func NewDataArchiverJob(callbackRepo *repository.GormRawCallbackRepository, archivePath string) *DataArchiverJob {
+	// 确保归档目录存在
+	if archivePath != "" {
+		os.MkdirAll(archivePath, 0755)
+	}
 	return &DataArchiverJob{
 		callbackRepo:  callbackRepo,
 		archivePath:   archivePath,
 		retentionDays: 90, // 保留90天
+		batchSize:     1000,
 	}
 }
 
 // Run 执行任务（每天凌晨4点执行）
 func (j *DataArchiverJob) Run() {
+	j.mu.Lock()
+	if j.running {
+		j.mu.Unlock()
+		log.Printf("[DataArchiverJob] Already running, skip")
+		return
+	}
+	j.running = true
+	j.mu.Unlock()
+
+	defer func() {
+		j.mu.Lock()
+		j.running = false
+		j.mu.Unlock()
+	}()
+
 	startTime := time.Now()
 	log.Printf("[DataArchiverJob] Started")
 
-	// TODO: 实现数据归档逻辑
-	// 1. 查询超过retentionDays的数据
-	// 2. 导出到archivePath目录
-	// 3. 删除已归档的数据
+	// 1. 统计需要归档的数据量
+	totalCount, err := j.callbackRepo.CountArchivedLogs(j.retentionDays)
+	if err != nil {
+		log.Printf("[DataArchiverJob] Count archived logs failed: %v", err)
+		return
+	}
 
-	log.Printf("[DataArchiverJob] Completed, took=%v", time.Since(startTime))
+	if totalCount == 0 {
+		log.Printf("[DataArchiverJob] No data to archive")
+		return
+	}
+
+	log.Printf("[DataArchiverJob] Found %d logs to archive", totalCount)
+
+	archivedCount := int64(0)
+	deletedCount := int64(0)
+
+	// 2. 分批处理归档
+	for {
+		// 查询待归档数据
+		logs, err := j.callbackRepo.FindArchivedLogs(j.retentionDays, j.batchSize)
+		if err != nil {
+			log.Printf("[DataArchiverJob] Find archived logs failed: %v", err)
+			break
+		}
+
+		if len(logs) == 0 {
+			break
+		}
+
+		// 3. 导出到归档文件（如果配置了归档路径）
+		if j.archivePath != "" {
+			archiveFile := filepath.Join(j.archivePath, fmt.Sprintf("callbacks_%s.jsonl", time.Now().Format("20060102_150405")))
+			if err := j.exportToFile(logs, archiveFile); err != nil {
+				log.Printf("[DataArchiverJob] Export to file failed: %v", err)
+				break
+			}
+			archivedCount += int64(len(logs))
+		}
+
+		// 4. 删除已归档的数据
+		ids := make([]int64, len(logs))
+		for i, l := range logs {
+			ids[i] = l.ID
+		}
+
+		deleted, err := j.callbackRepo.DeleteArchivedLogs(ids)
+		if err != nil {
+			log.Printf("[DataArchiverJob] Delete archived logs failed: %v", err)
+			break
+		}
+		deletedCount += deleted
+
+		// 进度日志
+		log.Printf("[DataArchiverJob] Progress: archived=%d, deleted=%d", archivedCount, deletedCount)
+	}
+
+	log.Printf("[DataArchiverJob] Completed: archived=%d, deleted=%d, took=%v",
+		archivedCount, deletedCount, time.Since(startTime))
+}
+
+// exportToFile 导出日志到文件（JSONL格式）
+func (j *DataArchiverJob) exportToFile(logs []*repository.RawCallbackLog, filePath string) error {
+	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("open archive file failed: %w", err)
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	for _, l := range logs {
+		if err := encoder.Encode(l); err != nil {
+			return fmt.Errorf("encode log failed: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // PartitionManagerJob 分区管理定时任务
 type PartitionManagerJob struct {
-	// TODO: 添加数据库连接
+	db      *gorm.DB
+	running bool
+	mu      sync.Mutex
 }
 
 // NewPartitionManagerJob 创建分区管理任务
-func NewPartitionManagerJob() *PartitionManagerJob {
-	return &PartitionManagerJob{}
+func NewPartitionManagerJob(db *gorm.DB) *PartitionManagerJob {
+	return &PartitionManagerJob{db: db}
 }
 
 // Run 执行任务（每月1号凌晨1点执行）
 func (j *PartitionManagerJob) Run() {
+	j.mu.Lock()
+	if j.running {
+		j.mu.Unlock()
+		log.Printf("[PartitionManagerJob] Already running, skip")
+		return
+	}
+	j.running = true
+	j.mu.Unlock()
+
+	defer func() {
+		j.mu.Lock()
+		j.running = false
+		j.mu.Unlock()
+	}()
+
 	startTime := time.Now()
 	log.Printf("[PartitionManagerJob] Started")
 
-	// TODO: 实现自动创建下个月分区的逻辑
-	// CREATE TABLE raw_callback_logs_YYYY_MM PARTITION OF raw_callback_logs
-	// FOR VALUES FROM ('YYYY-MM-01') TO ('YYYY-MM+1-01')
+	// 创建未来3个月的分区（确保始终有足够的分区）
+	for i := 1; i <= 3; i++ {
+		futureMonth := time.Now().AddDate(0, i, 0)
+		if err := j.createMonthlyPartition(futureMonth); err != nil {
+			log.Printf("[PartitionManagerJob] Create partition for %s failed: %v",
+				futureMonth.Format("2006-01"), err)
+		} else {
+			log.Printf("[PartitionManagerJob] Created/verified partition for %s",
+				futureMonth.Format("2006-01"))
+		}
+	}
 
 	log.Printf("[PartitionManagerJob] Completed, took=%v", time.Since(startTime))
+}
+
+// createMonthlyPartition 创建月度分区
+func (j *PartitionManagerJob) createMonthlyPartition(month time.Time) error {
+	if j.db == nil {
+		log.Printf("[PartitionManagerJob] Database connection not available, skip partition creation")
+		return nil
+	}
+
+	year := month.Year()
+	mon := int(month.Month())
+
+	// 分区表名
+	partitionName := fmt.Sprintf("raw_callback_logs_%d_%02d", year, mon)
+
+	// 计算分区范围
+	startDate := time.Date(year, time.Month(mon), 1, 0, 0, 0, 0, time.UTC)
+	endDate := startDate.AddDate(0, 1, 0)
+
+	// 检查分区是否已存在
+	var exists int64
+	checkSQL := `
+		SELECT COUNT(*) FROM pg_class c
+		JOIN pg_namespace n ON n.oid = c.relnamespace
+		WHERE c.relname = ? AND n.nspname = 'public'
+	`
+	if err := j.db.Raw(checkSQL, partitionName).Scan(&exists).Error; err != nil {
+		return fmt.Errorf("check partition exists failed: %w", err)
+	}
+
+	if exists > 0 {
+		log.Printf("[PartitionManagerJob] Partition %s already exists", partitionName)
+		return nil
+	}
+
+	// 创建分区（使用原生SQL）
+	createSQL := fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s PARTITION OF raw_callback_logs
+		FOR VALUES FROM ('%s') TO ('%s')
+	`, partitionName, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
+
+	if err := j.db.Exec(createSQL).Error; err != nil {
+		// 如果分区已存在或表不是分区表，忽略错误
+		log.Printf("[PartitionManagerJob] Create partition SQL result: %v", err)
+		return nil
+	}
+
+	log.Printf("[PartitionManagerJob] Successfully created partition: %s", partitionName)
+	return nil
 }
 
 // MerchantTypeCalculatorJob 商户类型计算定时任务

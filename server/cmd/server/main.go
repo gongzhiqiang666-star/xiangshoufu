@@ -223,7 +223,7 @@ func main() {
 	authService := service.NewAuthService(authConfig, userRepo, refreshTokenRepo, loginLogRepo, agentRepo)
 
 	// 14. 初始化PC端新增Service
-	agentService := service.NewAgentService(agentRepo, agentPolicyRepo, walletRepo, transactionRepo)
+	agentService := service.NewAgentService(agentRepo, agentPolicyRepo, walletRepo, transactionRepo, profitRepo)
 	walletService := service.NewWalletService(walletRepo, walletLogRepo, agentRepo)
 
 	// 15. 初始化PC端新增Handler
@@ -571,7 +571,7 @@ func setupScheduler(
 	scheduler.AddJob("message_cleanup", 6*time.Hour, cleanupJob.Run)
 
 	// 分区管理（每天检查一次）
-	partitionJob := jobs.NewPartitionManagerJob()
+	partitionJob := jobs.NewPartitionManagerJob(callbackRepo.GetDB())
 	scheduler.AddJob("partition_manager", 24*time.Hour, partitionJob.Run)
 
 	// 每日代扣任务（每24小时执行一次）

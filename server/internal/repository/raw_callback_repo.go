@@ -8,6 +8,9 @@ import (
 	"xiangshoufu/internal/models"
 )
 
+// RawCallbackLog 类型别名，方便外部使用
+type RawCallbackLog = models.RawCallbackLog
+
 // GormRawCallbackRepository GORM实现的原始回调仓库
 type GormRawCallbackRepository struct {
 	db *gorm.DB
@@ -86,6 +89,41 @@ func (r *GormRawCallbackRepository) IncrementRetryCount(id int64) error {
 	return r.db.Model(&models.RawCallbackLog{}).
 		Where("id = ?", id).
 		UpdateColumn("retry_count", gorm.Expr("retry_count + 1")).Error
+}
+
+// FindArchivedLogs 查找需要归档的日志（超过指定天数）
+func (r *GormRawCallbackRepository) FindArchivedLogs(retentionDays int, limit int) ([]*models.RawCallbackLog, error) {
+	var logs []*models.RawCallbackLog
+	cutoffTime := time.Now().AddDate(0, 0, -retentionDays)
+	err := r.db.Where("received_at < ? AND process_status = ?", cutoffTime, models.ProcessStatusSuccess).
+		Order("received_at ASC").
+		Limit(limit).
+		Find(&logs).Error
+	return logs, err
+}
+
+// DeleteArchivedLogs 删除已归档的日志
+func (r *GormRawCallbackRepository) DeleteArchivedLogs(ids []int64) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	result := r.db.Delete(&models.RawCallbackLog{}, ids)
+	return result.RowsAffected, result.Error
+}
+
+// CountArchivedLogs 统计需要归档的日志数量
+func (r *GormRawCallbackRepository) CountArchivedLogs(retentionDays int) (int64, error) {
+	var count int64
+	cutoffTime := time.Now().AddDate(0, 0, -retentionDays)
+	err := r.db.Model(&models.RawCallbackLog{}).
+		Where("received_at < ? AND process_status = ?", cutoffTime, models.ProcessStatusSuccess).
+		Count(&count).Error
+	return count, err
+}
+
+// GetDB 获取数据库连接（用于分区管理等原生SQL操作）
+func (r *GormRawCallbackRepository) GetDB() *gorm.DB {
+	return r.db
 }
 
 // 确保实现了接口

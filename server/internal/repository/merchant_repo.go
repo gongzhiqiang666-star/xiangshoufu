@@ -347,3 +347,8 @@ func (r *GormMerchantRepository) CountAllActiveMerchants() (int64, error) {
 	}
 	return count, nil
 }
+
+// GetDB 获取数据库连接（用于原生SQL操作）
+func (r *GormMerchantRepository) GetDB() *gorm.DB {
+	return r.db
+}

@@ -212,7 +212,27 @@ func (s *MerchantService) UpdateRate(id int64, agentID int64, creditRate, debitR
 		return errors.New("借记卡费率范围无效")
 	}
 
-	// TODO: 校验费率不能低于上级代理商费率
+	// 校验费率不能低于上级代理商费率
+	agent, err := s.agentRepo.FindByIDFull(agentID)
+	if err != nil || agent == nil {
+		return errors.New("代理商不存在")
+	}
+
+	// 获取上级代理商的政策费率（如果有上级）
+	if agent.ParentID > 0 {
+		parentPolicy, err := s.getParentPolicyRate(agent.ParentID, merchant.ChannelID)
+		if err == nil && parentPolicy != nil {
+			parentCreditRate := parseRate(parentPolicy.CreditRate)
+			parentDebitRate := parseRate(parentPolicy.DebitRate)
+
+			if creditRate < parentCreditRate {
+				return fmt.Errorf("贷记卡费率不能低于上级费率 %.4f", parentCreditRate)
+			}
+			if debitRate < parentDebitRate {
+				return fmt.Errorf("借记卡费率不能低于上级费率 %.4f", parentDebitRate)
+			}
+		}
+	}
 
 	creditRateStr := strconv.FormatFloat(creditRate, 'f', 4, 64)
 	debitRateStr := strconv.FormatFloat(debitRate, 'f', 4, 64)
@@ -464,4 +484,35 @@ func maskPhone(phone string) string {
 		}
 	}
 	return crypto.MaskPhone(phone)
+}
+
+// getParentPolicyRate 获取上级代理商的政策费率
+func (s *MerchantService) getParentPolicyRate(parentID int64, channelID int64) (*parentPolicyRate, error) {
+	// 查询上级代理商的政策
+	query := `
+		SELECT credit_rate, debit_rate
+		FROM agent_policies
+		WHERE agent_id = ? AND channel_id = ?
+		LIMIT 1
+	`
+	var result parentPolicyRate
+	if err := s.merchantRepo.GetDB().Raw(query, parentID, channelID).Scan(&result).Error; err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// parentPolicyRate 上级政策费率
+type parentPolicyRate struct {
+	CreditRate string `json:"credit_rate"`
+	DebitRate  string `json:"debit_rate"`
+}
+
+// parseRate 解析费率字符串为浮点数
+func parseRate(rateStr string) float64 {
+	rate, err := strconv.ParseFloat(rateStr, 64)
+	if err != nil {
+		return 0
+	}
+	return rate
 }

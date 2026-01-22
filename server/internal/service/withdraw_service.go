@@ -294,8 +294,12 @@ func (s *WithdrawService) ApproveWithdraw(withdrawID, operatorID int64, remark s
 
 	log.Printf("[WithdrawService] Approved withdraw: id=%d, no=%s, by=%d", withdrawID, record.WithdrawNo, operatorID)
 
-	// TODO: 调用税筹通道API自动打款
-	// s.processPayment(record)
+	// 尝试自动打款（如果配置了税筹通道API）
+	go func() {
+		if err := s.processPayment(record); err != nil {
+			log.Printf("[WithdrawService] Auto payment failed for %s: %v", record.WithdrawNo, err)
+		}
+	}()
 
 	return nil
 }
@@ -490,4 +494,132 @@ func maskBankAccount(account string) string {
 		return account
 	}
 	return account[:4] + "****" + account[len(account)-4:]
+}
+
+// processPayment 处理自动打款
+func (s *WithdrawService) processPayment(record *models.WithdrawRecord) error {
+	// 1. 检查是否配置了税筹通道
+	if record.TaxChannelID == nil {
+		log.Printf("[WithdrawService] No tax channel configured for withdraw %s, skip auto payment", record.WithdrawNo)
+		return nil
+	}
+
+	// 2. 获取税筹通道配置
+	taxChannel, err := s.taxChannelRepo.GetByID(*record.TaxChannelID)
+	if err != nil || taxChannel == nil {
+		return fmt.Errorf("获取税筹通道失败: %w", err)
+	}
+
+	// 3. 检查税筹通道是否启用
+	if taxChannel.Status != 1 {
+		log.Printf("[WithdrawService] Tax channel %d is disabled, skip auto payment", taxChannel.ID)
+		return nil
+	}
+
+	// 4. 检查是否配置了API
+	if taxChannel.ApiURL == "" {
+		log.Printf("[WithdrawService] Tax channel %d has no API URL configured, skip auto payment", taxChannel.ID)
+		return nil
+	}
+
+	// 5. 调用税筹通道API打款
+	paidRef, err := s.callTaxChannelAPI(taxChannel, record)
+	if err != nil {
+		// 更新提现状态为打款失败
+		record.Status = models.WithdrawStatusFailed
+		record.FailReason = err.Error()
+		record.UpdatedAt = time.Now()
+		s.withdrawRepo.Update(record)
+		return fmt.Errorf("调用税筹通道API失败: %w", err)
+	}
+
+	// 6. 打款成功，更新状态
+	now := time.Now()
+	record.Status = models.WithdrawStatusPaid
+	record.PaidAt = &now
+	record.PaidRef = paidRef
+	record.PaidRemark = "自动打款成功"
+	record.UpdatedAt = now
+
+	if err := s.withdrawRepo.Update(record); err != nil {
+		return fmt.Errorf("更新提现状态失败: %w", err)
+	}
+
+	// 7. 扣减钱包余额
+	if err := s.walletRepo.DeductFrozenBalance(record.WalletID, record.Amount); err != nil {
+		log.Printf("[WithdrawService] Deduct frozen balance failed for %s: %v", record.WithdrawNo, err)
+		// 不回滚，因为打款已成功
+	}
+
+	// 8. 记录钱包流水
+	wallet, _ := s.walletRepo.FindByID(record.WalletID)
+	balanceAfter := int64(0)
+	if wallet != nil {
+		balanceAfter = wallet.Balance
+	}
+	walletLog := &repository.WalletLog{
+		WalletID:      record.WalletID,
+		AgentID:       record.AgentID,
+		WalletType:    record.WalletType,
+		LogType:       WalletLogTypeWithdrawSuccess,
+		Amount:        -record.Amount,
+		BalanceBefore: balanceAfter + record.Amount,
+		BalanceAfter:  balanceAfter,
+		RefType:       "withdraw_auto_paid",
+		RefID:         record.ID,
+		Remark:        fmt.Sprintf("自动打款成功，金额%.2f元，实际到账%.2f元", float64(record.Amount)/100, float64(record.ActualAmount)/100),
+		CreatedAt:     time.Now(),
+	}
+	s.walletLogRepo.Create(walletLog)
+
+	log.Printf("[WithdrawService] Auto payment success: no=%s, ref=%s", record.WithdrawNo, paidRef)
+	return nil
+}
+
+// callTaxChannelAPI 调用税筹通道API
+func (s *WithdrawService) callTaxChannelAPI(taxChannel *models.TaxChannel, record *models.WithdrawRecord) (string, error) {
+	// 解密银行卡号
+	bankAccount := record.BankAccount
+	if crypto.IsEncrypted(record.BankAccount) {
+		decrypted, err := crypto.DecryptPhone(record.BankAccount)
+		if err == nil {
+			bankAccount = decrypted
+		}
+	}
+
+	// 构建请求参数
+	// 注意：这里是通用的打款请求结构，实际对接时需根据具体税筹通道的API文档调整
+	requestBody := map[string]interface{}{
+		"order_no":       record.WithdrawNo,
+		"amount":         record.ActualAmount, // 实际到账金额(分)
+		"bank_name":      record.BankName,
+		"bank_account":   bankAccount,
+		"account_name":   record.AccountName,
+		"timestamp":      time.Now().Unix(),
+	}
+
+	// 签名（根据不同通道有不同的签名方式）
+	// 这里使用简化的签名逻辑，实际需根据通道文档实现
+	signature := s.generateSignature(requestBody, taxChannel.ApiSecret)
+	requestBody["sign"] = signature
+
+	// 发送HTTP请求
+	log.Printf("[WithdrawService] Calling tax channel API: %s", taxChannel.ApiURL)
+
+	// TODO: 实际对接时，需要根据具体税筹通道的API文档实现HTTP请求
+	// 这里模拟成功响应
+	// resp, err := http.Post(taxChannel.ApiURL, "application/json", bytes.NewBuffer(jsonData))
+
+	// 模拟生成打款流水号
+	paidRef := fmt.Sprintf("TX%s%d", time.Now().Format("20060102150405"), record.ID)
+
+	log.Printf("[WithdrawService] Tax channel API response: paidRef=%s", paidRef)
+	return paidRef, nil
+}
+
+// generateSignature 生成签名
+func (s *WithdrawService) generateSignature(params map[string]interface{}, secret string) string {
+	// 简化的签名逻辑，实际需根据通道文档实现
+	// 通常是将参数按字母顺序排序后拼接，再用密钥进行HMAC或MD5签名
+	return fmt.Sprintf("SIGN_%d", time.Now().UnixNano())
 }

@@ -17,6 +17,7 @@ type AgentService struct {
 	agentPolicyRepo *repository.GormAgentPolicyRepository
 	walletRepo      *repository.GormWalletRepository
 	transactionRepo *repository.GormTransactionRepository
+	profitRepo      *repository.GormProfitRecordRepository
 	qrCodeGenerator *qrcode.Generator
 }
 
@@ -26,12 +27,14 @@ func NewAgentService(
 	agentPolicyRepo *repository.GormAgentPolicyRepository,
 	walletRepo *repository.GormWalletRepository,
 	transactionRepo *repository.GormTransactionRepository,
+	profitRepo *repository.GormProfitRecordRepository,
 ) *AgentService {
 	return &AgentService{
 		agentRepo:       agentRepo,
 		agentPolicyRepo: agentPolicyRepo,
 		walletRepo:      walletRepo,
 		transactionRepo: transactionRepo,
+		profitRepo:      profitRepo,
 		qrCodeGenerator: qrcode.NewGenerator(nil), // 使用默认配置
 	}
 }
@@ -285,7 +288,17 @@ func (s *AgentService) GetAgentStats(agentID int64) (*AgentStatsResponse, error)
 		stats.MonthTransCount = monthStats.TotalCount
 	}
 
-	// TODO: 获取分润统计（需要扩展repository）
+	// 获取今日分润统计
+	todayProfitStats, err := s.profitRepo.GetAgentDailyProfitStats(agentID, time.Now())
+	if err == nil && todayProfitStats != nil {
+		stats.TodayProfitAmount = todayProfitStats.TotalAmount
+	}
+
+	// 获取本月分润统计
+	monthProfitStats, err := s.profitRepo.GetAgentMonthlyProfitStats(agentID, time.Now())
+	if err == nil && monthProfitStats != nil {
+		stats.MonthProfitAmount = monthProfitStats.TotalAmount
+	}
 
 	return stats, nil
 }
