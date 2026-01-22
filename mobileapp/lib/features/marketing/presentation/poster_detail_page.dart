@@ -7,8 +7,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
-import '../../data/models/poster.dart';
-import '../providers/poster_provider.dart';
+import '../data/models/poster.dart';
+import 'providers/poster_provider.dart';
 
 /// 海报详情页
 class PosterDetailPage extends ConsumerStatefulWidget {

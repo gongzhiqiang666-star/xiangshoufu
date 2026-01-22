@@ -5,12 +5,9 @@ import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:dio/dio.dart';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
-import '../../../router/app_router.dart';
 import '../data/models/agent_model.dart';
 import 'providers/agent_provider.dart';
 

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/poster_provider.dart';
-import '../widgets/poster_card.dart';
+import 'providers/poster_provider.dart';
+import 'widgets/poster_card.dart';
 import 'poster_detail_page.dart';
-import '../../data/models/poster.dart';
+import '../data/models/poster.dart';
 
 /// 营销海报主页
 class MarketingPage extends ConsumerStatefulWidget {

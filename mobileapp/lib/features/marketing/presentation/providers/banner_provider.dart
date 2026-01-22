@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
-import '../data/models/banner.dart';
-import '../data/services/banner_service.dart';
+import '../../data/models/banner.dart';
+import '../../data/services/banner_service.dart';
 
 /// Banner服务Provider
 final bannerServiceProvider = Provider<BannerService>((ref) {

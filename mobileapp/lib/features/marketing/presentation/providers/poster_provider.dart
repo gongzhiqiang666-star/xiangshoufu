@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
-import '../data/models/poster.dart';
-import '../data/models/poster_category.dart';
-import '../data/services/poster_service.dart';
+import '../../data/models/poster.dart';
+import '../../data/models/poster_category.dart';
+import '../../data/services/poster_service.dart';
 
 /// 海报服务Provider
 final posterServiceProvider = Provider<PosterService>((ref) {
