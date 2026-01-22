@@ -225,7 +225,7 @@ class _TerminalTransferPageState extends ConsumerState<TerminalTransferPage> {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary.withOpacity(0.05) : AppColors.background,
+          color: isSelected ? AppColors.primary.withValues(alpha: 0.05) : AppColors.background,
           border: Border.all(
             color: isSelected ? AppColors.primary : Colors.transparent,
           ),
@@ -389,7 +389,7 @@ class _TerminalTransferPageState extends ConsumerState<TerminalTransferPage> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.warning.withOpacity(0.1),
+        color: AppColors.warning.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -422,7 +422,7 @@ class _TerminalTransferPageState extends ConsumerState<TerminalTransferPage> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),

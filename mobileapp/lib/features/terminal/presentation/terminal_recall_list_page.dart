@@ -209,7 +209,7 @@ class _RecallCard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -488,27 +488,27 @@ class _RecallCard extends ConsumerWidget {
 
     switch (status) {
       case 1:
-        bgColor = AppColors.warning.withOpacity(0.1);
+        bgColor = AppColors.warning.withValues(alpha: 0.1);
         textColor = AppColors.warning;
         label = '待确认';
         break;
       case 2:
-        bgColor = AppColors.success.withOpacity(0.1);
+        bgColor = AppColors.success.withValues(alpha: 0.1);
         textColor = AppColors.success;
         label = '已确认';
         break;
       case 3:
-        bgColor = AppColors.danger.withOpacity(0.1);
+        bgColor = AppColors.danger.withValues(alpha: 0.1);
         textColor = AppColors.danger;
         label = '已拒绝';
         break;
       case 4:
-        bgColor = AppColors.textTertiary.withOpacity(0.1);
+        bgColor = AppColors.textTertiary.withValues(alpha: 0.1);
         textColor = AppColors.textTertiary;
         label = '已取消';
         break;
       default:
-        bgColor = AppColors.textTertiary.withOpacity(0.1);
+        bgColor = AppColors.textTertiary.withValues(alpha: 0.1);
         textColor = AppColors.textTertiary;
         label = '未知';
     }

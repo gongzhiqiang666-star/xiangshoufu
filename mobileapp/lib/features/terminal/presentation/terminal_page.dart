@@ -304,8 +304,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage>
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: terminal.isActivated
-                        ? AppColors.success.withOpacity(0.1)
-                        : AppColors.textTertiary.withOpacity(0.1),
+                        ? AppColors.success.withValues(alpha: 0.1)
+                        : AppColors.textTertiary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(terminal.status.label,
@@ -398,7 +398,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage>
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, -2))
         ],
