@@ -20,6 +20,8 @@ class AppColors {
   static const Color warning = Color(0xFFF59E0B);
   /// 危险红 - 错误、亏损状态
   static const Color danger = Color(0xFFEF4444);
+  /// 错误红 - danger的别名
+  static const Color error = danger;
   /// 信息蓝 - 提示信息
   static const Color info = Color(0xFF3B82F6);
 

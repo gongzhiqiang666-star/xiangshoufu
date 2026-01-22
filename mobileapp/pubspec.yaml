@@ -42,7 +42,7 @@ dependencies:
 
   # ========== 图片相关 ==========
   cached_network_image: ^3.3.1   # 图片缓存
-  carousel_slider: ^4.2.1        # 轮播组件
+  carousel_slider: ^5.0.0
   image_gallery_saver: ^2.0.3    # 保存到相册
 
   # ========== URL启动 ==========

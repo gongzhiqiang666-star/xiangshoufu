@@ -272,11 +272,15 @@ func (h *AgentHandler) GetInviteCode(c *gin.Context) {
 		return
 	}
 
+	// 构造邀请链接
+	inviteLink := "https://app.xiangshoufu.com/register?code=" + inviteCode
+
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "success",
 		"data": gin.H{
 			"invite_code": inviteCode,
+			"invite_link": inviteLink,
 			"qr_code_url": qrCodeURL,
 		},
 	})

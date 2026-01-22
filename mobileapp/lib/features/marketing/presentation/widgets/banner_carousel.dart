@@ -54,7 +54,7 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
 
     return Column(
       children: [
-        CarouselSlider(
+        CarouselSlider.builder(
           options: CarouselOptions(
             height: widget.height,
             viewportFraction: 1.0,
@@ -68,9 +68,10 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
               });
             },
           ),
-          items: state.banners.map((banner) {
-            return _buildBannerItem(banner);
-          }).toList(),
+          itemCount: state.banners.length,
+          itemBuilder: (context, index, realIndex) {
+            return _buildBannerItem(state.banners[index]);
+          },
         ),
         if (state.banners.length > 1) _buildIndicator(state.banners.length),
       ],

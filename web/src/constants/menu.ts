@@ -53,11 +53,30 @@ export const MENU_LIST: MenuItem[] = [
     ],
   },
   {
+    path: '/deductions',
+    title: '代扣管理',
+    icon: 'CreditCard',
+    children: [
+      { path: '/deductions/list', title: '代扣列表', icon: '' },
+    ],
+  },
+  {
+    path: '/goods-deductions',
+    title: '货款代扣',
+    icon: 'ShoppingCart',
+    children: [
+      { path: '/goods-deductions/list', title: '货款代扣列表', icon: '' },
+    ],
+  },
+  {
     path: '/wallets',
     title: '钱包管理',
     icon: 'Wallet',
     children: [
       { path: '/wallets/list', title: '钱包总览', icon: '' },
+      { path: '/wallets/charging', title: '充值钱包', icon: '' },
+      { path: '/wallets/settlement', title: '沉淀钱包', icon: '' },
+      { path: '/wallets/tax-channels', title: '税筹通道', icon: '' },
     ],
   },
   {
@@ -69,12 +88,26 @@ export const MENU_LIST: MenuItem[] = [
     ],
   },
   {
+    path: '/marketing',
+    title: '营销管理',
+    icon: 'Picture',
+    children: [
+      { path: '/marketing/banners', title: '滚动图管理', icon: '' },
+      { path: '/marketing/posters', title: '海报管理', icon: '' },
+      { path: '/marketing/poster-categories', title: '海报分类', icon: '' },
+    ],
+  },
+  {
     path: '/system',
     title: '系统管理',
     icon: 'Setting',
     children: [
       { path: '/system/users', title: '用户管理', icon: '' },
       { path: '/system/logs', title: '操作日志', icon: '' },
+      { path: '/system/messages', title: '消息管理', icon: '' },
+      { path: '/system/jobs', title: '定时任务', icon: '' },
+      { path: '/system/job-logs', title: '执行日志', icon: '' },
+      { path: '/system/alert-configs', title: '告警配置', icon: '' },
     ],
   },
 ]
