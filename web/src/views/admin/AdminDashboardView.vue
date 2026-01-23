@@ -83,9 +83,9 @@
             <div class="card-header">
               <span class="title">全平台交易趋势</span>
               <el-radio-group v-model="chartDays" size="small" @change="handleDaysChange">
-                <el-radio-button :label="7">近7天</el-radio-button>
-                <el-radio-button :label="15">近15天</el-radio-button>
-                <el-radio-button :label="30">近30天</el-radio-button>
+                <el-radio-button :value="7">近7天</el-radio-button>
+                <el-radio-button :value="15">近15天</el-radio-button>
+                <el-radio-button :value="30">近30天</el-radio-button>
               </el-radio-group>
             </div>
           </template>

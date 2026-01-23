@@ -27,8 +27,8 @@
 
         <el-form-item label="计划类型" prop="plan_type">
           <el-radio-group v-model="formData.plan_type">
-            <el-radio :label="2">伙伴代扣</el-radio>
-            <el-radio :label="3">押金代扣</el-radio>
+            <el-radio :value="2">伙伴代扣</el-radio>
+            <el-radio :value="3">押金代扣</el-radio>
           </el-radio-group>
           <div class="form-tip">
             货款代扣请在终端下发时设置，此处仅支持伙伴代扣和押金代扣

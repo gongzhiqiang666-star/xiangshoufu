@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/home_api.dart';
-import '../domain/home_model.dart';
+import '../../data/home_api.dart';
+import '../../domain/home_model.dart';
 
 /// 首页状态
 class HomeState {

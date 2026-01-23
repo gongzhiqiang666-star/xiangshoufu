@@ -88,9 +88,9 @@
         </el-form-item>
         <el-form-item label="通道类型" prop="channel_type">
           <el-radio-group v-model="form.channel_type" :disabled="isEdit">
-            <el-radio :label="1">钉钉</el-radio>
-            <el-radio :label="2">企业微信</el-radio>
-            <el-radio :label="3">邮件</el-radio>
+            <el-radio :value="1">钉钉</el-radio>
+            <el-radio :value="2">企业微信</el-radio>
+            <el-radio :value="3">邮件</el-radio>
           </el-radio-group>
         </el-form-item>
 

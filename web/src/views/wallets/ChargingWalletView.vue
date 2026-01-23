@@ -76,10 +76,10 @@
         <div class="card-header">
           <span>充值记录</span>
           <el-radio-group v-model="depositStatus" @change="fetchDeposits">
-            <el-radio-button :label="undefined">全部</el-radio-button>
-            <el-radio-button :label="0">待确认</el-radio-button>
-            <el-radio-button :label="1">已确认</el-radio-button>
-            <el-radio-button :label="2">已拒绝</el-radio-button>
+            <el-radio-button :value="undefined">全部</el-radio-button>
+            <el-radio-button :value="0">待确认</el-radio-button>
+            <el-radio-button :value="1">已确认</el-radio-button>
+            <el-radio-button :value="2">已拒绝</el-radio-button>
           </el-radio-group>
         </div>
       </template>

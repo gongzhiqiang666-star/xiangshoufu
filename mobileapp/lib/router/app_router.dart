@@ -75,6 +75,7 @@ class RoutePaths {
 
   // 收益统计
   static const String profit = '/profit';
+  static const String transaction = '/transaction'; // 交易记录
 
   // 钱包
   static const String withdraw = '/wallet/withdraw';

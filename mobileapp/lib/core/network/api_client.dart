@@ -5,6 +5,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// ApiClient Provider
 final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
 
+/// Dio Provider (直接暴露 Dio 实例供其他模块使用)
+final dioProvider = Provider<Dio>((ref) => ApiClient().dio);
+
 /// API客户端单例
 class ApiClient {
   static final ApiClient _instance = ApiClient._internal();

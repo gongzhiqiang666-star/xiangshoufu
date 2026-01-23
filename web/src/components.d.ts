@@ -14,6 +14,7 @@ declare module 'vue' {
     AppHeader: typeof import('./components/Layout/AppHeader.vue')['default']
     AppLayout: typeof import('./components/Layout/AppLayout.vue')['default']
     AppSidebar: typeof import('./components/Layout/AppSidebar.vue')['default']
+    BarChart: typeof import('./components/Charts/BarChart.vue')['default']
     ChannelSelect: typeof import('./components/Common/ChannelSelect.vue')['default']
     DepositCashbackEditor: typeof import('./components/Policy/DepositCashbackEditor.vue')['default']
     ElAlert: typeof import('element-plus/es')['ElAlert']

@@ -111,8 +111,8 @@
         </el-form-item>
         <el-form-item label="扣费类型" required>
           <el-radio-group v-model="form.fee_type">
-            <el-radio :label="1">付款扣(充值时扣)</el-radio>
-            <el-radio :label="2">出款扣(提现时扣)</el-radio>
+            <el-radio :value="1">付款扣(充值时扣)</el-radio>
+            <el-radio :value="2">出款扣(提现时扣)</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="税率" required>

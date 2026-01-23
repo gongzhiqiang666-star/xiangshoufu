@@ -96,9 +96,9 @@
         <div class="card-header">
           <span>使用记录</span>
           <el-radio-group v-model="usageType" @change="fetchUsages">
-            <el-radio-button :label="undefined">全部</el-radio-button>
-            <el-radio-button :label="1">使用</el-radio-button>
-            <el-radio-button :label="2">归还</el-radio-button>
+            <el-radio-button :value="undefined">全部</el-radio-button>
+            <el-radio-button :value="1">使用</el-radio-button>
+            <el-radio-button :value="2">归还</el-radio-button>
           </el-radio-group>
         </div>
       </template>
