@@ -18,6 +18,7 @@ type MerchantService struct {
 	agentRepo       *repository.GormAgentRepository
 	transactionRepo *repository.GormTransactionRepository
 	terminalRepo    *repository.GormTerminalRepository
+	rateSyncService *RateSyncService
 }
 
 // NewMerchantService 创建商户服务
@@ -33,6 +34,11 @@ func NewMerchantService(
 		transactionRepo: transactionRepo,
 		terminalRepo:    terminalRepo,
 	}
+}
+
+// SetRateSyncService 设置费率同步服务（可选注入，避免循环依赖）
+func (s *MerchantService) SetRateSyncService(rateSyncService *RateSyncService) {
+	s.rateSyncService = rateSyncService
 }
 
 // ==================== 请求/响应结构体 ====================
@@ -192,30 +198,38 @@ func (s *MerchantService) UpdateMerchant(id int64, req *UpdateMerchantRequest) e
 	return s.merchantRepo.Update(merchant)
 }
 
-// UpdateRate 修改费率（校验费率范围）
-func (s *MerchantService) UpdateRate(id int64, agentID int64, creditRate, debitRate float64) error {
+// RateUpdateResult 费率更新结果
+type RateUpdateResult struct {
+	Success     bool   `json:"success"`      // 是否成功
+	SyncSuccess bool   `json:"sync_success"` // 通道同步是否成功
+	SyncMessage string `json:"sync_message"` // 通道同步消息
+}
+
+// UpdateRate 修改费率（校验费率范围，并同步到通道）
+// 返回更新结果，包含本地更新和通道同步状态
+func (s *MerchantService) UpdateRate(id int64, agentID int64, creditRate, debitRate float64) (*RateUpdateResult, error) {
 	merchant, err := s.merchantRepo.FindByID(id)
 	if err != nil {
-		return fmt.Errorf("商户不存在: %w", err)
+		return nil, fmt.Errorf("商户不存在: %w", err)
 	}
 
 	// 验证商户归属
 	if merchant.AgentID != agentID {
-		return errors.New("无权修改此商户费率")
+		return nil, errors.New("无权修改此商户费率")
 	}
 
 	// 验证费率范围 (0-1之间，通常为0.001-0.01即0.1%-1%)
 	if creditRate < 0 || creditRate > 0.1 {
-		return errors.New("贷记卡费率范围无效")
+		return nil, errors.New("贷记卡费率范围无效")
 	}
 	if debitRate < 0 || debitRate > 0.1 {
-		return errors.New("借记卡费率范围无效")
+		return nil, errors.New("借记卡费率范围无效")
 	}
 
 	// 校验费率不能低于上级代理商费率
 	agent, err := s.agentRepo.FindByIDFull(agentID)
 	if err != nil || agent == nil {
-		return errors.New("代理商不存在")
+		return nil, errors.New("代理商不存在")
 	}
 
 	// 获取上级代理商的政策费率（如果有上级）
@@ -226,18 +240,103 @@ func (s *MerchantService) UpdateRate(id int64, agentID int64, creditRate, debitR
 			parentDebitRate := parseRate(parentPolicy.DebitRate)
 
 			if creditRate < parentCreditRate {
-				return fmt.Errorf("贷记卡费率不能低于上级费率 %.4f", parentCreditRate)
+				return nil, fmt.Errorf("贷记卡费率不能低于上级费率 %.4f", parentCreditRate)
 			}
 			if debitRate < parentDebitRate {
-				return fmt.Errorf("借记卡费率不能低于上级费率 %.4f", parentDebitRate)
+				return nil, fmt.Errorf("借记卡费率不能低于上级费率 %.4f", parentDebitRate)
 			}
 		}
 	}
 
+	// 保存原费率用于日志记录
+	oldCreditRate := parseRate(merchant.CreditRate)
+	oldDebitRate := parseRate(merchant.DebitRate)
+
 	creditRateStr := strconv.FormatFloat(creditRate, 'f', 4, 64)
 	debitRateStr := strconv.FormatFloat(debitRate, 'f', 4, 64)
 
-	return s.merchantRepo.UpdateRate(id, creditRateStr, debitRateStr)
+	result := &RateUpdateResult{
+		Success:     true,
+		SyncSuccess: true,
+		SyncMessage: "费率更新成功",
+	}
+
+	// 【重要】先同步到支付通道，通道成功后才能修改本地费率
+	// 原则：费率修改必须和通道联动，先调用通道，通道返回成功才能修改自己的费率
+	if s.rateSyncService != nil {
+		syncResult := s.syncRateToChannel(merchant, agentID, oldCreditRate, oldDebitRate, creditRate, debitRate)
+		result.SyncSuccess = syncResult.Success
+		result.SyncMessage = syncResult.Message
+
+		// 通道同步失败，不更新本地数据库
+		if !syncResult.Success {
+			log.Printf("[MerchantService] 通道费率同步失败，本地费率不更新: merchantID=%d, err=%s", id, syncResult.Message)
+			return result, nil
+		}
+	}
+
+	// 通道同步成功（或无需同步），更新本地数据库
+	if err := s.merchantRepo.UpdateRate(id, creditRateStr, debitRateStr); err != nil {
+		return nil, fmt.Errorf("通道同步成功但本地更新失败: %w", err)
+	}
+
+	return result, nil
+}
+
+// syncRateToChannel 同步费率到通道（同步调用）
+func (s *MerchantService) syncRateToChannel(merchant *models.Merchant, agentID int64, oldCreditRate, oldDebitRate, newCreditRate, newDebitRate float64) *SyncResult {
+	// 获取通道编码
+	channelCode := s.getChannelCode(merchant.ChannelID)
+	if channelCode == "" {
+		log.Printf("[MerchantService] 获取通道编码失败，跳过同步: merchantID=%d", merchant.ID)
+		return &SyncResult{
+			Success: true,
+			Message: "通道编码未配置，跳过同步",
+		}
+	}
+
+	params := &RateUpdateParams{
+		MerchantID:  merchant.ID,
+		MerchantNo:  merchant.MerchantNo,
+		TerminalSN:  merchant.TerminalSN,
+		ChannelCode: channelCode,
+		AgentID:     agentID,
+		OldRates: &RateInfo{
+			CreditRate: oldCreditRate,
+			DebitRate:  oldDebitRate,
+		},
+		NewRates: &RateInfo{
+			CreditRate: newCreditRate,
+			DebitRate:  newDebitRate,
+		},
+	}
+
+	result, err := s.rateSyncService.SyncRateToChannel(nil, params)
+	if err != nil {
+		log.Printf("[MerchantService] 费率同步失败: merchantID=%d, error=%v", merchant.ID, err)
+		return &SyncResult{
+			Success: false,
+			Message: fmt.Sprintf("同步失败: %v", err),
+		}
+	}
+
+	if result.Success {
+		log.Printf("[MerchantService] 费率同步成功: merchantID=%d, tradeNo=%s", merchant.ID, result.TradeNo)
+	} else {
+		log.Printf("[MerchantService] 费率同步失败: merchantID=%d, message=%s", merchant.ID, result.Message)
+	}
+
+	return result
+}
+
+// getChannelCode 根据通道ID获取通道编码
+func (s *MerchantService) getChannelCode(channelID int64) string {
+	query := `SELECT channel_code FROM channels WHERE id = ? LIMIT 1`
+	var channelCode string
+	if err := s.merchantRepo.GetDB().Raw(query, channelID).Scan(&channelCode).Error; err != nil {
+		return ""
+	}
+	return channelCode
 }
 
 // RegisterMerchant 商户登记

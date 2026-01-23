@@ -122,6 +122,15 @@ export const privateRoutes: RouteRecordRaw[] = [
               breadcrumb: [{ title: '首页' }, { title: '商户管理' }, { title: '商户详情' }],
             },
           },
+          {
+            path: 'rate-sync-logs',
+            name: 'RateSyncLogs',
+            component: () => import('@/views/merchants/RateSyncLogView.vue'),
+            meta: {
+              title: '费率同步日志',
+              breadcrumb: [{ title: '首页' }, { title: '商户管理' }, { title: '费率同步日志' }],
+            },
+          },
         ],
       },
       // 终端管理

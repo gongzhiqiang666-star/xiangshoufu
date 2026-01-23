@@ -255,6 +255,16 @@ func main() {
 	merchantHandler := handler.NewMerchantHandler(merchantRepo, transactionRepo, merchantService)
 	terminalHandler := handler.NewTerminalHandler(terminalRepo, transactionRepo, terminalService)
 
+	// 16.1 初始化费率同步服务和Handler
+	rateSyncLogRepo := repository.NewGormRateSyncLogRepository(db)
+	rateSyncService := service.NewRateSyncService(rateSyncLogRepo, factory)
+	rateSyncService.SetMessageService(messageService)
+	rateSyncHandler := handler.NewRateSyncHandler(rateSyncService)
+
+	// 16.2 注入费率同步服务到商户服务和终端服务
+	merchantService.SetRateSyncService(rateSyncService)
+	terminalService.SetRateSyncService(rateSyncService)
+
 	// 17. 初始化政策相关Repository
 	policyTemplateRepo := repository.NewGormPolicyTemplateRepository(db)
 	depositPolicyRepo := repository.NewGormDepositCashbackPolicyRepository(db)
@@ -420,6 +430,7 @@ func main() {
 		uploadHandler, bannerHandler, posterHandler,
 		jobHandler, alertHandler, // 新增：任务管理和告警Handler
 		analyticsHandler,         // 新增：分析统计Handler
+		rateSyncHandler,          // 新增：费率同步Handler
 		authService, metricsService, config.SwaggerEnabled,
 	)
 
@@ -671,6 +682,7 @@ func setupRouter(
 	jobHandler *handler.JobHandler,
 	alertHandler *handler.AlertHandler,
 	analyticsHandler *handler.AnalyticsHandler,
+	rateSyncHandler *handler.RateSyncHandler,
 	authService *service.AuthService,
 	metricsService *service.MetricsService,
 	swaggerEnabled bool,
@@ -780,6 +792,14 @@ func setupRouter(
 
 		// 注册分析统计路由
 		handler.RegisterAnalyticsRoutes(apiV1, analyticsHandler, authService)
+
+		// 注册费率同步日志路由
+		rateSyncGroup := apiV1.Group("/rate-sync")
+		rateSyncGroup.Use(middleware.AuthMiddleware(authService))
+		{
+			rateSyncGroup.GET("/logs", rateSyncHandler.GetSyncLogs)
+			rateSyncGroup.GET("/logs/:id", rateSyncHandler.GetSyncLogDetail)
+		}
 	}
 
 	// Swagger UI (可通过环境变量关闭)

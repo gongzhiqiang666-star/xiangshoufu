@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -17,6 +18,7 @@ type TerminalService struct {
 	recallRepo        *repository.GormTerminalRecallRepository
 	importRecordRepo  *repository.GormTerminalImportRecordRepository
 	agentRepo         repository.AgentRepository
+	rateSyncService   *RateSyncService // 费率同步服务（用于通道实时交互）
 }
 
 // NewTerminalService 创建终端服务
@@ -32,6 +34,11 @@ func NewTerminalService(
 		importRecordRepo: importRecordRepo,
 		agentRepo:        agentRepo,
 	}
+}
+
+// SetRateSyncService 设置费率同步服务（可选注入，避免循环依赖）
+func (s *TerminalService) SetRateSyncService(rateSyncService *RateSyncService) {
+	s.rateSyncService = rateSyncService
 }
 
 // ImportTerminalsRequest 终端入库请求
@@ -506,7 +513,7 @@ func (s *TerminalService) GetTerminalPolicy(sn string, agentID int64) (*models.T
 	return policy, nil
 }
 
-// BatchSetRate 批量设置费率
+// BatchSetRate 批量设置费率（先同步通道，成功后再保存本地）
 func (s *TerminalService) BatchSetRate(req *BatchSetRateRequest) (*BatchPolicyResult, error) {
 	if len(req.TerminalSNs) == 0 {
 		return nil, fmt.Errorf("终端列表不能为空")
@@ -518,6 +525,7 @@ func (s *TerminalService) BatchSetRate(req *BatchSetRateRequest) (*BatchPolicyRe
 	}
 
 	now := time.Now()
+	ctx := context.Background()
 
 	for _, sn := range req.TerminalSNs {
 		// 验证终端存在且属于该代理商
@@ -534,8 +542,59 @@ func (s *TerminalService) BatchSetRate(req *BatchSetRateRequest) (*BatchPolicyRe
 			continue
 		}
 
-		// 查询或创建政策
-		policy, _ := s.terminalRepo.FindPolicyBySN(sn)
+		// 查询现有政策（获取原费率）
+		existingPolicy, _ := s.terminalRepo.FindPolicyBySN(sn)
+		var oldRates *RateInfo
+		if existingPolicy != nil {
+			oldRates = &RateInfo{
+				CreditRate:   float64(existingPolicy.CreditRate) / 10000,
+				DebitRate:    float64(existingPolicy.DebitRate) / 10000,
+				DebitCap:     int64(existingPolicy.DebitCap),
+				WechatRate:   float64(existingPolicy.WechatRate) / 10000,
+				AlipayRate:   float64(existingPolicy.AlipayRate) / 10000,
+				UnionpayRate: float64(existingPolicy.UnionpayRate) / 10000,
+			}
+		}
+
+		// 新费率（转换为小数形式）
+		newRates := &RateInfo{
+			CreditRate:   float64(req.CreditRate) / 10000,
+			DebitRate:    float64(req.DebitRate) / 10000,
+			DebitCap:     int64(req.DebitCap),
+			WechatRate:   float64(req.WechatRate) / 10000,
+			AlipayRate:   float64(req.AlipayRate) / 10000,
+			UnionpayRate: float64(req.UnionpayRate) / 10000,
+		}
+
+		// 【重要】先同步到支付通道，通道成功后才能修改本地费率
+		if s.rateSyncService != nil {
+			syncParams := &RateUpdateParams{
+				MerchantNo:  terminal.MerchantNo, // 商户号
+				TerminalSN:  sn,
+				ChannelCode: terminal.ChannelCode,
+				AgentID:     req.AgentID,
+				OldRates:    oldRates,
+				NewRates:    newRates,
+			}
+
+			syncResult, syncErr := s.rateSyncService.SyncRateToChannel(ctx, syncParams)
+			if syncErr != nil {
+				result.FailedCount++
+				result.Errors = append(result.Errors, fmt.Sprintf("终端 %s: 通道同步异常 - %v", sn, syncErr))
+				continue
+			}
+
+			if syncResult != nil && !syncResult.Success {
+				result.FailedCount++
+				result.Errors = append(result.Errors, fmt.Sprintf("终端 %s: 通道同步失败 - %s", sn, syncResult.Message))
+				continue
+			}
+
+			log.Printf("[TerminalService] 终端 %s 费率已同步到通道: %s", sn, terminal.ChannelCode)
+		}
+
+		// 通道同步成功（或无需同步），更新本地数据库
+		policy := existingPolicy
 		if policy == nil {
 			policy = &models.TerminalPolicy{
 				TerminalSN: sn,
@@ -555,11 +614,11 @@ func (s *TerminalService) BatchSetRate(req *BatchSetRateRequest) (*BatchPolicyRe
 		policy.AlipayRate = req.AlipayRate
 		policy.UpdatedBy = req.UpdatedBy
 		policy.UpdatedAt = now
-		policy.IsSynced = false // 标记需要同步
+		policy.IsSynced = true // 已同步到通道
 
 		if err := s.terminalRepo.SavePolicy(policy); err != nil {
 			result.FailedCount++
-			result.Errors = append(result.Errors, fmt.Sprintf("终端 %s: 保存失败 - %v", sn, err))
+			result.Errors = append(result.Errors, fmt.Sprintf("终端 %s: 本地保存失败 - %v", sn, err))
 			continue
 		}
 

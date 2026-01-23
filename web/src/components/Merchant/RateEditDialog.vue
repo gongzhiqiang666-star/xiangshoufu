@@ -144,16 +144,23 @@ async function handleSubmit() {
 
   submitting.value = true
   try {
-    await updateMerchantRate(props.merchant.id, {
+    const result = await updateMerchantRate(props.merchant.id, {
       credit_rate: form.credit_rate,
       debit_rate: form.debit_rate,
     })
-    ElMessage.success('费率修改成功')
+
+    // 显示同步结果
+    if (result.sync_success) {
+      ElMessage.success('费率修改成功，已同步到支付通道')
+    } else {
+      ElMessage.warning(`费率修改成功，但通道同步失败：${result.sync_message}，请人工处理`)
+    }
+
     emit('success')
     handleClose()
-  } catch (error) {
+  } catch (error: any) {
     console.error('Update rate error:', error)
-    ElMessage.error('费率修改失败')
+    ElMessage.error(error.message || '费率修改失败')
   } finally {
     submitting.value = false
   }

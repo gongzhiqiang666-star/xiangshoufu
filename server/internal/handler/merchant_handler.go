@@ -691,7 +691,8 @@ func (h *MerchantHandler) UpdateMerchantRate(c *gin.Context) {
 		return
 	}
 
-	if err := h.merchantService.UpdateRate(id, agentID, req.CreditRate, req.DebitRate); err != nil {
+	result, err := h.merchantService.UpdateRate(id, agentID, req.CreditRate, req.DebitRate)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
 			"message": err.Error(),
@@ -699,9 +700,19 @@ func (h *MerchantHandler) UpdateMerchantRate(c *gin.Context) {
 		return
 	}
 
+	// 构建响应消息
+	message := "费率更新成功"
+	if result != nil && !result.SyncSuccess {
+		message = result.SyncMessage
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
-		"message": "费率更新成功",
+		"message": message,
+		"data": gin.H{
+			"sync_success": result != nil && result.SyncSuccess,
+			"sync_message": result.SyncMessage,
+		},
 	})
 }
 

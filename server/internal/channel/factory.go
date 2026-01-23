@@ -97,6 +97,7 @@ type ChannelConfig struct {
 	PrivateKey  string `json:"private_key"`  // RSA私钥（用于签名，如有需要）
 	APIKey      string `json:"api_key"`      // API密钥
 	APISecret   string `json:"api_secret"`   // API密钥
+	APIBaseURL  string `json:"api_base_url"` // API基础URL（用于费率更新等主动调用）
 	CallbackURL string `json:"callback_url"` // 回调URL
 	Enabled     bool   `json:"enabled"`      // 是否启用
 }
