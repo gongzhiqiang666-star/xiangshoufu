@@ -159,10 +159,10 @@ func (a *Adapter) ParseTransaction(rawBody []byte) (*channel.UnifiedTransaction,
 
 ## 文档
 
-- [收享付实施方案](docs/design/收享付实施方案.md)
-- [业务逻辑梳理](docs/design/业务逻辑梳理.md)
-- [PC端管理功能详细设计](docs/design/PC端管理功能详细设计.md)
-- [APP详细设计文档](docs/design/APP详细设计文档.md)
+- [收享付实施方案](docs/收享付实施方案.md)
+- [业务逻辑梳理](docs/业务逻辑梳理.md)
+- [PC端管理功能详细设计](docs/PC端管理功能详细设计.md)
+- [APP设计稿](docs/APP设计稿.md)
 - [恒信通API文档](docs/api/恒信通-20251222-API推送接口文档.md)
 
 ## License

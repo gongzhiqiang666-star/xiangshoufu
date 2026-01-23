@@ -59,6 +59,8 @@ dev_dependencies:
   build_runner: ^2.4.0
   json_serializable: ^6.7.0
   riverpod_generator: ^2.4.0
+  mocktail: ^1.0.4              # Mock工具
+  network_image_mock: ^2.1.1    # 网络图片Mock
 
 flutter:
   uses-material-design: true
