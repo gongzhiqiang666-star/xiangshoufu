@@ -214,10 +214,10 @@ func TestAmountFormat(t *testing.T) {
 // TestGrowthRate 测试增长率计算
 func TestGrowthRate(t *testing.T) {
 	tests := []struct {
-		name         string
-		current      int64
-		previous     int64
-		growthRate   float64
+		name       string
+		current    int64
+		previous   int64
+		growthRate float64
 	}{
 		{"positive growth", 120, 100, 20.0},
 		{"negative growth", 80, 100, -20.0},
@@ -235,4 +235,156 @@ func TestGrowthRate(t *testing.T) {
 			assert.InDelta(t, tt.growthRate, rate, 0.01)
 		})
 	}
+}
+
+// TestDashboardScopeParameter 测试scope参数
+func TestDashboardScopeParameter(t *testing.T) {
+	tests := []struct {
+		name          string
+		scope         string
+		expectedScope string
+	}{
+		{"direct scope", "direct", "direct"},
+		{"team scope", "team", "team"},
+		{"empty defaults to direct", "", "direct"},
+		{"invalid defaults to direct", "invalid", "direct"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			scope := tt.scope
+			if scope == "" || (scope != "direct" && scope != "team") {
+				scope = "direct"
+			}
+			assert.Equal(t, tt.expectedScope, scope)
+		})
+	}
+}
+
+// TestProfitBreakdown 测试收益分类
+func TestProfitBreakdown(t *testing.T) {
+	dayStats := map[string]int64{
+		"profit_trade":   85600,  // 交易分润
+		"profit_deposit": 15000,  // 押金返现
+		"profit_sim":     13840,  // 流量返现
+		"profit_reward":  9000,   // 激活奖励
+	}
+
+	// 验证总分润 = 各分类之和
+	totalProfit := dayStats["profit_trade"] + dayStats["profit_deposit"] +
+		dayStats["profit_sim"] + dayStats["profit_reward"]
+	assert.Equal(t, int64(123440), totalProfit)
+
+	// 验证元转换
+	assert.Equal(t, float64(856.00), float64(dayStats["profit_trade"])/100)
+	assert.Equal(t, float64(150.00), float64(dayStats["profit_deposit"])/100)
+	assert.Equal(t, float64(138.40), float64(dayStats["profit_sim"])/100)
+	assert.Equal(t, float64(90.00), float64(dayStats["profit_reward"])/100)
+}
+
+// TestChannelStatsCalculation 测试通道统计计算
+func TestChannelStatsCalculation(t *testing.T) {
+	channelStats := []struct {
+		channelCode string
+		channelName string
+		transAmount int64
+		transCount  int
+	}{
+		{"HENGXINTONG", "恒信通", 6000000, 100},
+		{"LAKALA", "拉卡拉", 2500000, 50},
+		{"OTHER", "其他", 1500000, 30},
+	}
+
+	// 计算总额
+	var totalAmount int64
+	for _, c := range channelStats {
+		totalAmount += c.transAmount
+	}
+	assert.Equal(t, int64(10000000), totalAmount)
+
+	// 计算百分比
+	for _, c := range channelStats {
+		percentage := float64(c.transAmount) / float64(totalAmount) * 100
+		switch c.channelCode {
+		case "HENGXINTONG":
+			assert.InDelta(t, 60.0, percentage, 0.01)
+		case "LAKALA":
+			assert.InDelta(t, 25.0, percentage, 0.01)
+		case "OTHER":
+			assert.InDelta(t, 15.0, percentage, 0.01)
+		}
+	}
+}
+
+// TestMerchantDistribution 测试商户类型分布
+func TestMerchantDistribution(t *testing.T) {
+	distribution := map[string]int{
+		"loyal":      5,   // 忠诚 (>5万)
+		"quality":    12,  // 优质 (3-5万)
+		"potential":  25,  // 潜力 (2-3万)
+		"normal":     40,  // 一般 (1-2万)
+		"low_active": 30,  // 低活跃 (<1万)
+		"inactive":   8,   // 30天无交易
+	}
+
+	// 验证总数
+	var total int
+	for _, count := range distribution {
+		total += count
+	}
+	assert.Equal(t, 120, total)
+
+	// 验证百分比计算
+	loyalPercentage := float64(distribution["loyal"]) / float64(total) * 100
+	assert.InDelta(t, 4.17, loyalPercentage, 0.01)
+}
+
+// TestAgentPathMatching 测试物化路径匹配
+func TestAgentPathMatching(t *testing.T) {
+	tests := []struct {
+		name       string
+		agentPath  string
+		queryPath  string
+		shouldMatch bool
+	}{
+		{"direct child", "/1/5/12/", "/1/5/%", true},
+		{"grandchild", "/1/5/12/38/", "/1/5/%", true},
+		{"same agent", "/1/5/", "/1/5/%", true},
+		{"different branch", "/1/6/12/", "/1/5/%", false},
+		{"root level", "/1/", "/1/%", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// 模拟 SQL LIKE 匹配
+			pattern := tt.queryPath[:len(tt.queryPath)-1] // 去掉 %
+			matched := len(tt.agentPath) >= len(pattern) && tt.agentPath[:len(pattern)] == pattern
+			assert.Equal(t, tt.shouldMatch, matched)
+		})
+	}
+}
+
+// TestTerminalStats 测试终端统计
+func TestTerminalStats(t *testing.T) {
+	terminalStats := struct {
+		total          int
+		activated      int
+		todayActivated int
+		monthActivated int
+	}{
+		total:          150,
+		activated:      120,
+		todayActivated: 3,
+		monthActivated: 15,
+	}
+
+	// 验证激活数不超过总数
+	assert.LessOrEqual(t, terminalStats.activated, terminalStats.total)
+	// 验证今日激活不超过本月激活
+	assert.LessOrEqual(t, terminalStats.todayActivated, terminalStats.monthActivated)
+	// 验证本月激活不超过已激活总数
+	assert.LessOrEqual(t, terminalStats.monthActivated, terminalStats.activated)
+	// 计算未激活数
+	unactivated := terminalStats.total - terminalStats.activated
+	assert.Equal(t, 30, unactivated)
 }

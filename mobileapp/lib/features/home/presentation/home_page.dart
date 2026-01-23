@@ -7,6 +7,8 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/format_utils.dart';
 import '../../../router/app_router.dart';
 import '../../marketing/presentation/widgets/banner_carousel.dart';
+import '../domain/home_model.dart';
+import 'providers/home_provider.dart';
 
 /// 首页
 class HomePage extends ConsumerStatefulWidget {
@@ -19,6 +21,8 @@ class HomePage extends ConsumerStatefulWidget {
 class _HomePageState extends ConsumerState<HomePage> {
   @override
   Widget build(BuildContext context) {
+    final homeState = ref.watch(homeProvider);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -59,26 +63,48 @@ class _HomePageState extends ConsumerState<HomePage> {
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          await Future.delayed(const Duration(seconds: 1));
+          await ref.read(homeProvider.notifier).refresh();
         },
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildBanner(),
-              const SizedBox(height: AppSpacing.md),
-              _buildTodayProfit(),
-              const SizedBox(height: AppSpacing.md),
-              _buildProfitDetails(),
-              const SizedBox(height: AppSpacing.md),
-              _buildQuickActions(),
-              const SizedBox(height: AppSpacing.md),
-              _buildRecentTransactions(),
-              const SizedBox(height: AppSpacing.lg),
-            ],
+        child: homeState.isLoading && homeState.overview == null
+            ? const Center(child: CircularProgressIndicator())
+            : homeState.error != null && homeState.overview == null
+                ? _buildErrorWidget(homeState.error!)
+                : SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildBanner(),
+                        const SizedBox(height: AppSpacing.md),
+                        _buildTodayProfit(homeState),
+                        const SizedBox(height: AppSpacing.md),
+                        _buildProfitDetails(homeState),
+                        const SizedBox(height: AppSpacing.md),
+                        _buildQuickActions(),
+                        const SizedBox(height: AppSpacing.md),
+                        _buildRecentTransactions(homeState),
+                        const SizedBox(height: AppSpacing.lg),
+                      ],
+                    ),
+                  ),
+      ),
+    );
+  }
+
+  Widget _buildErrorWidget(String error) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline, size: 48, color: AppColors.textTertiary),
+          const SizedBox(height: 16),
+          Text('加载失败', style: TextStyle(color: AppColors.textSecondary)),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () => ref.read(homeProvider.notifier).refresh(),
+            child: const Text('点击重试'),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -89,13 +115,17 @@ class _HomePageState extends ConsumerState<HomePage> {
       height: 140,
       autoPlayInterval: 5000,
       onInternalLinkTap: (route) {
-        // 处理内部页面跳转
         context.push(route);
       },
     );
   }
 
-  Widget _buildTodayProfit() {
+  Widget _buildTodayProfit(HomeState state) {
+    final overview = state.overview;
+    final todayProfit = overview?.today.profitTotalYuan ?? 0;
+    final changeRate = overview?.profitChangeRate ?? 0;
+    final isGrowth = overview?.isProfitGrowth ?? true;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -107,16 +137,23 @@ class _HomePageState extends ConsumerState<HomePage> {
         children: [
           const Text('今日收益', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
           const SizedBox(height: 8),
-          const Text(
-            '¥ 1,234.56',
-            style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+          Text(
+            FormatUtils.formatYuan(todayProfit),
+            style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
           ),
           const SizedBox(height: 4),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Text('较昨日 ', style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
-              Text('↑12.5%', style: TextStyle(fontSize: 12, color: AppColors.success, fontWeight: FontWeight.w500)),
+              Text(
+                '${isGrowth ? "↑" : "↓"}${changeRate.abs().toStringAsFixed(1)}%',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isGrowth ? AppColors.success : AppColors.danger,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ],
           ),
         ],
@@ -124,7 +161,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  Widget _buildProfitDetails() {
+  Widget _buildProfitDetails(HomeState state) {
+    final today = state.overview?.today;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
       child: GridView.count(
@@ -135,10 +174,10 @@ class _HomePageState extends ConsumerState<HomePage> {
         mainAxisSpacing: AppSpacing.cardGap,
         childAspectRatio: 1.6,
         children: [
-          _buildProfitCard('交易分润', 856.00, AppColors.profitTrade, Icons.swap_horiz),
-          _buildProfitCard('押金返现', 150.00, AppColors.profitDeposit, Icons.monetization_on_outlined),
-          _buildProfitCard('流量返现', 138.56, AppColors.profitSim, Icons.signal_cellular_alt),
-          _buildProfitCard('激活奖励', 90.00, AppColors.profitReward, Icons.card_giftcard),
+          _buildProfitCard('交易分润', today?.profitTradeYuan ?? 0, AppColors.profitTrade, Icons.swap_horiz),
+          _buildProfitCard('押金返现', today?.profitDepositYuan ?? 0, AppColors.profitDeposit, Icons.monetization_on_outlined),
+          _buildProfitCard('流量返现', today?.profitSimYuan ?? 0, AppColors.profitSim, Icons.signal_cellular_alt),
+          _buildProfitCard('激活奖励', today?.profitRewardYuan ?? 0, AppColors.profitReward, Icons.card_giftcard),
         ],
       ),
     );
@@ -202,9 +241,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
       decoration: BoxDecoration(
-        color: Colors.transparent, // Remove background from container
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [ // Move shadow here if needed, or keep in Material elevation
+        boxShadow: [
            BoxShadow(
             color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
@@ -231,7 +270,6 @@ class _HomePageState extends ConsumerState<HomePage> {
               return InkWell(
                 onTap: () {
                   final route = action['route'] as String;
-                  // 底部导航栏内的路由用go，其他用push
                   if (route == RoutePaths.terminal ||
                       route == RoutePaths.wallet ||
                       route == RoutePaths.profile ||
@@ -271,7 +309,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  Widget _buildRecentTransactions() {
+  Widget _buildRecentTransactions(HomeState state) {
+    final transactions = state.recentTransactions;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
       decoration: BoxDecoration(
@@ -286,21 +326,36 @@ class _HomePageState extends ConsumerState<HomePage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('最近交易', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                Row(
-                  children: const [
-                    Text('查看更多', style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
-                    Icon(Icons.chevron_right, size: 18, color: AppColors.textTertiary),
-                  ],
+                GestureDetector(
+                  onTap: () => context.push(RoutePaths.transaction),
+                  child: Row(
+                    children: const [
+                      Text('查看更多', style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
+                      Icon(Icons.chevron_right, size: 18, color: AppColors.textTertiary),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
           const Divider(height: 1, color: AppColors.divider),
-          _buildTransactionItem('张三商店', '刷卡', 1500.00, '10:30'),
-          const Divider(height: 1, indent: 16, endIndent: 16, color: AppColors.divider),
-          _buildTransactionItem('李四超市', '微信', 320.00, '10:25'),
-          const Divider(height: 1, indent: 16, endIndent: 16, color: AppColors.divider),
-          _buildTransactionItem('王五便利店', '支付宝', 850.00, '10:20'),
+          if (transactions.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(32),
+              child: Text('暂无交易记录', style: TextStyle(color: AppColors.textTertiary)),
+            )
+          else
+            ...transactions.asMap().entries.map((entry) {
+              final index = entry.key;
+              final tx = entry.value;
+              return Column(
+                children: [
+                  _buildTransactionItem(tx.merchantName, tx.payTypeName, tx.amountYuan, tx.timeAgo),
+                  if (index < transactions.length - 1)
+                    const Divider(height: 1, indent: 16, endIndent: 16, color: AppColors.divider),
+                ],
+              );
+            }).toList(),
         ],
       ),
     );

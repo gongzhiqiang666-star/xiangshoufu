@@ -31,6 +31,16 @@ func (r *GormTransactionRepository) FindByOrderNo(orderNo string) (*Transaction,
 	return &tx, nil
 }
 
+// FindByID 根据交易ID查找
+func (r *GormTransactionRepository) FindByID(id int64) (*Transaction, error) {
+	var tx Transaction
+	err := r.db.Where("id = ?", id).First(&tx).Error
+	if err != nil {
+		return nil, err
+	}
+	return &tx, nil
+}
+
 // FindUnprocessedProfit 查找未计算分润的交易
 func (r *GormTransactionRepository) FindUnprocessedProfit(limit int) ([]*Transaction, error) {
 	var txs []*Transaction

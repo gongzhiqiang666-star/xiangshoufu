@@ -159,3 +159,61 @@ flutter run
 - Table-driven tests with `t.Run()` subtests
 - Error wrapping: `fmt.Errorf("message: %w", err)`
 - Repository naming: `Gorm<Entity>Repository`
+
+## 开发规范 - 测试驱动开发 (TDD)
+
+### 核心原则
+
+| 之前 | 之后 |
+|------|------|
+| 编译通过就部署 | 测试通过才部署 |
+| 手动测试验证 | 一个命令自动验证 |
+| 改代码担心破坏旧功能 | 测试会告诉你哪里坏了 |
+| Bug在生产环境发现 | Bug在开发时就被发现 |
+
+### 每次开发必须遵循的步骤
+
+1. **开发前**：先写测试用例（或让Claude生成）
+   - 正常情况测试
+   - 边界情况测试
+   - 错误处理测试
+
+2. **开发中**：确保测试通过
+   ```bash
+   go test ./internal/service/... -v
+   ```
+
+3. **开发后**：运行全量测试
+   ```bash
+   go test ./... -v
+   ```
+
+4. **查看覆盖率**：
+   ```bash
+   go test ./internal/service/... -cover
+   ```
+
+### Claude Code 开发指令模板
+
+每次让Claude开发功能时，使用以下模板：
+
+```
+请帮我实现[功能]，要求：
+1. 先写单元测试，覆盖：正常流程、边界情况、错误处理
+2. 再写实现代码
+3. 确保 go test 通过
+```
+
+### 测试文件规范
+
+| 源文件 | 测试文件 |
+|--------|----------|
+| `xxx_service.go` | `xxx_service_test.go` |
+| `xxx_handler.go` | `xxx_handler_test.go` |
+| `adapter.go` | `adapter_test.go` |
+
+### Mock 规范
+
+- 使用接口进行依赖注入，便于 mock
+- Mock 实现放在 `_test.go` 文件中
+- 命名规范：`Mock<Interface>` 如 `MockTransactionRepository`

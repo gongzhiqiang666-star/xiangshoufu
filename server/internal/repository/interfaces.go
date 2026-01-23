@@ -87,6 +87,7 @@ type MessageStats struct {
 // TransactionRepository 交易仓库接口
 type TransactionRepository interface {
 	Create(tx *Transaction) error
+	FindByID(id int64) (*Transaction, error)
 	FindByOrderNo(orderNo string) (*Transaction, error)
 	FindUnprocessedProfit(limit int) ([]*Transaction, error)
 	UpdateProfitStatus(id int64, status int16) error

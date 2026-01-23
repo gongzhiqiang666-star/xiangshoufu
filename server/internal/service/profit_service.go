@@ -71,7 +71,7 @@ func (s *ProfitService) ProcessMessage(msgBytes []byte) error {
 // CalculateProfit 计算单笔交易的分润
 func (s *ProfitService) CalculateProfit(txID int64) error {
 	// 1. 获取交易信息
-	tx, err := s.transactionRepo.FindByOrderNo("")
+	tx, err := s.transactionRepo.FindByID(txID)
 	if err != nil {
 		return fmt.Errorf("find transaction failed: %w", err)
 	}
