@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"xiangshoufu/internal/middleware"
 	"xiangshoufu/internal/models"
 	"xiangshoufu/internal/service"
 
@@ -616,8 +617,9 @@ func (h *GoodsDeductionHandler) MarkAllNotificationsAsRead(c *gin.Context) {
 }
 
 // RegisterGoodsDeductionRoutes 注册货款代扣路由
-func RegisterGoodsDeductionRoutes(r *gin.RouterGroup, h *GoodsDeductionHandler) {
+func RegisterGoodsDeductionRoutes(r *gin.RouterGroup, h *GoodsDeductionHandler, authService *service.AuthService) {
 	gd := r.Group("/goods-deduction")
+	gd.Use(middleware.AuthMiddleware(authService))
 	{
 		// 创建货款代扣
 		gd.POST("", h.CreateGoodsDeduction)

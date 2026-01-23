@@ -81,9 +81,9 @@
       </el-form-item>
       <el-form-item label="归属类型">
         <el-radio-group v-model="searchForm.owner_type">
-          <el-radio-button label="all">全部</el-radio-button>
-          <el-radio-button label="direct">直营</el-radio-button>
-          <el-radio-button label="team">团队</el-radio-button>
+          <el-radio-button value="all">全部</el-radio-button>
+          <el-radio-button value="direct">直营</el-radio-button>
+          <el-radio-button value="team">团队</el-radio-button>
         </el-radio-group>
       </el-form-item>
       <el-form-item label="关键词">
@@ -111,7 +111,7 @@
       <el-table-column prop="phone_masked" label="手机号" width="130" />
       <el-table-column prop="is_direct" label="归属类型" width="90" align="center">
         <template #default="{ row }">
-          <el-tag :type="row.is_direct ? 'primary' : ''" size="small">
+          <el-tag :type="row.is_direct ? 'primary' : 'info'" size="small">
             {{ row.is_direct ? '直营' : '团队' }}
           </el-tag>
         </template>

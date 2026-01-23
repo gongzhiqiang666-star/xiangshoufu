@@ -141,7 +141,7 @@
           <el-input v-model="form.api_key" placeholder="可选" type="password" show-password />
         </el-form-item>
         <el-form-item label="备注">
-          <el-input v-model="form.remark" type="textarea" rows="2" />
+          <el-input v-model="form.remark" type="textarea" :rows="2" />
         </el-form-item>
       </el-form>
       <template #footer>

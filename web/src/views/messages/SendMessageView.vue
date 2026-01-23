@@ -50,9 +50,9 @@
 
         <el-form-item label="发送范围" prop="send_scope">
           <el-radio-group v-model="form.send_scope">
-            <el-radio label="all">全部代理商</el-radio>
-            <el-radio label="agents">指定代理商</el-radio>
-            <el-radio label="level">指定层级</el-radio>
+            <el-radio value="all">全部代理商</el-radio>
+            <el-radio value="agents">指定代理商</el-radio>
+            <el-radio value="level">指定层级</el-radio>
           </el-radio-group>
         </el-form-item>
 

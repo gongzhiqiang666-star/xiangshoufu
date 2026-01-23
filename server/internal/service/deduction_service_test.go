@@ -115,6 +115,20 @@ func (m *MockDeductionPlanRepository) UpdateDeductedAmount(id int64, amount int6
 	return nil
 }
 
+func (m *MockDeductionPlanRepository) List(offset, limit int, status, planType int16) ([]*models.DeductionPlan, int64, error) {
+	var result []*models.DeductionPlan
+	for _, plan := range m.plans {
+		if status > 0 && plan.Status != status {
+			continue
+		}
+		if planType > 0 && plan.PlanType != planType {
+			continue
+		}
+		result = append(result, plan)
+	}
+	return result, int64(len(result)), nil
+}
+
 // MockDeductionRecordRepository 模拟代扣记录仓库
 type MockDeductionRecordRepository struct {
 	records   map[int64]*models.DeductionRecord

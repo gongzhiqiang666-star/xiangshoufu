@@ -48,6 +48,53 @@ func NewDeductionService(
 	}
 }
 
+// ListPlans 分页查询代扣计划列表
+func (s *DeductionService) ListPlans(page, pageSize int, status, planType int16) ([]*models.DeductionPlan, int64, error) {
+	offset := (page - 1) * pageSize
+	return s.planRepo.List(offset, pageSize, status, planType)
+}
+
+// DeductionStats 代扣统计
+type DeductionStats struct {
+	TotalPlans      int64 `json:"total_plans"`       // 总计划数
+	ActivePlans     int64 `json:"active_plans"`      // 进行中计划数
+	CompletedPlans  int64 `json:"completed_plans"`   // 已完成计划数
+	PausedPlans     int64 `json:"paused_plans"`      // 已暂停计划数
+	CancelledPlans  int64 `json:"cancelled_plans"`   // 已取消计划数
+	TotalAmount     int64 `json:"total_amount"`      // 总代扣金额（分）
+	DeductedAmount  int64 `json:"deducted_amount"`   // 已扣金额（分）
+	RemainingAmount int64 `json:"remaining_amount"`  // 剩余金额（分）
+}
+
+// GetDeductionStats 获取代扣统计
+func (s *DeductionService) GetDeductionStats() (*DeductionStats, error) {
+	stats := &DeductionStats{}
+
+	// 获取各状态计划数
+	_, activeCount, _ := s.planRepo.List(0, 1, models.DeductionPlanStatusActive, 0)
+	_, completedCount, _ := s.planRepo.List(0, 1, models.DeductionPlanStatusCompleted, 0)
+	_, pausedCount, _ := s.planRepo.List(0, 1, models.DeductionPlanStatusPaused, 0)
+	_, cancelledCount, _ := s.planRepo.List(0, 1, models.DeductionPlanStatusCancelled, 0)
+
+	stats.ActivePlans = activeCount
+	stats.CompletedPlans = completedCount
+	stats.PausedPlans = pausedCount
+	stats.CancelledPlans = cancelledCount
+	stats.TotalPlans = activeCount + completedCount + pausedCount + cancelledCount
+
+	// 获取金额统计
+	plans, _, err := s.planRepo.List(0, 10000, 0, 0) // 获取所有计划
+	if err == nil {
+		for _, plan := range plans {
+			stats.TotalAmount += plan.TotalAmount
+			stats.DeductedAmount += plan.DeductedAmount
+			stats.RemainingAmount += plan.RemainingAmount
+		}
+	}
+
+	return stats, nil
+}
+
 // CreateDeductionPlanRequest 创建代扣计划请求
 type CreateDeductionPlanRequest struct {
 	DeductorID   int64  `json:"deductor_id"`   // 扣款方代理商ID

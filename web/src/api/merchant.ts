@@ -49,7 +49,7 @@ export function getMerchant(id: number): Promise<MerchantDetail> {
  * 获取商户关联终端
  */
 export function getMerchantTerminals(merchantId: number): Promise<any[]> {
-  return get<any[]>(`/v1/merchants/${merchantId}/terminals`)
+  return get<any[]>('/v1/terminals', { merchant_id: merchantId })
 }
 
 /**

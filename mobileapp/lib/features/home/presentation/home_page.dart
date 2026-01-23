@@ -7,6 +7,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/format_utils.dart';
 import '../../../router/app_router.dart';
 import '../../marketing/presentation/widgets/banner_carousel.dart';
+import '../../message/presentation/providers/message_provider.dart';
 import '../domain/home_model.dart';
 import 'providers/home_provider.dart';
 
@@ -22,40 +23,43 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   Widget build(BuildContext context) {
     final homeState = ref.watch(homeProvider);
+    final unreadCount = ref.watch(unreadCountProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('享收付'),
-        leading: IconButton(
-          icon: const Icon(Icons.menu),
-          onPressed: () {},
-        ),
         actions: [
           Stack(
             children: [
               IconButton(
                 icon: const Icon(Icons.notifications_outlined),
-                onPressed: () {},
+                onPressed: () => context.push(RoutePaths.message),
               ),
-              Positioned(
-                right: 8,
-                top: 8,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(
-                    color: AppColors.danger,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Text(
-                    '3',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
+              unreadCount.when(
+                data: (count) => count > 0
+                    ? Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: AppColors.danger,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            count > 99 ? '99+' : '$count',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const SizedBox.shrink(),
               ),
             ],
           ),
@@ -191,11 +195,13 @@ class _HomePageState extends ConsumerState<HomePage> {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisAlignment: MainAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Container(
                 width: 24,
@@ -207,12 +213,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                 child: Icon(icon, color: color, size: 14),
               ),
               const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                  overflow: TextOverflow.ellipsis,
-                ),
+              Text(
+                title,
+                style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
               ),
             ],
           ),

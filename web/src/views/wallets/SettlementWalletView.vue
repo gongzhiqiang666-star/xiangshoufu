@@ -161,7 +161,7 @@
           <span class="form-tip">元 (最少1元)</span>
         </el-form-item>
         <el-form-item label="备注">
-          <el-input v-model="useForm.remark" type="textarea" rows="2" />
+          <el-input v-model="useForm.remark" type="textarea" :rows="2" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -186,7 +186,7 @@
           <span class="form-tip">元</span>
         </el-form-item>
         <el-form-item label="备注">
-          <el-input v-model="returnForm.remark" type="textarea" rows="2" />
+          <el-input v-model="returnForm.remark" type="textarea" :rows="2" />
         </el-form-item>
       </el-form>
       <template #footer>

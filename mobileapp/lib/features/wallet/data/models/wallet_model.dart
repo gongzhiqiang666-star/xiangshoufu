@@ -104,7 +104,7 @@ class WalletSummaryModel {
       rechargeBalance: json['recharge_balance'] ?? 0,
       depositBalance: json['deposit_balance'] ?? 0,
       totalBalance: json['total_balance'] ?? 0,
-      totalAvailable: json['total_available'] ?? 0,
+      totalAvailable: json['total_available'] ?? json['available_balance'] ?? 0,
       totalFrozen: json['total_frozen'] ?? 0,
     );
   }

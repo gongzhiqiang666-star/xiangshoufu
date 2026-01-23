@@ -19,6 +19,7 @@ type DeductionPlanRepository interface {
 	FindActivePlans(limit int) ([]*models.DeductionPlan, error)
 	UpdateStatus(id int64, status int16) error
 	UpdateDeductedAmount(id int64, amount int64, currentPeriod int) error
+	List(offset, limit int, status, planType int16) ([]*models.DeductionPlan, int64, error)
 }
 
 // DeductionRecordRepository 代扣记录仓库接口
@@ -150,6 +151,28 @@ func (r *GormDeductionPlanRepository) UpdateDeductedAmount(id int64, amount int6
 			"current_period":   currentPeriod,
 			"updated_at":       time.Now(),
 		}).Error
+}
+
+// List 分页查询代扣计划列表
+func (r *GormDeductionPlanRepository) List(offset, limit int, status, planType int16) ([]*models.DeductionPlan, int64, error) {
+	var plans []*models.DeductionPlan
+	var total int64
+
+	query := r.db.Model(&models.DeductionPlan{})
+	if status > 0 {
+		query = query.Where("status = ?", status)
+	}
+	if planType > 0 {
+		query = query.Where("plan_type = ?", planType)
+	}
+
+	err := query.Count(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	err = query.Order("created_at DESC").Limit(limit).Offset(offset).Find(&plans).Error
+	return plans, total, err
 }
 
 var _ DeductionPlanRepository = (*GormDeductionPlanRepository)(nil)

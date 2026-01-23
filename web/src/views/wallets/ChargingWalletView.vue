@@ -121,8 +121,8 @@
         <div class="card-header">
           <span>奖励发放记录</span>
           <el-radio-group v-model="rewardDirection" @change="fetchRewards">
-            <el-radio-button label="from">我发放的</el-radio-button>
-            <el-radio-button label="to">我收到的</el-radio-button>
+            <el-radio-button value="from">我发放的</el-radio-button>
+            <el-radio-button value="to">我收到的</el-radio-button>
           </el-radio-group>
         </div>
       </template>

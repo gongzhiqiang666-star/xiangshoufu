@@ -14,10 +14,10 @@ import type {
 } from '@/types'
 
 /**
- * 获取代理商列表
+ * 获取代理商列表（当前代理商的下级列表）
  */
 export function getAgents(params: AgentQueryParams): Promise<PaginatedResponse<Agent>> {
-  return get<PaginatedResponse<Agent>>('/v1/agents', params)
+  return get<PaginatedResponse<Agent>>('/v1/agents/subordinates', params)
 }
 
 /**
@@ -72,8 +72,9 @@ export function updateAgentStatus(id: number, status: number): Promise<void> {
 /**
  * 搜索代理商（用于选择器）
  */
-export function searchAgents(keyword: string): Promise<Agent[]> {
-  return get<Agent[]>('/v1/agents/search', { keyword, limit: 20 })
+export async function searchAgents(keyword: string): Promise<Agent[]> {
+  const res = await get<{ list: Agent[]; total: number }>('/v1/agents/search', { keyword, page_size: 20 })
+  return res.list || []
 }
 
 /**

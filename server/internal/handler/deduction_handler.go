@@ -22,6 +22,75 @@ func NewDeductionHandler(deductionService *service.DeductionService) *DeductionH
 	}
 }
 
+// ListDeductionPlans 获取代扣计划列表
+// @Summary 获取代扣计划列表
+// @Description 分页获取代扣计划列表
+// @Tags 代扣管理
+// @Produce json
+// @Param page query int false "页码" default(1)
+// @Param page_size query int false "每页数量" default(10)
+// @Param status query int false "状态筛选"
+// @Param plan_type query int false "计划类型筛选"
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/deduction/plans [get]
+func (h *DeductionHandler) ListDeductionPlans(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	status, _ := strconv.Atoi(c.DefaultQuery("status", "0"))
+	planType, _ := strconv.Atoi(c.DefaultQuery("plan_type", "0"))
+
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 10
+	}
+
+	plans, total, err := h.deductionService.ListPlans(page, pageSize, int16(status), int16(planType))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "查询失败: " + err.Error(),
+		})
+		return
+	}
+
+	// 转换为前端友好格式
+	list := make([]gin.H, 0, len(plans))
+	for _, plan := range plans {
+		list = append(list, gin.H{
+			"id":               plan.ID,
+			"plan_no":          plan.PlanNo,
+			"deductor_id":      plan.DeductorID,
+			"deductee_id":      plan.DeducteeID,
+			"plan_type":        plan.PlanType,
+			"plan_type_name":   DeductionPlanTypeDesc(plan.PlanType),
+			"total_amount":     plan.TotalAmount,
+			"total_amount_yuan": float64(plan.TotalAmount) / 100,
+			"deducted_amount":  plan.DeductedAmount,
+			"deducted_yuan":    float64(plan.DeductedAmount) / 100,
+			"remaining_amount": plan.RemainingAmount,
+			"remaining_yuan":   float64(plan.RemainingAmount) / 100,
+			"total_periods":    plan.TotalPeriods,
+			"current_period":   plan.CurrentPeriod,
+			"status":           plan.Status,
+			"status_name":      DeductionPlanStatusDesc(plan.Status),
+			"created_at":       plan.CreatedAt,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"list":  list,
+			"total": total,
+			"page":  page,
+			"page_size": pageSize,
+		},
+	})
+}
+
 // CreateDeductionPlanRequest API请求
 type CreateDeductionPlanRequest struct {
 	DeductorID   int64  `json:"deductor_id" binding:"required"`   // 扣款方代理商ID
@@ -335,11 +404,39 @@ func (h *DeductionHandler) ExecuteDailyDeduction(c *gin.Context) {
 	})
 }
 
+// GetDeductionStats 获取代扣统计
+// @Summary 获取代扣统计
+// @Description 获取代扣计划的统计数据
+// @Tags 代扣管理
+// @Produce json
+// @Param start_date query string false "开始日期"
+// @Param end_date query string false "结束日期"
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/deduction/plans/stats [get]
+func (h *DeductionHandler) GetDeductionStats(c *gin.Context) {
+	stats, err := h.deductionService.GetDeductionStats()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "获取统计失败: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    stats,
+	})
+}
+
 // RegisterDeductionRoutes 注册代扣管理路由
 func RegisterDeductionRoutes(r *gin.RouterGroup, h *DeductionHandler) {
 	deduction := r.Group("/deduction")
 	{
 		// 代扣计划
+		deduction.GET("/plans", h.ListDeductionPlans)
+		deduction.GET("/plans/stats", h.GetDeductionStats) // 统计接口必须在 :id 之前
 		deduction.POST("/plans", h.CreateDeductionPlan)
 		deduction.GET("/plans/:id", h.GetDeductionPlan)
 		deduction.POST("/plans/:id/pause", h.PauseDeductionPlan)

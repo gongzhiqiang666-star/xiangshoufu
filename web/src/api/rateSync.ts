@@ -34,10 +34,10 @@ export function getRateSyncLogs(params: RateSyncLogQuery) {
     total: number
     page: number
     page_size: number
-  }>('/api/v1/rate-sync/logs', { params })
+  }>('/v1/rate-sync/logs', { params })
 }
 
 // 获取费率同步日志详情
 export function getRateSyncLogDetail(id: number) {
-  return request.get<RateSyncLog>(`/api/v1/rate-sync/logs/${id}`)
+  return request.get<RateSyncLog>(`/v1/rate-sync/logs/${id}`)
 }

@@ -15,7 +15,10 @@ export function formatAmount(amount: number, decimals = 2): string {
  * 格式化大数字（带单位）
  * @param num 数字
  */
-export function formatNumber(num: number): string {
+export function formatNumber(num: number | undefined | null): string {
+  if (num === undefined || num === null) {
+    return '0'
+  }
   if (num >= 100000000) {
     return (num / 100000000).toFixed(2) + '亿'
   }

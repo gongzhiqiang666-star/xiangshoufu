@@ -36,7 +36,7 @@ class WalletService {
     if (!apiResponse.isSuccess) {
       throw ApiException(apiResponse.code, apiResponse.message);
     }
-    final List<dynamic> list = apiResponse.data ?? [];
+    final List<dynamic> list = apiResponse.data['list'] ?? [];
     return list.map((e) => WalletModel.fromJson(e)).toList();
   }
 

@@ -5,12 +5,12 @@
       <div class="filter-bar">
         <div class="filter-left">
           <el-radio-group v-model="currentTab" @change="handleTabChange">
-            <el-radio-button label="all">全部</el-radio-button>
-            <el-radio-button label="unread">
+            <el-radio-button value="all">全部</el-radio-button>
+            <el-radio-button value="unread">
               未读
               <el-badge v-if="unreadCount > 0" :value="unreadCount" :max="99" class="unread-badge" />
             </el-radio-button>
-            <el-radio-button label="read">已读</el-radio-button>
+            <el-radio-button value="read">已读</el-radio-button>
           </el-radio-group>
         </div>
         <div class="filter-right">

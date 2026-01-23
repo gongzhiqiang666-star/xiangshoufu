@@ -751,7 +751,7 @@ func setupRouter(
 		handler.RegisterSimCashbackRoutes(apiV1, simCashbackHandler)
 
 		// 注册货款代扣路由
-		handler.RegisterGoodsDeductionRoutes(apiV1, goodsDeductionHandler)
+		handler.RegisterGoodsDeductionRoutes(apiV1, goodsDeductionHandler, authService)
 
 		// 注册PC端新增路由
 		handler.RegisterAgentRoutes(apiV1, agentHandler, authService)

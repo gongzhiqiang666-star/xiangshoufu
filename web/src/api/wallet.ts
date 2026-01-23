@@ -12,8 +12,9 @@ import type {
 /**
  * 获取钱包列表
  */
-export function getWallets(params?: { channel_id?: number }): Promise<Wallet[]> {
-  return get<Wallet[]>('/v1/wallets', params)
+export async function getWallets(params?: { channel_id?: number }): Promise<Wallet[]> {
+  const res = await get<{ list: Wallet[] }>('/v1/wallets', params)
+  return res.list || []
 }
 
 /**

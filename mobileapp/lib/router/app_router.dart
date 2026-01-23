@@ -39,6 +39,7 @@ import '../features/profile/presentation/profile_page.dart';
 import '../features/profile/presentation/settings_page.dart';
 import '../features/profile/presentation/bank_card_edit_page.dart';
 import '../features/profile/presentation/invite_code_page.dart';
+import '../features/transaction/presentation/transaction_page.dart';
 import '../shared/widgets/main_scaffold.dart';
 
 /// 路由路径常量
@@ -298,6 +299,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: RoutePaths.profit,
         name: 'profit',
         builder: (context, state) => const ProfitPage(),
+      ),
+
+      // ==================== 交易记录 ====================
+      GoRoute(
+        path: RoutePaths.transaction,
+        name: 'transaction',
+        builder: (context, state) => const TransactionPage(),
       ),
 
       // ==================== 钱包相关 ====================
