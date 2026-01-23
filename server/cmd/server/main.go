@@ -240,8 +240,12 @@ func main() {
 	walletHandler.SetAuditService(auditService) // 注入审计服务（三级等保）
 	transactionHandler := handler.NewTransactionHandler(transactionRepo)
 	profitHandler := handler.NewProfitHandler(profitRepo)
-	dashboardHandler := handler.NewDashboardHandler(transactionRepo, profitRepo, agentRepo, walletRepo)
 	messageHandler := handler.NewMessageHandler(messageRepo)
+
+	// 15.0 初始化统计汇总Repository和Analytics Handler
+	statsRepo := repository.NewGormAgentStatsRepository(db)
+	dashboardHandler := handler.NewDashboardHandler(transactionRepo, profitRepo, agentRepo, walletRepo, statsRepo)
+	analyticsHandler := handler.NewAnalyticsHandler(statsRepo)
 
 	// 15.1 初始化管理端消息Handler
 	adminMessageHandler := handler.NewAdminMessageHandler(messageService, agentRepo)
@@ -415,6 +419,7 @@ func main() {
 		chargingWalletHandler, settlementWalletHandler, taxChannelHandler,
 		uploadHandler, bannerHandler, posterHandler,
 		jobHandler, alertHandler, // 新增：任务管理和告警Handler
+		analyticsHandler,         // 新增：分析统计Handler
 		authService, metricsService, config.SwaggerEnabled,
 	)
 
@@ -623,6 +628,18 @@ func setupScheduler(
 	merchantTypeJob := jobs.NewMerchantTypeCalculatorJob(merchantRepo, merchantService)
 	scheduler.AddJob("merchant_type_calculator", 24*time.Hour, merchantTypeJob.Run)
 
+	// ============================================================
+	// 新增：统计汇总表刷新任务
+	// ============================================================
+
+	// 代理商统计刷新任务（每10分钟刷新今日汇总）
+	statsRefreshJob := jobs.NewAgentStatsRefreshJob(callbackRepo.GetDB())
+	scheduler.AddJob("agent_stats_refresh", 10*time.Minute, statsRefreshJob.Run)
+
+	// 代理商统计每日任务（每24小时全量刷新+月表汇总）
+	statsDailyJob := jobs.NewAgentStatsDailyJob(callbackRepo.GetDB())
+	scheduler.AddJob("agent_stats_daily", 24*time.Hour, statsDailyJob.Run)
+
 	return scheduler
 }
 
@@ -653,6 +670,7 @@ func setupRouter(
 	posterHandler *handler.PosterHandler,
 	jobHandler *handler.JobHandler,
 	alertHandler *handler.AlertHandler,
+	analyticsHandler *handler.AnalyticsHandler,
 	authService *service.AuthService,
 	metricsService *service.MetricsService,
 	swaggerEnabled bool,
@@ -759,6 +777,9 @@ func setupRouter(
 			jobHandler.RegisterRoutes(adminGroup)
 			alertHandler.RegisterRoutes(adminGroup)
 		}
+
+		// 注册分析统计路由
+		handler.RegisterAnalyticsRoutes(apiV1, analyticsHandler, authService)
 	}
 
 	// Swagger UI (可通过环境变量关闭)

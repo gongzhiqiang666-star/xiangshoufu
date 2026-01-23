@@ -30,6 +30,18 @@ export const privateRoutes: RouteRecordRaw[] = [
           breadcrumb: [{ title: '首页' }, { title: '仪表盘' }],
         },
       },
+      // 管理员控制台
+      {
+        path: 'admin/dashboard',
+        name: 'AdminDashboard',
+        component: () => import('@/views/admin/AdminDashboardView.vue'),
+        meta: {
+          title: '管理员控制台',
+          icon: 'DataAnalysis',
+          roles: ['admin'],
+          breadcrumb: [{ title: '首页' }, { title: '管理员控制台' }],
+        },
+      },
       // 代理管理
       {
         path: 'agents',

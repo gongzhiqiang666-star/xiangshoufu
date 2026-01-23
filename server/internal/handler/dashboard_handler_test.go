@@ -364,8 +364,8 @@ func TestAgentPathMatching(t *testing.T) {
 	}
 }
 
-// TestTerminalStats 测试终端统计
-func TestTerminalStats(t *testing.T) {
+// TestDashboardTerminalStats 测试终端统计
+func TestDashboardTerminalStats(t *testing.T) {
 	terminalStats := struct {
 		total          int
 		activated      int
