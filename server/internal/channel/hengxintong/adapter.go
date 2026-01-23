@@ -1,6 +1,7 @@
 package hengxintong
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -10,9 +11,12 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"xiangshoufu/internal/channel"
 )
@@ -408,6 +412,169 @@ func (a *Adapter) Configure(config *channel.ChannelConfig) error {
 		a.publicKey = pubKey
 	}
 	return nil
+}
+
+// SupportsRateUpdate 是否支持费率实时更新
+func (a *Adapter) SupportsRateUpdate() bool {
+	// 恒信通支持费率实时更新
+	return true
+}
+
+// UpdateMerchantRate 更新商户费率（调用恒信通API）
+func (a *Adapter) UpdateMerchantRate(req *channel.RateUpdateRequest) (*channel.RateUpdateResponse, error) {
+	if a.config == nil || a.config.APIBaseURL == "" {
+		return nil, errors.New("通道API未配置")
+	}
+
+	// 构建恒信通费率更新请求
+	apiReq := &RateUpdateAPIRequest{
+		MerchantNo:       req.MerchantNo,
+		Tusn:             req.TerminalSN,
+		CreditCardFee:    formatRatePercent(req.CreditRate),
+		DebitCardFee:     formatRatePercent(req.DebitRate),
+		DebitCardFeeMax:  strconv.FormatInt(req.DebitCap, 10),
+		WxPayFee:         formatRatePercent(req.WechatRate),
+		AlipayFee:        formatRatePercent(req.AlipayRate),
+		CloudCreditFee:   formatRatePercent(req.UnionpayRate),
+		Timestamp:        strconv.FormatInt(time.Now().Unix(), 10),
+	}
+
+	// 生成签名
+	sign, err := a.generateSign(apiReq)
+	if err != nil {
+		return nil, fmt.Errorf("生成签名失败: %w", err)
+	}
+	apiReq.Sign = sign
+
+	// 调用API
+	resp, err := a.callRateUpdateAPI(apiReq)
+	if err != nil {
+		return nil, fmt.Errorf("调用通道API失败: %w", err)
+	}
+
+	return &channel.RateUpdateResponse{
+		Success:     resp.Code == "0000",
+		ChannelCode: a.GetChannelCode(),
+		TradeNo:     resp.TradeNo,
+		Message:     resp.Message,
+	}, nil
+}
+
+// RateUpdateAPIRequest 恒信通费率更新API请求
+type RateUpdateAPIRequest struct {
+	MerchantNo      string `json:"merchantNo"`
+	Tusn            string `json:"tusn"`
+	CreditCardFee   string `json:"creditCardFee"`   // 贷记卡费率（百分比，如0.60）
+	DebitCardFee    string `json:"debitCardFee"`    // 借记卡费率
+	DebitCardFeeMax string `json:"debitCardFeeMax"` // 借记卡封顶（分）
+	WxPayFee        string `json:"wxPayFee"`        // 微信费率
+	AlipayFee       string `json:"alipayFee"`       // 支付宝费率
+	CloudCreditFee  string `json:"cloudCreditFee"`  // 云闪付费率
+	Timestamp       string `json:"timestamp"`
+	Sign            string `json:"sign"`
+}
+
+// RateUpdateAPIResponse 恒信通费率更新API响应
+type RateUpdateAPIResponse struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	TradeNo string `json:"tradeNo"`
+}
+
+// formatRatePercent 将费率转换为百分比格式（0.006 -> "0.60"）
+func formatRatePercent(rate float64) string {
+	return strconv.FormatFloat(rate*100, 'f', 2, 64)
+}
+
+// generateSign 生成请求签名
+func (a *Adapter) generateSign(req *RateUpdateAPIRequest) (string, error) {
+	if a.config == nil || a.config.PrivateKey == "" {
+		// 开发环境跳过签名
+		return "dev_sign", nil
+	}
+
+	// 构建待签名字符串
+	signContent := fmt.Sprintf("merchantNo=%s&tusn=%s&creditCardFee=%s&debitCardFee=%s&timestamp=%s",
+		req.MerchantNo, req.Tusn, req.CreditCardFee, req.DebitCardFee, req.Timestamp)
+
+	// 使用私钥签名
+	privateKey, err := parsePrivateKey(a.config.PrivateKey)
+	if err != nil {
+		return "", err
+	}
+
+	hash := sha256.Sum256([]byte(signContent))
+	signature, err := rsa.SignPKCS1v15(nil, privateKey, crypto.SHA256, hash[:])
+	if err != nil {
+		return "", err
+	}
+
+	return base64.StdEncoding.EncodeToString(signature), nil
+}
+
+// parsePrivateKey 解析RSA私钥
+func parsePrivateKey(privateKeyPEM string) (*rsa.PrivateKey, error) {
+	if !strings.Contains(privateKeyPEM, "-----BEGIN") {
+		privateKeyPEM = "-----BEGIN RSA PRIVATE KEY-----\n" + privateKeyPEM + "\n-----END RSA PRIVATE KEY-----"
+	}
+
+	block, _ := pem.Decode([]byte(privateKeyPEM))
+	if block == nil {
+		return nil, errors.New("failed to decode PEM block")
+	}
+
+	priv, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		// 尝试PKCS8格式
+		privInterface, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse private key: %w", err)
+		}
+		priv, _ = privInterface.(*rsa.PrivateKey)
+	}
+
+	return priv, nil
+}
+
+// callRateUpdateAPI 调用费率更新API
+func (a *Adapter) callRateUpdateAPI(req *RateUpdateAPIRequest) (*RateUpdateAPIResponse, error) {
+	// 构建请求URL
+	apiURL := a.config.APIBaseURL + "/api/merchant/rate/update"
+
+	// 序列化请求
+	reqBody, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	// 创建HTTP请求
+	httpReq, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(reqBody))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	// 发送请求（超时5秒）
+	client := &http.Client{Timeout: 5 * time.Second}
+	httpResp, err := client.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("HTTP请求失败: %w", err)
+	}
+	defer httpResp.Body.Close()
+
+	// 读取响应
+	respBody, err := io.ReadAll(httpResp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("读取响应失败: %w", err)
+	}
+
+	// 解析响应
+	var resp RateUpdateAPIResponse
+	if err := json.Unmarshal(respBody, &resp); err != nil {
+		return nil, fmt.Errorf("解析响应失败: %w", err)
+	}
+
+	return &resp, nil
 }
 
 // 确保Adapter实现了ChannelAdapter接口

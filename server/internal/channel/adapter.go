@@ -53,6 +53,33 @@ type ChannelAdapter interface {
 
 	// ParseRateChange 解析费率变更回调
 	ParseRateChange(rawBody []byte) (*UnifiedRateChange, error)
+
+	// UpdateMerchantRate 更新商户费率（主动调用通道API）
+	// 返回: 通道流水号, 错误信息
+	UpdateMerchantRate(req *RateUpdateRequest) (*RateUpdateResponse, error)
+
+	// SupportsRateUpdate 是否支持费率实时更新
+	SupportsRateUpdate() bool
+}
+
+// RateUpdateRequest 费率更新请求
+type RateUpdateRequest struct {
+	MerchantNo   string  `json:"merchant_no"`   // 商户号
+	TerminalSN   string  `json:"terminal_sn"`   // 终端SN
+	CreditRate   float64 `json:"credit_rate"`   // 贷记卡费率（如0.006表示0.6%）
+	DebitRate    float64 `json:"debit_rate"`    // 借记卡费率
+	DebitCap     int64   `json:"debit_cap"`     // 借记卡封顶（分）
+	WechatRate   float64 `json:"wechat_rate"`   // 微信费率
+	AlipayRate   float64 `json:"alipay_rate"`   // 支付宝费率
+	UnionpayRate float64 `json:"unionpay_rate"` // 云闪付费率
+}
+
+// RateUpdateResponse 费率更新响应
+type RateUpdateResponse struct {
+	Success     bool   `json:"success"`      // 是否成功
+	ChannelCode string `json:"channel_code"` // 通道编码
+	TradeNo     string `json:"trade_no"`     // 通道流水号
+	Message     string `json:"message"`      // 返回消息
 }
 
 // ========== 统一数据模型 ==========
