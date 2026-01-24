@@ -15,7 +15,7 @@ export const useAppStore = defineStore('app', () => {
   const pageLoading = ref(false)
 
   // 系统标题
-  const title = computed(() => import.meta.env.VITE_APP_TITLE || '收享付管理系统')
+  const title = computed(() => import.meta.env.VITE_APP_TITLE || '享收付管理系统')
 
   // 切换侧边栏
   function toggleSidebar() {

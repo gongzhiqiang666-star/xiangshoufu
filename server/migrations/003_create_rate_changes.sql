@@ -1,4 +1,4 @@
--- 收享付 - 费率变更记录表
+-- 享收付 - 费率变更记录表
 
 CREATE TABLE IF NOT EXISTS rate_changes (
     id              BIGSERIAL PRIMARY KEY,

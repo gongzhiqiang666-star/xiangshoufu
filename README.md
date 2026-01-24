@@ -1,4 +1,4 @@
-# 收享付
+# 享收付
 
 代理商分润管理系统 - 支持多级代理商体系、多通道对接、实时分润计算。
 
@@ -159,7 +159,7 @@ func (a *Adapter) ParseTransaction(rawBody []byte) (*channel.UnifiedTransaction,
 
 ## 文档
 
-- [收享付实施方案](docs/收享付实施方案.md)
+- [享收付实施方案](docs/享收付实施方案.md)
 - [业务逻辑梳理](docs/业务逻辑梳理.md)
 - [PC端管理功能详细设计](docs/PC端管理功能详细设计.md)
 - [APP设计稿](docs/APP设计稿.md)

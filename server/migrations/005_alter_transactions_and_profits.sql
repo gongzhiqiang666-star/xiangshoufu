@@ -1,4 +1,4 @@
--- 收享付 - 扩展现有交易表和分润表
+-- 享收付 - 扩展现有交易表和分润表
 
 -- 交易表增加退款状态和扩展字段
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS refund_status SMALLINT DEFAULT 0;

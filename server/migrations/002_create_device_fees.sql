@@ -1,4 +1,4 @@
--- 收享付 - 流量费/服务费记录表
+-- 享收付 - 流量费/服务费记录表
 
 CREATE TABLE IF NOT EXISTS device_fees (
     id              BIGSERIAL PRIMARY KEY,

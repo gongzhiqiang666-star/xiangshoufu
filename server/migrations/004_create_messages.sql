@@ -1,4 +1,4 @@
--- 收享付 - 消息通知表
+-- 享收付 - 消息通知表
 
 CREATE TABLE IF NOT EXISTS messages (
     id              BIGSERIAL PRIMARY KEY,

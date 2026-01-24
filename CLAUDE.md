@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-收享付 (ShouXiangFu) - An agent profit-sharing management system that processes payment channel callbacks from multiple payment providers. The system handles transaction callbacks, calculates profit sharing across agent hierarchies, and manages wallets.
+享收付 (XiangShouFu) - An agent profit-sharing management system that processes payment channel callbacks from multiple payment providers. The system handles transaction callbacks, calculates profit sharing across agent hierarchies, and manages wallets.
 
 ---
 
@@ -81,12 +81,91 @@ cd mobileapp && flutter test          # 测试必须通过
 | 前端路由是否配置 | 检查 `router/routes.ts` 或路由配置文件 |
 | 环境变量是否文档化 | 检查是否需要更新环境变量说明 |
 
+#### 5. 运行时验证（重要！）
+
+> ⚠️ **编译通过 ≠ 代码正确**
+>
+> 以下问题**只能通过实际运行**才能发现，编译和测试都无法捕获：
+
+| 问题类型 | 示例 | 为什么编译不报错 |
+|----------|------|------------------|
+| API路径错误 | `/api/api/users` 双重前缀 | 字符串拼接语法正确 |
+| import路径错误 | `@/api/user` vs `@/api/users` | 路径语法正确，文件不存在时才报错 |
+| Vue prop类型错误 | `:visible="dialogVisible"` vs `v-model:visible` | 模板语法正确 |
+| 运行时依赖缺失 | Provider未导出、常量未定义 | 类型定义存在但值不存在 |
+
+**前端改动必须执行：**
+
+```bash
+# 1. 启动后端
+cd server && go run cmd/server/main.go
+
+# 2. 启动前端（另一个终端）
+cd web && npm run dev
+
+# 3. 打开浏览器验证
+# - 打开 DevTools → Network 面板
+# - 执行相关操作
+# - 检查：请求路径是否正确、响应状态是否200
+# - 打开 Console 面板，确认无红色错误
+```
+
+**APP改动必须执行：**
+
+```bash
+# 1. 启动后端
+cd server && go run cmd/server/main.go
+
+# 2. 运行APP
+cd mobileapp && flutter run
+
+# 3. 验证
+# - 执行相关功能
+# - 检查日志输出无错误
+# - 网络请求正确返回
+```
+
+---
+
+### 🔍 常见问题自查表
+
+> 基于历史Bug总结，每次提交前必须检查：
+
+#### 前端（Vue/TypeScript）
+
+| 检查项 | 常见错误 | 正确做法 |
+|--------|----------|----------|
+| API路径 | `${API_BASE}/api/xxx` 导致双重 `/api` | 检查 `API_BASE` 是否已包含 `/api` |
+| import路径 | 文件名单复数不一致 `user` vs `users` | 使用IDE跳转验证路径存在 |
+| Element Plus对话框 | `:visible` 属性 | 使用 `v-model="visible"` |
+| 路由常量 | 使用了未定义的路由名 | 检查 `router/routes.ts` 中是否定义 |
+| API函数导出 | 函数定义了但未export | 检查 `export { functionName }` |
+
+#### APP（Flutter）
+
+| 检查项 | 常见错误 | 正确做法 |
+|--------|----------|----------|
+| Provider导出 | Provider定义了但未在 `providers.dart` 导出 | 检查barrel文件导出 |
+| 路由注册 | 页面创建了但未注册路由 | 检查 `router.dart` |
+| API路径 | 硬编码路径与后端不一致 | 使用常量定义，对照Swagger |
+
+#### 后端（Go）
+
+| 检查项 | 常见错误 | 正确做法 |
+|--------|----------|----------|
+| 路由注册 | Handler写了但没注册 | 检查 `main.go` 路由组 |
+| 依赖注入 | Service未注入到Handler | 检查构造函数参数 |
+| 数据库字段 | Model字段与表结构不匹配 | 对照migration文件 |
+
+---
+
 ### ❌ 绝对禁止的行为
 
 1. **不允许**说"开发完成"但没有执行上述验证命令
 2. **不允许**说"应该能通过"但没有实际运行验证
 3. **不允许**遗漏任何一项必要的检查
 4. **不允许**假设配置已完成而不去实际检查
+5. **不允许**只做编译验证而跳过运行时验证
 
 ---
 

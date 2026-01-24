@@ -4,7 +4,7 @@
       <!-- Logo和标题 -->
       <div class="login-header">
         <img src="/vite.svg" alt="Logo" class="logo" />
-        <h1 class="title">收享付管理系统</h1>
+        <h1 class="title">享收付管理系统</h1>
         <p class="subtitle">Agent Profit Sharing Management System</p>
       </div>
 
@@ -57,7 +57,7 @@
 
       <!-- 底部信息 -->
       <div class="login-footer">
-        <p>© 2024 收享付. All rights reserved.</p>
+        <p>© 2024 享收付. All rights reserved.</p>
       </div>
     </div>
 
