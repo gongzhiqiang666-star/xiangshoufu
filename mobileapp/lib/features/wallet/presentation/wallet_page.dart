@@ -321,22 +321,13 @@ class _WalletPageState extends ConsumerState<WalletPage> {
   }
 
   Widget _buildWalletList(List<WalletModel> wallets) {
+    // 如果没有钱包数据，显示默认钱包类型（余额为0）
+    final displayWallets = wallets.isEmpty ? _getDefaultWallets() : wallets;
+
     // 按通道筛选
     final filteredWallets = _selectedChannel == '全部'
-        ? wallets
-        : wallets.where((w) => w.channelName == _selectedChannel).toList();
-
-    if (filteredWallets.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(32),
-        child: const Center(
-          child: Text(
-            '暂无钱包数据',
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
-        ),
-      );
-    }
+        ? displayWallets
+        : displayWallets.where((w) => w.channelName == _selectedChannel).toList();
 
     return Padding(
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -346,6 +337,54 @@ class _WalletPageState extends ConsumerState<WalletPage> {
         }).toList(),
       ),
     );
+  }
+
+  /// 获取默认钱包列表（余额为0）
+  List<WalletModel> _getDefaultWallets() {
+    return [
+      WalletModel(
+        id: 0,
+        agentId: 0,
+        agentName: '',
+        walletType: 1,
+        channelId: 0,
+        channelName: '通用',
+        balance: 0,
+        available: 0,
+        frozen: 0,
+        totalIncome: 0,
+        totalWithdraw: 0,
+        updatedAt: '',
+      ),
+      WalletModel(
+        id: 0,
+        agentId: 0,
+        agentName: '',
+        walletType: 2,
+        channelId: 0,
+        channelName: '通用',
+        balance: 0,
+        available: 0,
+        frozen: 0,
+        totalIncome: 0,
+        totalWithdraw: 0,
+        updatedAt: '',
+      ),
+      WalletModel(
+        id: 0,
+        agentId: 0,
+        agentName: '',
+        walletType: 3,
+        channelId: 0,
+        channelName: '通用',
+        balance: 0,
+        available: 0,
+        frozen: 0,
+        totalIncome: 0,
+        totalWithdraw: 0,
+        updatedAt: '',
+      ),
+    ];
   }
 
   Widget _buildWalletCard(WalletModel wallet) {

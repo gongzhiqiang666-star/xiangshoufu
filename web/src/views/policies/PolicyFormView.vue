@@ -59,86 +59,25 @@
             <span>1. 成本配置（费率）</span>
             <el-tag type="success" size="small">分润钱包</el-tag>
           </div>
-          <el-row :gutter="24">
-            <el-col :span="8">
-              <el-form-item label="贷记卡费率" prop="credit_rate">
-                <el-input-number
-                  v-model="form.credit_rate"
-                  :min="0"
-                  :max="100"
-                  :precision="4"
-                  :step="0.01"
-                  style="width: 160px"
-                />
-                <span class="form-unit">%</span>
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="借记卡费率" prop="debit_rate">
-                <el-input-number
-                  v-model="form.debit_rate"
-                  :min="0"
-                  :max="100"
-                  :precision="4"
-                  :step="0.01"
-                  style="width: 160px"
-                />
-                <span class="form-unit">%</span>
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="借记卡封顶" prop="debit_cap">
-                <el-input-number
-                  v-model="form.debit_cap"
-                  :min="0"
-                  :max="1000"
-                  :precision="2"
-                  :step="1"
-                  style="width: 160px"
-                />
-                <span class="form-unit">元</span>
-              </el-form-item>
-            </el-col>
-          </el-row>
-          <el-row :gutter="24">
-            <el-col :span="8">
-              <el-form-item label="云闪付费率" prop="unionpay_rate">
-                <el-input-number
-                  v-model="form.unionpay_rate"
-                  :min="0"
-                  :max="100"
-                  :precision="4"
-                  :step="0.01"
-                  style="width: 160px"
-                />
-                <span class="form-unit">%</span>
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="微信扫码费率" prop="wechat_rate">
-                <el-input-number
-                  v-model="form.wechat_rate"
-                  :min="0"
-                  :max="100"
-                  :precision="4"
-                  :step="0.01"
-                  style="width: 160px"
-                />
-                <span class="form-unit">%</span>
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="支付宝费率" prop="alipay_rate">
-                <el-input-number
-                  v-model="form.alipay_rate"
-                  :min="0"
-                  :max="100"
-                  :precision="4"
-                  :step="0.01"
-                  style="width: 160px"
-                />
-                <span class="form-unit">%</span>
-              </el-form-item>
+          <el-row :gutter="24" v-loading="rateTypesLoading">
+            <template v-if="rateTypes && rateTypes.length > 0 && Object.keys(form.rate_configs).length > 0">
+              <el-col :span="8" v-for="rateType in rateTypes" :key="rateType.code">
+                <el-form-item :label="rateType.name" v-if="form.rate_configs[rateType.code]">
+                  <el-input-number
+                    v-model="form.rate_configs[rateType.code].rate"
+                    :min="parseFloat(rateType.min_rate)"
+                    :max="parseFloat(rateType.max_rate)"
+                    :precision="4"
+                    :step="0.01"
+                    style="width: 140px"
+                  />
+                  <span class="form-unit">%</span>
+                  <span class="rate-range">({{ rateType.min_rate }}~{{ rateType.max_rate }})</span>
+                </el-form-item>
+              </el-col>
+            </template>
+            <el-col :span="24" v-else-if="!rateTypesLoading">
+              <el-empty description="请先选择通道" :image-size="60" />
             </el-col>
           </el-row>
         </div>
@@ -184,7 +123,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -197,6 +136,8 @@ import {
   RateStageEditor,
 } from '@/components/Policy'
 import { getPolicyTemplateDetail, createPolicyTemplate, updatePolicyTemplate } from '@/api/policy'
+import { getChannelRateTypes } from '@/api/channel'
+import type { RateTypeDefinition, RateConfigs } from '@/types/policy'
 
 const route = useRoute()
 const router = useRouter()
@@ -207,6 +148,10 @@ const isEdit = computed(() => route.name === 'PolicyEdit')
 // 加载状态
 const loading = ref(false)
 const submitting = ref(false)
+
+// 动态费率类型
+const rateTypes = ref<RateTypeDefinition[]>([])
+const rateTypesLoading = ref(false)
 
 // 表单引用
 const formRef = ref<FormInstance>()
@@ -255,13 +200,8 @@ const form = reactive({
   channel_id: undefined as number | undefined,
   status: 1,
   is_default: false,
-  // 1. 成本（费率）
-  credit_rate: 0.6,
-  debit_rate: 0.6,
-  debit_cap: 20,
-  unionpay_rate: 0.38,
-  wechat_rate: 0.38,
-  alipay_rate: 0.38,
+  // 1. 成本（动态费率配置）
+  rate_configs: {} as RateConfigs,
   // 2. 押金返现
   deposit_cashbacks: [] as DepositCashbackItem[],
   // 3. 流量卡返现
@@ -281,12 +221,47 @@ const rules: FormRules = {
   channel_id: [
     { required: true, message: '请选择所属通道', trigger: 'change' },
   ],
-  credit_rate: [
-    { required: true, message: '请输入贷记卡费率', trigger: 'blur' },
-  ],
-  debit_rate: [
-    { required: true, message: '请输入借记卡费率', trigger: 'blur' },
-  ],
+}
+
+// 监听通道变化，动态加载费率类型
+watch(() => form.channel_id, async (channelId) => {
+  if (channelId) {
+    rateTypesLoading.value = true
+    try {
+      const result = await getChannelRateTypes(channelId)
+      rateTypes.value = result || []
+      // 每次加载完费率类型后都初始化配置
+      initRateConfigs()
+    } catch (error) {
+      console.error('Failed to load rate types:', error)
+      rateTypes.value = []
+      form.rate_configs = {}
+    } finally {
+      rateTypesLoading.value = false
+    }
+  } else {
+    rateTypes.value = []
+    form.rate_configs = {}
+  }
+})
+
+// 初始化费率配置
+function initRateConfigs() {
+  if (!rateTypes.value || rateTypes.value.length === 0) {
+    form.rate_configs = {}
+    return
+  }
+  const configs: RateConfigs = {}
+  for (const rt of rateTypes.value) {
+    if (form.rate_configs[rt.code]) {
+      // 保留已有配置
+      configs[rt.code] = form.rate_configs[rt.code]
+    } else {
+      // 使用最小费率作为默认值
+      configs[rt.code] = { rate: rt.min_rate }
+    }
+  }
+  form.rate_configs = configs
 }
 
 // 获取模板详情
@@ -301,17 +276,23 @@ async function fetchDetail() {
       channel_id: data.channel_id,
       status: data.status,
       is_default: data.is_default,
-      credit_rate: parseFloat(data.credit_rate) || 0,
-      debit_rate: parseFloat(data.debit_rate) || 0,
-      debit_cap: parseFloat(data.debit_cap) || 0,
-      unionpay_rate: parseFloat(data.unionpay_rate) || 0,
-      wechat_rate: parseFloat(data.wechat_rate) || 0,
-      alipay_rate: parseFloat(data.alipay_rate) || 0,
+      // 动态费率配置
+      rate_configs: data.rate_configs || {},
       deposit_cashbacks: data.deposit_cashbacks || [],
       sim_cashback: data.sim_cashback || null,
       activation_rewards: data.activation_rewards || [],
       rate_stages: data.rate_stages || [],
     })
+    // 加载费率类型后初始化配置
+    if (data.channel_id) {
+      rateTypesLoading.value = true
+      try {
+        rateTypes.value = await getChannelRateTypes(data.channel_id)
+        initRateConfigs()
+      } finally {
+        rateTypesLoading.value = false
+      }
+    }
   } catch (error) {
     console.error('Fetch policy template error:', error)
     ElMessage.error('获取模板详情失败')
@@ -330,18 +311,20 @@ async function handleSubmit() {
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
 
+  // 验证费率配置
+  if (rateTypes.value.length > 0 && Object.keys(form.rate_configs).length === 0) {
+    ElMessage.warning('请配置费率')
+    return
+  }
+
   submitting.value = true
   try {
     const submitData = {
       template_name: form.template_name,
       channel_id: form.channel_id,
       is_default: form.is_default,
-      credit_rate: String(form.credit_rate),
-      debit_rate: String(form.debit_rate),
-      debit_cap: String(form.debit_cap),
-      unionpay_rate: String(form.unionpay_rate),
-      wechat_rate: String(form.wechat_rate),
-      alipay_rate: String(form.alipay_rate),
+      // 动态费率配置
+      rate_configs: form.rate_configs,
       deposit_cashbacks: form.deposit_cashbacks,
       sim_cashback: form.sim_cashback,
       activation_rewards: form.activation_rewards,
@@ -406,5 +389,11 @@ onMounted(() => {
   margin-left: 16px;
   font-size: 12px;
   color: #c0c4cc;
+}
+
+.rate-range {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #909399;
 }
 </style>

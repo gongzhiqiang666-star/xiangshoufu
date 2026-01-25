@@ -1,8 +1,101 @@
 package models
 
 import (
+	"database/sql/driver"
+	"encoding/json"
+	"fmt"
 	"time"
 )
+
+// ============================================================
+// 费率类型动态化相关类型定义
+// ============================================================
+
+// RateTypeDefinition 费率类型定义（从通道配置读取）
+type RateTypeDefinition struct {
+	Code      string `json:"code"`       // 费率类型编码（与通道回调的payTypeCode一致）
+	Name      string `json:"name"`       // 费率类型名称（用于前端显示）
+	SortOrder int    `json:"sort_order"` // 排序
+	MinRate   string `json:"min_rate"`   // 费率下限（通道成本底线）
+	MaxRate   string `json:"max_rate"`   // 费率上限（商户最高费率）
+}
+
+// RateConfigValue 费率配置值
+type RateConfigValue struct {
+	Rate string `json:"rate"` // 费率值（百分比）
+}
+
+// RateConfigs 费率配置集合 - 实现GORM的Scanner和Valuer接口
+type RateConfigs map[string]RateConfigValue
+
+// Scan 实现sql.Scanner接口
+func (r *RateConfigs) Scan(value interface{}) error {
+	if value == nil {
+		*r = make(RateConfigs)
+		return nil
+	}
+
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return fmt.Errorf("cannot scan type %T into RateConfigs", value)
+	}
+
+	if len(bytes) == 0 || string(bytes) == "{}" {
+		*r = make(RateConfigs)
+		return nil
+	}
+
+	return json.Unmarshal(bytes, r)
+}
+
+// Value 实现driver.Valuer接口
+func (r RateConfigs) Value() (driver.Value, error) {
+	if r == nil {
+		return "{}", nil
+	}
+	return json.Marshal(r)
+}
+
+// RateDeltas 费率阶梯调整值 - 实现GORM的Scanner和Valuer接口
+type RateDeltas map[string]string
+
+// Scan 实现sql.Scanner接口
+func (r *RateDeltas) Scan(value interface{}) error {
+	if value == nil {
+		*r = make(RateDeltas)
+		return nil
+	}
+
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return fmt.Errorf("cannot scan type %T into RateDeltas", value)
+	}
+
+	if len(bytes) == 0 || string(bytes) == "{}" {
+		*r = make(RateDeltas)
+		return nil
+	}
+
+	return json.Unmarshal(bytes, r)
+}
+
+// Value 实现driver.Valuer接口
+func (r RateDeltas) Value() (driver.Value, error) {
+	if r == nil {
+		return "{}", nil
+	}
+	return json.Marshal(r)
+}
 
 // ============================================================
 // 钱包类型常量
@@ -151,23 +244,29 @@ const (
 
 // RateStagePolicy 费率阶梯政策
 type RateStagePolicy struct {
-	ID                int64     `json:"id" gorm:"primaryKey"`
-	TemplateID        int64     `json:"template_id" gorm:"not null;index"`      // 政策模板ID
-	ChannelID         int64     `json:"channel_id" gorm:"not null;index"`       // 通道ID
-	BrandCode         string    `json:"brand_code" gorm:"size:32"`              // 品牌编码
-	StageName         string    `json:"stage_name" gorm:"size:100;not null"`    // 阶梯名称
-	ApplyTo           int16     `json:"apply_to" gorm:"not null;default:1"`     // 应用对象：1-商户 2-代理商
-	MinDays           int       `json:"min_days" gorm:"default:0"`              // 最小入网天数
-	MaxDays           int       `json:"max_days" gorm:"not null"`               // 最大入网天数（-1表示无限）
-	CreditRateDelta   string    `json:"credit_rate_delta" gorm:"type:decimal(10,4);default:0"`   // 贷记卡费率调整值
-	DebitRateDelta    string    `json:"debit_rate_delta" gorm:"type:decimal(10,4);default:0"`    // 借记卡费率调整值
-	UnionpayRateDelta string    `json:"unionpay_rate_delta" gorm:"type:decimal(10,4);default:0"` // 云闪付费率调整值
-	WechatRateDelta   string    `json:"wechat_rate_delta" gorm:"type:decimal(10,4);default:0"`   // 微信费率调整值
-	AlipayRateDelta   string    `json:"alipay_rate_delta" gorm:"type:decimal(10,4);default:0"`   // 支付宝费率调整值
-	Priority          int       `json:"priority" gorm:"default:0"`              // 优先级
-	Status            int16     `json:"status" gorm:"default:1"`                // 1:启用 0:禁用
-	CreatedAt         time.Time `json:"created_at" gorm:"default:now()"`
-	UpdatedAt         time.Time `json:"updated_at" gorm:"default:now()"`
+	ID         int64  `json:"id" gorm:"primaryKey"`
+	TemplateID int64  `json:"template_id" gorm:"not null;index"`   // 政策模板ID
+	ChannelID  int64  `json:"channel_id" gorm:"not null;index"`    // 通道ID
+	BrandCode  string `json:"brand_code" gorm:"size:32"`           // 品牌编码
+	StageName  string `json:"stage_name" gorm:"size:100;not null"` // 阶梯名称
+	ApplyTo    int16  `json:"apply_to" gorm:"not null;default:1"`  // 应用对象：1-商户 2-代理商
+	MinDays    int    `json:"min_days" gorm:"default:0"`           // 最小入网天数
+	MaxDays    int    `json:"max_days" gorm:"not null"`            // 最大入网天数（-1表示无限）
+
+	// 动态费率阶梯调整值（新版）
+	RateDeltas RateDeltas `json:"rate_deltas" gorm:"type:jsonb;default:'{}'"` // 费率调整值JSON
+
+	// 旧字段，保留兼容
+	CreditRateDelta   string `json:"credit_rate_delta" gorm:"type:decimal(10,4);default:0"`   // 贷记卡费率调整值
+	DebitRateDelta    string `json:"debit_rate_delta" gorm:"type:decimal(10,4);default:0"`    // 借记卡费率调整值
+	UnionpayRateDelta string `json:"unionpay_rate_delta" gorm:"type:decimal(10,4);default:0"` // 云闪付费率调整值
+	WechatRateDelta   string `json:"wechat_rate_delta" gorm:"type:decimal(10,4);default:0"`   // 微信费率调整值
+	AlipayRateDelta   string `json:"alipay_rate_delta" gorm:"type:decimal(10,4);default:0"`   // 支付宝费率调整值
+
+	Priority  int       `json:"priority" gorm:"default:0"`          // 优先级
+	Status    int16     `json:"status" gorm:"default:1"`            // 1:启用 0:禁用
+	CreatedAt time.Time `json:"created_at" gorm:"default:now()"`
+	UpdatedAt time.Time `json:"updated_at" gorm:"default:now()"`
 }
 
 func (RateStagePolicy) TableName() string {
@@ -250,23 +349,26 @@ type PolicyTemplateComplete struct {
 	ChannelID    int64     `json:"channel_id" gorm:"not null;index"`
 	IsDefault    bool      `json:"is_default" gorm:"default:false"`
 
-	// 成本（费率）
-	CreditRate   string    `json:"credit_rate" gorm:"type:decimal(10,4)"`   // 贷记卡费率
-	DebitRate    string    `json:"debit_rate" gorm:"type:decimal(10,4)"`    // 借记卡费率
-	DebitCap     string    `json:"debit_cap" gorm:"type:decimal(10,2)"`     // 借记卡封顶
-	UnionpayRate string    `json:"unionpay_rate" gorm:"type:decimal(10,4)"` // 云闪付费率
-	WechatRate   string    `json:"wechat_rate" gorm:"type:decimal(10,4)"`   // 微信费率
-	AlipayRate   string    `json:"alipay_rate" gorm:"type:decimal(10,4)"`   // 支付宝费率
+	// 动态费率配置（新版）
+	RateConfigs RateConfigs `json:"rate_configs" gorm:"type:jsonb;default:'{}'"` // 费率配置JSON
+
+	// 成本（费率）- 旧字段，保留兼容，新代码使用RateConfigs
+	CreditRate   string `json:"credit_rate" gorm:"type:decimal(10,4)"`   // 贷记卡费率
+	DebitRate    string `json:"debit_rate" gorm:"type:decimal(10,4)"`    // 借记卡费率
+	DebitCap     string `json:"debit_cap" gorm:"type:decimal(10,2)"`     // 借记卡封顶
+	UnionpayRate string `json:"unionpay_rate" gorm:"type:decimal(10,4)"` // 云闪付费率
+	WechatRate   string `json:"wechat_rate" gorm:"type:decimal(10,4)"`   // 微信费率
+	AlipayRate   string `json:"alipay_rate" gorm:"type:decimal(10,4)"`   // 支付宝费率
 
 	Status    int16     `json:"status" gorm:"default:1"`
 	CreatedAt time.Time `json:"created_at" gorm:"default:now()"`
 	UpdatedAt time.Time `json:"updated_at" gorm:"default:now()"`
 
 	// 关联的政策配置（非数据库字段）
-	DepositCashbackPolicies   []DepositCashbackPolicy   `json:"deposit_cashback_policies" gorm:"-"`
-	SimCashbackPolicies       []SimCashbackPolicy       `json:"sim_cashback_policies" gorm:"-"`
-	ActivationRewardPolicies  []ActivationRewardPolicy  `json:"activation_reward_policies" gorm:"-"`
-	RateStagePolicies         []RateStagePolicy         `json:"rate_stage_policies" gorm:"-"`
+	DepositCashbackPolicies  []DepositCashbackPolicy  `json:"deposit_cashback_policies" gorm:"-"`
+	SimCashbackPolicies      []SimCashbackPolicy      `json:"sim_cashback_policies" gorm:"-"`
+	ActivationRewardPolicies []ActivationRewardPolicy `json:"activation_reward_policies" gorm:"-"`
+	RateStagePolicies        []RateStagePolicy        `json:"rate_stage_policies" gorm:"-"`
 }
 
 func (PolicyTemplateComplete) TableName() string {
@@ -279,10 +381,13 @@ func (PolicyTemplateComplete) TableName() string {
 
 // AgentPolicyComplete 代理商完整政策配置
 type AgentPolicyComplete struct {
-	AgentID   int64  `json:"agent_id"`
-	ChannelID int64  `json:"channel_id"`
+	AgentID   int64 `json:"agent_id"`
+	ChannelID int64 `json:"channel_id"`
 
-	// 成本（费率）
+	// 动态费率配置（新版）
+	RateConfigs RateConfigs `json:"rate_configs"`
+
+	// 成本（费率）- 旧字段，保留兼容
 	CreditRate   string `json:"credit_rate"`
 	DebitRate    string `json:"debit_rate"`
 	DebitCap     string `json:"debit_cap"`

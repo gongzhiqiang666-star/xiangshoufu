@@ -99,6 +99,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage>
       body: Column(
         children: [
           _buildStatistics(),
+          _buildQuickActions(),
           Expanded(
             child: TabBarView(
               controller: _tabController,
@@ -155,6 +156,94 @@ class _TerminalPageState extends ConsumerState<TerminalPage>
         ),
         child: Text('加载统计失败: $error',
             style: TextStyle(color: Colors.red.shade700)),
+      ),
+    );
+  }
+
+  /// 快捷入口：划拨记录、回拨记录
+  Widget _buildQuickActions() {
+    return Container(
+      margin: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildQuickActionCard(
+              icon: Icons.send_outlined,
+              title: '划拨记录',
+              subtitle: '查看划拨历史',
+              color: const Color(0xFF4CAF50),
+              onTap: () => context.push(RoutePaths.terminalDistributeList),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _buildQuickActionCard(
+              icon: Icons.undo_outlined,
+              title: '回拨记录',
+              subtitle: '查看回拨历史',
+              color: const Color(0xFFFF9800),
+              onTap: () => context.push(RoutePaths.terminalRecallList),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActionCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: color.withOpacity(0.5), size: 20),
+          ],
+        ),
       ),
     );
   }

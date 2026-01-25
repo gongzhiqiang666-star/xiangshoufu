@@ -407,6 +407,56 @@ export const privateRoutes: RouteRecordRaw[] = [
           },
         ],
       },
+      // 奖励管理
+      {
+        path: 'rewards',
+        name: 'Rewards',
+        redirect: '/rewards/templates',
+        meta: {
+          title: '奖励管理',
+          icon: 'Trophy',
+        },
+        children: [
+          {
+            path: 'templates',
+            name: 'RewardTemplateList',
+            component: () => import('@/views/rewards/RewardTemplateListView.vue'),
+            meta: {
+              title: '奖励模版',
+              breadcrumb: [{ title: '首页' }, { title: '奖励管理' }, { title: '奖励模版' }],
+            },
+          },
+          {
+            path: 'templates/create',
+            name: 'RewardTemplateCreate',
+            component: () => import('@/views/rewards/RewardTemplateFormView.vue'),
+            meta: {
+              title: '新建模版',
+              hidden: true,
+              breadcrumb: [{ title: '首页' }, { title: '奖励管理' }, { title: '新建模版' }],
+            },
+          },
+          {
+            path: 'templates/:id/edit',
+            name: 'RewardTemplateEdit',
+            component: () => import('@/views/rewards/RewardTemplateFormView.vue'),
+            meta: {
+              title: '编辑模版',
+              hidden: true,
+              breadcrumb: [{ title: '首页' }, { title: '奖励管理' }, { title: '编辑模版' }],
+            },
+          },
+          {
+            path: 'overflow-logs',
+            name: 'OverflowLogs',
+            component: () => import('@/views/rewards/OverflowLogsView.vue'),
+            meta: {
+              title: '溢出日志',
+              breadcrumb: [{ title: '首页' }, { title: '奖励管理' }, { title: '溢出日志' }],
+            },
+          },
+        ],
+      },
       // 营销管理
       {
         path: 'marketing',

@@ -172,19 +172,78 @@ func (s *RateStagingService) calculateDaysFromPtr(t *time.Time) int {
 // getRateDelta 根据卡类型获取费率调整值
 func (s *RateStagingService) getRateDelta(policy *models.RateStagePolicy, cardType int16) float64 {
 	var deltaStr string
-	switch cardType {
-	case 1: // 借记卡
-		deltaStr = policy.DebitRateDelta
-	case 2: // 贷记卡
-		deltaStr = policy.CreditRateDelta
-	case 3: // 云闪付
-		deltaStr = policy.UnionpayRateDelta
-	case 4: // 微信
-		deltaStr = policy.WechatRateDelta
-	case 5: // 支付宝
-		deltaStr = policy.AlipayRateDelta
-	default:
-		deltaStr = policy.CreditRateDelta
+
+	// 优先使用动态 RateDeltas
+	if len(policy.RateDeltas) > 0 {
+		// 根据卡类型映射到费率类型代码
+		var rateTypeCode string
+		switch cardType {
+		case 1: // 借记卡
+			rateTypeCode = "DEBIT"
+		case 2: // 贷记卡
+			rateTypeCode = "CREDIT"
+		case 3: // 云闪付
+			rateTypeCode = "UNIONPAY"
+		case 4: // 微信
+			rateTypeCode = "WECHAT"
+		case 5: // 支付宝
+			rateTypeCode = "ALIPAY"
+		default:
+			rateTypeCode = "CREDIT"
+		}
+
+		if delta, ok := policy.RateDeltas[rateTypeCode]; ok {
+			deltaStr = delta
+		}
+	}
+
+	// 如果动态配置没有值，回退到旧字段
+	if deltaStr == "" {
+		switch cardType {
+		case 1: // 借记卡
+			deltaStr = policy.DebitRateDelta
+		case 2: // 贷记卡
+			deltaStr = policy.CreditRateDelta
+		case 3: // 云闪付
+			deltaStr = policy.UnionpayRateDelta
+		case 4: // 微信
+			deltaStr = policy.WechatRateDelta
+		case 5: // 支付宝
+			deltaStr = policy.AlipayRateDelta
+		default:
+			deltaStr = policy.CreditRateDelta
+		}
+	}
+
+	delta, _ := strconv.ParseFloat(deltaStr, 64)
+	return delta
+}
+
+// GetRateDeltaByCode 根据费率类型代码获取费率调整值（新版动态支持）
+func (s *RateStagingService) GetRateDeltaByCode(policy *models.RateStagePolicy, rateTypeCode string) float64 {
+	var deltaStr string
+
+	// 优先使用动态 RateDeltas
+	if len(policy.RateDeltas) > 0 {
+		if delta, ok := policy.RateDeltas[rateTypeCode]; ok {
+			deltaStr = delta
+		}
+	}
+
+	// 如果动态配置没有值，回退到旧字段（根据code映射）
+	if deltaStr == "" {
+		switch rateTypeCode {
+		case "DEBIT":
+			deltaStr = policy.DebitRateDelta
+		case "CREDIT":
+			deltaStr = policy.CreditRateDelta
+		case "UNIONPAY":
+			deltaStr = policy.UnionpayRateDelta
+		case "WECHAT":
+			deltaStr = policy.WechatRateDelta
+		case "ALIPAY":
+			deltaStr = policy.AlipayRateDelta
+		}
 	}
 
 	delta, _ := strconv.ParseFloat(deltaStr, 64)

@@ -49,39 +49,38 @@
         </el-select>
       </el-form-item>
 
-      <el-form-item label="贷记卡费率" prop="credit_rate">
-        <el-input-number
-          v-model="formData.credit_rate"
-          :min="0"
-          :max="10"
-          :precision="4"
-          :step="0.001"
-          style="width: 200px"
-        />
-        <span class="rate-unit">% (范围: 0 - 10%)</span>
-      </el-form-item>
-
-      <el-form-item label="借记卡费率" prop="debit_rate">
-        <el-input-number
-          v-model="formData.debit_rate"
-          :min="0"
-          :max="10"
-          :precision="4"
-          :step="0.001"
-          style="width: 200px"
-        />
-        <span class="rate-unit">% (范围: 0 - 10%)</span>
-      </el-form-item>
+      <!-- 动态费率配置 -->
+      <div v-loading="rateTypesLoading">
+        <template v-if="rateTypes.length > 0 && formData.template_id">
+          <el-form-item
+            v-for="rateType in rateTypes"
+            :key="rateType.code"
+            :label="rateType.name"
+          >
+            <el-input-number
+              v-model="formData.rate_configs[rateType.code].rate"
+              :min="parseFloat(rateType.min_rate)"
+              :max="parseFloat(rateType.max_rate)"
+              :precision="4"
+              :step="0.01"
+              style="width: 200px"
+            />
+            <span class="rate-unit">% ({{ rateType.min_rate }}~{{ rateType.max_rate }})</span>
+          </el-form-item>
+        </template>
+      </div>
 
       <el-alert
-        v-if="selectedTemplate"
+        v-if="selectedTemplate && rateTypes.length > 0"
         type="info"
         :closable="false"
         style="margin-top: 10px"
       >
         <template #title>
-          模板参考费率：贷记卡 {{ (selectedTemplate.credit_rate * 100).toFixed(4) }}%，
-          借记卡 {{ (selectedTemplate.debit_rate * 100).toFixed(4) }}%
+          模板参考费率：
+          <template v-for="(rateType, index) in rateTypes" :key="rateType.code">
+            {{ rateType.name }} {{ selectedTemplate.rate_configs?.[rateType.code]?.rate || '0' }}%<template v-if="index < rateTypes.length - 1">，</template>
+          </template>
         </template>
       </el-alert>
     </el-form>
@@ -101,6 +100,8 @@ import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { getChannels } from '@/api/agent-channel'
 import { getTemplatesByChannel, assignAgentPolicy } from '@/api/policy'
+import { getChannelRateTypes } from '@/api/channel'
+import type { RateTypeDefinition, RateConfigs } from '@/types/policy'
 
 interface Props {
   modelValue: boolean
@@ -130,27 +131,27 @@ interface PolicyTemplate {
   id: number
   name: string
   is_default: boolean
-  credit_rate: number
-  debit_rate: number
+  rate_configs: RateConfigs
 }
 
 const channels = ref<Channel[]>([])
 const templates = ref<PolicyTemplate[]>([])
 const selectedTemplate = ref<PolicyTemplate | null>(null)
 
+// 动态费率类型
+const rateTypes = ref<RateTypeDefinition[]>([])
+const rateTypesLoading = ref(false)
+
 const formData = reactive({
   agent_name: '',
   channel_id: null as number | null,
   template_id: null as number | null,
-  credit_rate: 0.6,
-  debit_rate: 0.6,
+  rate_configs: {} as RateConfigs,
 })
 
 const rules: FormRules = {
   channel_id: [{ required: true, message: '请选择通道', trigger: 'change' }],
   template_id: [{ required: true, message: '请选择政策模板', trigger: 'change' }],
-  credit_rate: [{ required: true, message: '请输入贷记卡费率', trigger: 'blur' }],
-  debit_rate: [{ required: true, message: '请输入借记卡费率', trigger: 'blur' }],
 }
 
 watch(() => props.modelValue, (val) => {
@@ -178,24 +179,50 @@ async function handleChannelChange(channelId: number) {
   formData.template_id = null
   selectedTemplate.value = null
   templates.value = []
+  formData.rate_configs = {}
+  rateTypes.value = []
 
   if (channelId) {
     try {
-      const res = await getTemplatesByChannel(channelId)
-      templates.value = res as PolicyTemplate[]
+      // 并行加载模板和费率类型
+      rateTypesLoading.value = true
+      const [templatesRes, rateTypesRes] = await Promise.all([
+        getTemplatesByChannel(channelId),
+        getChannelRateTypes(channelId)
+      ])
+      templates.value = templatesRes as PolicyTemplate[]
+      rateTypes.value = rateTypesRes
+      // 初始化费率配置
+      initRateConfigs()
     } catch (error) {
-      console.error('Fetch templates error:', error)
+      console.error('Fetch templates/rate types error:', error)
+    } finally {
+      rateTypesLoading.value = false
     }
   }
+}
+
+// 初始化费率配置
+function initRateConfigs() {
+  const configs: RateConfigs = {}
+  for (const rt of rateTypes.value) {
+    if (formData.rate_configs[rt.code]) {
+      configs[rt.code] = formData.rate_configs[rt.code]
+    } else {
+      configs[rt.code] = { rate: rt.min_rate }
+    }
+  }
+  formData.rate_configs = configs
 }
 
 function handleTemplateChange(templateId: number) {
   const template = templates.value.find(t => t.id === templateId)
   if (template) {
     selectedTemplate.value = template
-    // 使用模板的费率作为默认值（转换为百分比显示）
-    formData.credit_rate = template.credit_rate * 100
-    formData.debit_rate = template.debit_rate * 100
+    // 使用模板的费率配置作为默认值
+    if (template.rate_configs) {
+      formData.rate_configs = { ...template.rate_configs }
+    }
   }
 }
 
@@ -210,8 +237,7 @@ async function handleSave() {
       await assignAgentPolicy(props.agentId, {
         channel_id: formData.channel_id!,
         template_id: formData.template_id!,
-        credit_rate: formData.credit_rate / 100, // 转换回小数
-        debit_rate: formData.debit_rate / 100,
+        rate_configs: formData.rate_configs,
       })
       ElMessage.success('政策分配成功')
       emit('success')
@@ -229,10 +255,10 @@ function handleClose() {
   formRef.value?.resetFields()
   formData.channel_id = null
   formData.template_id = null
-  formData.credit_rate = 0.6
-  formData.debit_rate = 0.6
+  formData.rate_configs = {}
   selectedTemplate.value = null
   templates.value = []
+  rateTypes.value = []
 }
 </script>
 

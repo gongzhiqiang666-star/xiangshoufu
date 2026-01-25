@@ -7,15 +7,42 @@ export interface PolicyTemplate {
   is_default: boolean
   status: number
 
-  // 费率设置
-  credit_rate: number
-  debit_rate: number
-  debit_cap: number
-  unionpay_qr_rate: number
-  wechat_rate: number
-  alipay_rate: number
-  t0_fee: number
+  // 动态费率配置
+  rate_configs: RateConfigs
 
+  created_at: string
+  updated_at: string
+}
+
+// 费率类型定义（从通道配置读取）
+export interface RateTypeDefinition {
+  code: string       // 费率类型编码
+  name: string       // 费率类型名称
+  sort_order: number // 排序
+  min_rate: string   // 费率下限
+  max_rate: string   // 费率上限
+}
+
+// 费率配置值
+export interface RateConfigValue {
+  rate: string // 费率值（百分比）
+}
+
+// 费率配置集合
+export type RateConfigs = Record<string, RateConfigValue>
+
+// 费率阶梯调整值
+export type RateDeltas = Record<string, string>
+
+// 通道
+export interface Channel {
+  id: number
+  channel_code: string
+  channel_name: string
+  description: string
+  status: number
+  priority: number
+  config: string
   created_at: string
   updated_at: string
 }
@@ -107,13 +134,8 @@ export interface PolicyTemplateForm {
   name: string
   channel_id: number
   is_default: boolean
-  credit_rate: number
-  debit_rate: number
-  debit_cap: number
-  unionpay_qr_rate: number
-  wechat_rate: number
-  alipay_rate: number
-  t0_fee: number
+  // 动态费率配置
+  rate_configs: RateConfigs
   rate_stages: Omit<RateStage, 'id' | 'template_id'>[]
   activation_rewards: Omit<ActivationReward, 'id' | 'template_id'>[]
   deposit_cashbacks: Omit<DepositCashback, 'id' | 'template_id'>[]

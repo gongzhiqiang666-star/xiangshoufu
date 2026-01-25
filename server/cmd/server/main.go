@@ -362,6 +362,10 @@ func main() {
 	taxChannelService := service.NewTaxChannelService(taxChannelRepo)
 	taxChannelHandler := handler.NewTaxChannelHandler(taxChannelService)
 
+	// 20.4.1 初始化通道服务（费率类型动态化）
+	channelService := service.NewChannelService(channelRepo)
+	channelHandler := handler.NewChannelHandler(channelService)
+
 	// 20.5 初始化营销模块（Banner、海报）
 	bannerRepo := repository.NewGormBannerRepository(db)
 	posterRepo := repository.NewGormPosterRepository(db)
@@ -396,6 +400,33 @@ func main() {
 	// 21. 初始化政策Handler
 	policyHandler := handler.NewPolicyHandler(policyTemplateRepo, agentPolicyRepo, policyService)
 
+	// 21.1 初始化奖励模块Repository
+	rewardTemplateRepo := repository.NewGormRewardPolicyTemplateRepository(db)
+	rewardStageRepo := repository.NewGormRewardStageRepository(db)
+	agentRewardRateRepo := repository.NewGormAgentRewardRateRepository(db)
+	terminalRewardProgressRepo := repository.NewGormTerminalRewardProgressRepository(db)
+	terminalStageRewardRepo := repository.NewGormTerminalStageRewardRepository(db)
+	rewardDistributionRepo := repository.NewGormRewardDistributionRepository(db)
+	rewardOverflowLogRepo := repository.NewGormRewardOverflowLogRepository(db)
+
+	// 21.2 初始化奖励服务
+	rewardService := service.NewRewardService(
+		db,
+		rewardTemplateRepo,
+		rewardStageRepo,
+		agentRewardRateRepo,
+		terminalRewardProgressRepo,
+		terminalStageRewardRepo,
+		rewardDistributionRepo,
+		rewardOverflowLogRepo,
+		agentRepo,
+		transactionRepo,
+		walletService,
+	)
+
+	// 21.3 初始化奖励Handler
+	rewardHandler := handler.NewRewardHandler(rewardService)
+
 	// 添加depositCashbackService到定时任务
 	_ = depositCashbackService // 将在后续定时任务中使用
 
@@ -416,6 +447,8 @@ func main() {
 		merchantRepo, merchantService,
 		// 新增参数：流量费返现
 		deviceFeeRepo,
+		// 新增参数：奖励模块
+		rewardService,
 	)
 	scheduler.Start()
 
@@ -427,10 +460,12 @@ func main() {
 		adminMessageHandler,
 		merchantHandler, terminalHandler, policyHandler, agentChannelHandler,
 		chargingWalletHandler, settlementWalletHandler, taxChannelHandler,
+		channelHandler, // 新增：通道费率类型Handler
 		uploadHandler, bannerHandler, posterHandler,
 		jobHandler, alertHandler, // 新增：任务管理和告警Handler
 		analyticsHandler,         // 新增：分析统计Handler
 		rateSyncHandler,          // 新增：费率同步Handler
+		rewardHandler,            // 新增：奖励模块Handler
 		authService, metricsService, config.SwaggerEnabled,
 	)
 
@@ -589,6 +624,8 @@ func setupScheduler(
 	merchantService *service.MerchantService,
 	// 新增参数：流量费返现
 	deviceFeeRepo *repository.GormDeviceFeeRepository,
+	// 新增参数：奖励模块
+	rewardService *service.RewardService,
 ) *jobs.Scheduler {
 	scheduler := jobs.NewScheduler()
 
@@ -676,6 +713,7 @@ func setupRouter(
 	chargingWalletHandler *handler.ChargingWalletHandler,
 	settlementWalletHandler *handler.SettlementWalletHandler,
 	taxChannelHandler *handler.TaxChannelHandler,
+	channelHandler *handler.ChannelHandler, // 新增：通道费率类型Handler
 	uploadHandler *handler.UploadHandler,
 	bannerHandler *handler.BannerHandler,
 	posterHandler *handler.PosterHandler,
@@ -683,6 +721,7 @@ func setupRouter(
 	alertHandler *handler.AlertHandler,
 	analyticsHandler *handler.AnalyticsHandler,
 	rateSyncHandler *handler.RateSyncHandler,
+	rewardHandler *handler.RewardHandler, // 新增：奖励模块Handler
 	authService *service.AuthService,
 	metricsService *service.MetricsService,
 	swaggerEnabled bool,
@@ -788,6 +827,11 @@ func setupRouter(
 		{
 			jobHandler.RegisterRoutes(adminGroup)
 			alertHandler.RegisterRoutes(adminGroup)
+
+			// 通道费率类型路由
+			adminGroup.GET("/channels", channelHandler.GetChannelList)
+			adminGroup.GET("/channels/:channelId", channelHandler.GetChannelDetail)
+			adminGroup.GET("/channels/:channelId/rate-types", channelHandler.GetRateTypes)
 		}
 
 		// 注册分析统计路由
@@ -800,6 +844,9 @@ func setupRouter(
 			rateSyncGroup.GET("/logs", rateSyncHandler.GetSyncLogs)
 			rateSyncGroup.GET("/logs/:id", rateSyncHandler.GetSyncLogDetail)
 		}
+
+		// 注册奖励管理路由
+		handler.RegisterRewardRoutes(apiV1, rewardHandler, authService)
 	}
 
 	// Swagger UI (可通过环境变量关闭)

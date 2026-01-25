@@ -37,35 +37,18 @@
       <el-card class="detail-card">
         <template #header>费率配置</template>
         <el-row :gutter="20">
-          <el-col :span="4">
-            <div class="rate-item">
-              <div class="rate-label">贷记卡费率</div>
-              <div class="rate-value primary">{{ formatRate(detail?.credit_rate) }}%</div>
-            </div>
-          </el-col>
-          <el-col :span="4">
-            <div class="rate-item">
-              <div class="rate-label">借记卡费率</div>
-              <div class="rate-value success">{{ formatRate(detail?.debit_rate) }}%</div>
-            </div>
-          </el-col>
-          <el-col :span="4">
-            <div class="rate-item">
-              <div class="rate-label">借记卡封顶</div>
-              <div class="rate-value warning">¥{{ detail?.debit_cap || 0 }}</div>
-            </div>
-          </el-col>
-          <el-col :span="4">
-            <div class="rate-item">
-              <div class="rate-label">云闪付费率</div>
-              <div class="rate-value info">{{ formatRate(detail?.qrcode_rate) }}%</div>
-            </div>
-          </el-col>
-          <el-col :span="4">
-            <div class="rate-item">
-              <div class="rate-label">扫码费率</div>
-              <div class="rate-value">{{ formatRate(detail?.scan_rate) }}%</div>
-            </div>
+          <template v-if="rateTypes.length > 0 && detail?.rate_configs">
+            <el-col :span="4" v-for="rateType in rateTypes" :key="rateType.code">
+              <div class="rate-item">
+                <div class="rate-label">{{ rateType.name }}</div>
+                <div class="rate-value primary">
+                  {{ formatRate(detail.rate_configs[rateType.code]?.rate) }}%
+                </div>
+              </div>
+            </el-col>
+          </template>
+          <el-col :span="24" v-else>
+            <el-empty description="暂无费率配置" :image-size="60" />
           </el-col>
         </el-row>
       </el-card>
@@ -143,7 +126,9 @@ import { StarFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import PageHeader from '@/components/Common/PageHeader.vue'
 import { getPolicyTemplate } from '@/api/policy'
+import { getChannelRateTypes } from '@/api/channel'
 import { formatAmount } from '@/utils/format'
+import type { RateTypeDefinition } from '@/types/policy'
 
 const route = useRoute()
 const router = useRouter()
@@ -154,10 +139,14 @@ const loading = ref(false)
 // 详情数据
 const detail = ref<any>(null)
 
-// 格式化费率
-function formatRate(rate?: number) {
+// 费率类型定义
+const rateTypes = ref<RateTypeDefinition[]>([])
+
+// 格式化费率（已经是百分比形式）
+function formatRate(rate?: string | number) {
   if (rate === undefined || rate === null) return '0.00'
-  return (rate * 100).toFixed(2)
+  const numRate = typeof rate === 'string' ? parseFloat(rate) : rate
+  return numRate.toFixed(2)
 }
 
 // 获取层级标签
@@ -198,6 +187,14 @@ async function fetchDetail() {
   loading.value = true
   try {
     detail.value = await getPolicyTemplate(Number(route.params.id))
+    // 加载费率类型
+    if (detail.value?.channel_id) {
+      try {
+        rateTypes.value = await getChannelRateTypes(detail.value.channel_id)
+      } catch (error) {
+        console.error('Failed to load rate types:', error)
+      }
+    }
   } catch (error) {
     console.error('Fetch policy template error:', error)
     ElMessage.error('获取模板详情失败')

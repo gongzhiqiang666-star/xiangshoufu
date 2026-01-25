@@ -62,7 +62,10 @@ type CreatePolicyTemplateRequest struct {
 	ChannelID    int64  `json:"channel_id" binding:"required"`
 	IsDefault    bool   `json:"is_default"`
 
-	// 成本（费率）
+	// 动态费率配置（新版）
+	RateConfigs models.RateConfigs `json:"rate_configs"`
+
+	// 成本（费率）- 旧字段，保留兼容
 	CreditRate   string `json:"credit_rate"`
 	DebitRate    string `json:"debit_rate"`
 	DebitCap     string `json:"debit_cap"`
@@ -109,10 +112,15 @@ type ActivationRewardInput struct {
 
 // RateStageInput 费率阶梯输入
 type RateStageInput struct {
-	StageName         string `json:"stage_name"`
-	ApplyTo           int16  `json:"apply_to"` // 1-商户 2-代理商
-	MinDays           int    `json:"min_days"`
-	MaxDays           int    `json:"max_days"`
+	StageName string `json:"stage_name"`
+	ApplyTo   int16  `json:"apply_to"` // 1-商户 2-代理商
+	MinDays   int    `json:"min_days"`
+	MaxDays   int    `json:"max_days"`
+
+	// 动态费率阶梯调整值（新版）
+	RateDeltas models.RateDeltas `json:"rate_deltas"`
+
+	// 旧字段，保留兼容
 	CreditRateDelta   string `json:"credit_rate_delta"`
 	DebitRateDelta    string `json:"debit_rate_delta"`
 	UnionpayRateDelta string `json:"unionpay_rate_delta"`
@@ -130,7 +138,10 @@ type PolicyTemplateResponse struct {
 	Status       int16  `json:"status"`
 	CreatedAt    string `json:"created_at"`
 
-	// 成本（费率）
+	// 动态费率配置（新版）
+	RateConfigs models.RateConfigs `json:"rate_configs"`
+
+	// 成本（费率）- 旧字段，保留兼容
 	CreditRate   string `json:"credit_rate"`
 	DebitRate    string `json:"debit_rate"`
 	DebitCap     string `json:"debit_cap"`
@@ -166,6 +177,7 @@ func (s *PolicyService) CreatePolicyTemplate(req *CreatePolicyTemplateRequest) (
 		TemplateName: req.TemplateName,
 		ChannelID:    req.ChannelID,
 		IsDefault:    req.IsDefault,
+		RateConfigs:  req.RateConfigs,
 		CreditRate:   req.CreditRate,
 		DebitRate:    req.DebitRate,
 		DebitCap:     req.DebitCap,
@@ -218,6 +230,7 @@ func (s *PolicyService) UpdatePolicyTemplate(id int64, req *CreatePolicyTemplate
 	// 更新主模板
 	template.TemplateName = req.TemplateName
 	template.IsDefault = req.IsDefault
+	template.RateConfigs = req.RateConfigs
 	template.CreditRate = req.CreditRate
 	template.DebitRate = req.DebitRate
 	template.DebitCap = req.DebitCap
@@ -263,6 +276,7 @@ func (s *PolicyService) GetPolicyTemplateDetail(id int64) (*PolicyTemplateRespon
 		IsDefault:    template.IsDefault,
 		Status:       template.Status,
 		CreatedAt:    template.CreatedAt.Format("2006-01-02 15:04:05"),
+		RateConfigs:  template.RateConfigs,
 		CreditRate:   template.CreditRate,
 		DebitRate:    template.DebitRate,
 		DebitCap:     template.DebitCap,
@@ -315,6 +329,7 @@ func (s *PolicyService) GetPolicyTemplateDetail(id int64) (*PolicyTemplateRespon
 			ApplyTo:           p.ApplyTo,
 			MinDays:           p.MinDays,
 			MaxDays:           p.MaxDays,
+			RateDeltas:        p.RateDeltas,
 			CreditRateDelta:   p.CreditRateDelta,
 			DebitRateDelta:    p.DebitRateDelta,
 			UnionpayRateDelta: p.UnionpayRateDelta,
@@ -717,6 +732,7 @@ func (s *PolicyService) createRateStagePolicies(templateID, channelID int64, inp
 			ApplyTo:           input.ApplyTo,
 			MinDays:           input.MinDays,
 			MaxDays:           input.MaxDays,
+			RateDeltas:        input.RateDeltas,
 			CreditRateDelta:   input.CreditRateDelta,
 			DebitRateDelta:    input.DebitRateDelta,
 			UnionpayRateDelta: input.UnionpayRateDelta,

@@ -304,6 +304,51 @@ func (s *WalletService) Withdraw(req *WithdrawRequest) error {
 	return nil
 }
 
+// AddRewardWalletBalance 添加奖励钱包余额
+// 返回钱包流水记录ID
+func (s *WalletService) AddRewardWalletBalance(agentID int64, amount int64, remark string) (int64, error) {
+	if amount <= 0 {
+		return 0, errors.New("金额必须大于0")
+	}
+
+	// 获取奖励钱包（wallet_type=3）
+	wallet, err := s.walletRepo.FindByAgentAndType(agentID, 0, models.WalletTypeReward)
+	if err != nil {
+		// 钱包不存在时返回错误，需要先创建钱包
+		return 0, fmt.Errorf("奖励钱包不存在，请先创建: %w", err)
+	}
+
+	// 更新余额
+	balanceBefore := wallet.Balance
+	balanceAfter := balanceBefore + amount
+
+	if err := s.walletRepo.UpdateBalance(wallet.ID, amount); err != nil {
+		return 0, fmt.Errorf("更新钱包余额失败: %w", err)
+	}
+
+	// 创建流水记录
+	walletLog := &repository.WalletLog{
+		WalletID:      wallet.ID,
+		AgentID:       agentID,
+		WalletType:    models.WalletTypeReward,
+		LogType:       1, // 入账
+		Amount:        amount,
+		BalanceBefore: balanceBefore,
+		BalanceAfter:  balanceAfter,
+		RefType:       "stage_reward",
+		Remark:        remark,
+		CreatedAt:     time.Now(),
+	}
+
+	if err := s.walletLogRepo.Create(walletLog); err != nil {
+		log.Printf("[WalletService] 创建钱包流水失败: %v", err)
+		// 流水记录失败不影响主流程
+	}
+
+	log.Printf("[WalletService] 奖励入账成功: AgentID=%d, Amount=%d, Remark=%s", agentID, amount, remark)
+	return walletLog.ID, nil
+}
+
 // checkParentChargingWalletBalance 检查上级充值钱包余额是否足够
 // 业务规则：奖励钱包提现时，需要确保上级充值钱包余额 >= 提现金额
 func (s *WalletService) checkParentChargingWalletBalance(agentID int64, amount int64) error {
