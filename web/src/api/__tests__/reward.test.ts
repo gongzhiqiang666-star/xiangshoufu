@@ -16,8 +16,8 @@ import {
   updateRewardTemplate,
   deleteRewardTemplate,
   updateRewardTemplateStatus,
-  getAgentRewardRate,
-  setAgentRewardRate,
+  getAgentRewardAmount,
+  setAgentRewardAmount,
   getTerminalRewardProgress,
   getOverflowLogs,
   resolveOverflowLog,
@@ -143,36 +143,36 @@ describe('reward API', () => {
   })
 
   // ============================================================
-  // 代理商奖励比例测试
+  // 代理商奖励金额配置测试（差额分配模式）
   // ============================================================
 
-  describe('getAgentRewardRate', () => {
-    it('应该正确获取代理商奖励比例', async () => {
-      const mockRate = { agent_id: 1, reward_rate: 0.1 }
+  describe('getAgentRewardAmount', () => {
+    it('应该正确获取代理商奖励金额配置', async () => {
+      const mockRate = { agent_id: 1, template_id: 1, reward_amount: 10000 }
       vi.mocked(request.get).mockResolvedValue(mockRate)
 
-      const result = await getAgentRewardRate(1)
+      const result = await getAgentRewardAmount(1, 1)
 
-      expect(request.get).toHaveBeenCalledWith('/v1/rewards/agents/1/rate')
-      expect(result.reward_rate).toBe(0.1)
+      expect(request.get).toHaveBeenCalledWith('/v1/rewards/agents/1/amount', { template_id: 1 })
+      expect(result.reward_amount).toBe(10000)
     })
   })
 
-  describe('setAgentRewardRate', () => {
-    it('应该正确设置代理商奖励比例', async () => {
+  describe('setAgentRewardAmount', () => {
+    it('应该正确设置代理商奖励金额', async () => {
       vi.mocked(request.put).mockResolvedValue(undefined)
 
-      await setAgentRewardRate(1, 0.15)
+      await setAgentRewardAmount(1, 1, 15000)
 
-      expect(request.put).toHaveBeenCalledWith('/v1/rewards/agents/1/rate', { reward_rate: 0.15 })
+      expect(request.put).toHaveBeenCalledWith('/v1/rewards/agents/1/amount', { template_id: 1, reward_amount: 15000 })
     })
 
-    it('应该支持设置0%比例', async () => {
+    it('应该支持设置0金额', async () => {
       vi.mocked(request.put).mockResolvedValue(undefined)
 
-      await setAgentRewardRate(1, 0)
+      await setAgentRewardAmount(1, 1, 0)
 
-      expect(request.put).toHaveBeenCalledWith('/v1/rewards/agents/1/rate', { reward_rate: 0 })
+      expect(request.put).toHaveBeenCalledWith('/v1/rewards/agents/1/amount', { template_id: 1, reward_amount: 0 })
     })
   })
 

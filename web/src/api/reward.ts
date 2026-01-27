@@ -42,7 +42,8 @@ export interface UpdateRewardTemplateRequest extends CreateRewardTemplateRequest
 export interface AgentRewardRate {
   id: number
   agent_id: number
-  reward_rate: number
+  template_id: number
+  reward_amount: number  // 奖励金额（分）- 差额分配模式
   created_at: string
   updated_at: string
 }
@@ -120,14 +121,14 @@ export function updateRewardTemplateStatus(id: number, enabled: boolean): Promis
   return put<void>(`/v1/rewards/templates/${id}/status`, { enabled })
 }
 
-// ======== 代理商奖励比例 ========
+// ======== 代理商奖励金额配置（差额分配模式） ========
 
-export function getAgentRewardRate(agentId: number): Promise<AgentRewardRate> {
-  return get<AgentRewardRate>(`/v1/rewards/agents/${agentId}/rate`)
+export function getAgentRewardAmount(agentId: number, templateId: number): Promise<AgentRewardRate> {
+  return get<AgentRewardRate>(`/v1/rewards/agents/${agentId}/amount`, { template_id: templateId })
 }
 
-export function setAgentRewardRate(agentId: number, rewardRate: number): Promise<void> {
-  return put<void>(`/v1/rewards/agents/${agentId}/rate`, { reward_rate: rewardRate })
+export function setAgentRewardAmount(agentId: number, templateId: number, rewardAmount: number): Promise<void> {
+  return put<void>(`/v1/rewards/agents/${agentId}/amount`, { template_id: templateId, reward_amount: rewardAmount })
 }
 
 // ======== 终端奖励进度 ========

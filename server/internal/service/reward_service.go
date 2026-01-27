@@ -315,79 +315,75 @@ func (s *RewardService) validateStages(timeType models.TimeType, stages []models
 }
 
 // ============================================================
-// 代理商奖励比例配置
+// 代理商奖励金额配置（差额分配模式）
 // ============================================================
 
-// SetAgentRewardRate 设置代理商奖励比例
-func (s *RewardService) SetAgentRewardRate(req *models.AgentRewardRateRequest) error {
+// SetAgentRewardAmount 设置代理商奖励金额（上级给下级配置的奖励金额）
+// 差额分配规则：A给B配置100元，B给C配置30元，C达标时：C得30，B得70（100-30）
+func (s *RewardService) SetAgentRewardAmount(req *models.AgentRewardRateRequest) error {
 	// 1. 验证代理商存在
 	agent, err := s.agentRepo.FindByID(req.AgentID)
 	if err != nil {
 		return fmt.Errorf("代理商不存在: %w", err)
 	}
 
-	// 2. 验证比例范围
-	if req.RewardRate < 0 || req.RewardRate > 1 {
-		return errors.New("奖励比例必须在0-100%之间")
+	// 2. 验证模版存在
+	_, err = s.templateRepo.FindByID(req.TemplateID)
+	if err != nil {
+		return fmt.Errorf("奖励模版不存在: %w", err)
 	}
 
-	// 3. 验证链上比例之和不超过100%（配置时验证）
-	if err := s.validateAgentChainRate(agent, req.RewardRate); err != nil {
+	// 3. 验证金额范围（不能为负数）
+	if req.RewardAmount < 0 {
+		return errors.New("奖励金额不能为负数")
+	}
+
+	// 4. 验证不超过上级配置的金额（配置时验证）
+	if err := s.validateAgentRewardAmount(agent, req.TemplateID, req.RewardAmount); err != nil {
 		return err
 	}
 
-	// 4. 保存或更新
+	// 5. 保存或更新
 	rate := &models.AgentRewardRate{
-		AgentID:    req.AgentID,
-		RewardRate: req.RewardRate,
-		UpdatedAt:  time.Now(),
+		AgentID:      req.AgentID,
+		TemplateID:   req.TemplateID,
+		RewardAmount: req.RewardAmount,
+		UpdatedAt:    time.Now(),
 	}
 
 	if err := s.agentRateRepo.Upsert(rate); err != nil {
-		return fmt.Errorf("保存奖励比例失败: %w", err)
+		return fmt.Errorf("保存奖励金额配置失败: %w", err)
 	}
 
-	log.Printf("[RewardService] 设置代理商奖励比例: AgentID=%d, Rate=%.2f%%", req.AgentID, req.RewardRate*100)
+	log.Printf("[RewardService] 设置代理商奖励金额: AgentID=%d, TemplateID=%d, Amount=%d分",
+		req.AgentID, req.TemplateID, req.RewardAmount)
 	return nil
 }
 
-// GetAgentRewardRate 获取代理商奖励比例
-func (s *RewardService) GetAgentRewardRate(agentID int64) (*models.AgentRewardRate, error) {
-	return s.agentRateRepo.FindByAgentID(agentID)
+// GetAgentRewardAmount 获取代理商奖励金额配置
+func (s *RewardService) GetAgentRewardAmount(agentID, templateID int64) (*models.AgentRewardRate, error) {
+	return s.agentRateRepo.FindByAgentAndTemplate(agentID, templateID)
 }
 
-// validateAgentChainRate 验证代理商链上比例之和不超过100%
-func (s *RewardService) validateAgentChainRate(agent *repository.Agent, newRate float64) error {
-	// 获取代理商链（包括自己和所有上级）
-	ancestors, err := s.agentRepo.FindAncestors(agent.ID)
+// validateAgentRewardAmount 验证代理商奖励金额不超过上级配置的金额
+// 差额分配规则：下级配置的金额不能超过上级给自己配置的金额
+func (s *RewardService) validateAgentRewardAmount(agent *repository.Agent, templateID int64, newAmount int64) error {
+	// 如果没有上级（顶级代理商），则不需要验证
+	if agent.ParentID == 0 {
+		return nil
+	}
+
+	// 获取上级给当前代理商配置的金额
+	parentRate, err := s.agentRateRepo.FindByAgentAndTemplate(agent.ID, templateID)
 	if err != nil {
-		return fmt.Errorf("查询代理商链失败: %w", err)
+		// 如果上级还没有给当前代理商配置金额，则当前代理商也不能配置
+		return errors.New("上级尚未配置奖励金额，无法给下级配置")
 	}
 
-	// 获取链上所有代理商的奖励比例
-	agentIDs := make([]int64, 0, len(ancestors)+1)
-	for _, a := range ancestors {
-		agentIDs = append(agentIDs, a.ID)
-	}
-
-	rates, err := s.agentRateRepo.FindByAgentIDs(agentIDs)
-	if err != nil {
-		return fmt.Errorf("查询奖励比例失败: %w", err)
-	}
-
-	// 计算总比例（不包括当前代理商的旧比例）
-	var totalRate float64
-	for _, r := range rates {
-		if r.AgentID != agent.ID {
-			totalRate += r.RewardRate
-		}
-	}
-
-	// 加上新比例
-	totalRate += newRate
-
-	if totalRate > 1.0 {
-		return fmt.Errorf("代理商链上奖励比例之和(%.2f%%)超过100%%", totalRate*100)
+	// 下级配置的金额不能超过上级给自己配置的金额
+	if newAmount > parentRate.RewardAmount {
+		return fmt.Errorf("配置的奖励金额(%d分)不能超过上级配置的金额(%d分)",
+			newAmount, parentRate.RewardAmount)
 	}
 
 	return nil
@@ -713,121 +709,129 @@ func (s *RewardService) calculateActualValue(terminalSN string, snapshot models.
 	return 0, nil
 }
 
-// distributeReward 级差分配奖励（固定池模式）
+// distributeReward 差额分配奖励
+// 规则：A给B配置100元，B给C配置30元，C达标时：C得30，B得70（100-30），总金额100
 func (s *RewardService) distributeReward(tx *gorm.DB, reward *models.TerminalStageReward, progress *models.TerminalRewardProgress) error {
 	if reward.RewardAmount == nil || *reward.RewardAmount <= 0 {
 		return nil
 	}
 
-	totalReward := *reward.RewardAmount
+	templateID := progress.TemplateID
 
-	// 1. 获取代理商链
+	// 1. 获取代理商链（从终端归属代理商往上）
 	ancestors, err := s.agentRepo.FindAncestors(progress.BindAgentID)
 	if err != nil {
 		return fmt.Errorf("获取代理商链失败: %w", err)
 	}
 
-	// 2. 获取各级代理商的奖励比例
-	agentIDs := make([]int64, 0, len(ancestors)+1)
-	agentIDs = append(agentIDs, progress.BindAgentID)
+	// 2. 构建完整的代理商链（包括终端归属代理商）
+	// 顺序：终端归属代理商 -> 上级 -> 上上级 -> ... -> 顶级
+	allAgentIDs := make([]int64, 0, len(ancestors)+1)
+	allAgentIDs = append(allAgentIDs, progress.BindAgentID)
 	for _, a := range ancestors {
-		agentIDs = append(agentIDs, a.ID)
+		allAgentIDs = append(allAgentIDs, a.ID)
 	}
 
-	rates, err := s.agentRateRepo.FindByAgentIDs(agentIDs)
+	// 3. 获取各级代理商针对该模版的奖励金额配置
+	rates, err := s.agentRateRepo.FindByAgentIDsAndTemplate(allAgentIDs, templateID)
 	if err != nil {
-		return fmt.Errorf("获取奖励比例失败: %w", err)
+		return fmt.Errorf("获取奖励金额配置失败: %w", err)
 	}
 
-	rateMap := make(map[int64]float64)
+	// 构建金额映射：agent_id -> 上级给该代理商配置的奖励金额
+	amountMap := make(map[int64]int64)
 	for _, r := range rates {
-		rateMap[r.AgentID] = r.RewardRate
+		amountMap[r.AgentID] = r.RewardAmount
 	}
 
-	// 3. 计算总比例，检查溢出
-	var totalRate float64
+	// 4. 差额分配计算
+	// 规则：每个代理商得到的金额 = 上级给自己配置的金额 - 自己给下级配置的金额
+	distributions := make([]*models.RewardDistribution, 0)
 	agentChain := make(models.AgentChain, 0)
-	for _, a := range ancestors {
-		rate := rateMap[a.ID]
-		totalRate += rate
-		agentChain = append(agentChain, models.AgentChainInfo{
-			AgentID:    a.ID,
-			AgentName:  a.AgentName,
-			Level:      a.Level,
-			RewardRate: rate,
-		})
+
+	// 从终端归属代理商开始，往上遍历
+	var totalDistributed int64
+	prevAmount := int64(0) // 下级获得的金额（用于计算差额）
+
+	for level, agentID := range allAgentIDs {
+		// 获取上级给当前代理商配置的金额
+		configuredAmount, hasConfig := amountMap[agentID]
+		if !hasConfig {
+			// 如果没有配置，跳过（顶级代理商可能没有上级给他配置）
+			continue
+		}
+
+		// 当前代理商获得的金额 = 上级给自己配置的金额 - 自己给下级配置的金额
+		earnedAmount := configuredAmount - prevAmount
+
+		if earnedAmount < 0 {
+			// 配置错误：下级金额超过上级配置，记录异常
+			agentChain = append(agentChain, models.AgentChainInfo{
+				AgentID:      agentID,
+				Level:        level + 1,
+				RewardRate:   float64(configuredAmount) / float64(*reward.RewardAmount),
+			})
+
+			overflowLog := &models.RewardOverflowLog{
+				TerminalSN:    reward.TerminalSN,
+				StageRewardID: &reward.ID,
+				AgentChain:    agentChain,
+				TotalRate:     0,
+				RewardAmount:  *reward.RewardAmount,
+				ErrorMessage:  fmt.Sprintf("差额分配异常：代理商%d配置金额(%d)小于下级获得金额(%d)", agentID, configuredAmount, prevAmount),
+				CreatedAt:     time.Now(),
+			}
+			if err := tx.Create(overflowLog).Error; err != nil {
+				log.Printf("[RewardService] 记录溢出日志失败: %v", err)
+			}
+			return fmt.Errorf("差额分配异常：配置金额不足以覆盖下级奖励")
+		}
+
+		if earnedAmount > 0 {
+			dist := &models.RewardDistribution{
+				StageRewardID: reward.ID,
+				TerminalSN:    reward.TerminalSN,
+				AgentID:       agentID,
+				AgentLevel:    level + 1,
+				RewardRate:    float64(earnedAmount) / float64(*reward.RewardAmount),
+				RewardAmount:  earnedAmount,
+				WalletStatus:  0,
+				CreatedAt:     time.Now(),
+			}
+			distributions = append(distributions, dist)
+			totalDistributed += earnedAmount
+		}
+
+		// 更新prevAmount为当前代理商配置的金额
+		prevAmount = configuredAmount
 	}
 
-	if totalRate > 1.0 {
-		// 记录溢出日志，不发放奖励
+	// 5. 验证总分配金额不超过奖励金额
+	if totalDistributed > *reward.RewardAmount {
 		overflowLog := &models.RewardOverflowLog{
 			TerminalSN:    reward.TerminalSN,
 			StageRewardID: &reward.ID,
 			AgentChain:    agentChain,
-			TotalRate:     totalRate,
-			RewardAmount:  totalReward,
-			ErrorMessage:  fmt.Sprintf("链上比例之和(%.4f)超过100%%", totalRate),
+			TotalRate:     float64(totalDistributed) / float64(*reward.RewardAmount),
+			RewardAmount:  *reward.RewardAmount,
+			ErrorMessage:  fmt.Sprintf("分配总额(%d)超过奖励金额(%d)", totalDistributed, *reward.RewardAmount),
 			CreatedAt:     time.Now(),
 		}
 		if err := tx.Create(overflowLog).Error; err != nil {
 			log.Printf("[RewardService] 记录溢出日志失败: %v", err)
 		}
-		return fmt.Errorf("奖励池溢出: 链上比例之和(%.2f%%)超过100%%", totalRate*100)
+		return fmt.Errorf("奖励池溢出: 分配总额(%d分)超过奖励金额(%d分)", totalDistributed, *reward.RewardAmount)
 	}
 
-	// 4. 按固定池模式分配
-	distributions := make([]*models.RewardDistribution, 0)
-	var distributedAmount int64
-
-	// 先分配上级代理商
-	level := len(ancestors) + 1
-	for i := len(ancestors) - 1; i >= 0; i-- {
-		agent := ancestors[i]
-		rate := rateMap[agent.ID]
-		if rate > 0 {
-			amount := int64(float64(totalReward) * rate)
-			distributedAmount += amount
-
-			dist := &models.RewardDistribution{
-				StageRewardID: reward.ID,
-				TerminalSN:    reward.TerminalSN,
-				AgentID:       agent.ID,
-				AgentLevel:    level,
-				RewardRate:    rate,
-				RewardAmount:  amount,
-				WalletStatus:  0,
-				CreatedAt:     time.Now(),
-			}
-			distributions = append(distributions, dist)
-		}
-		level--
-	}
-
-	// 终端归属代理商拿剩余部分
-	remainAmount := totalReward - distributedAmount
-	if remainAmount > 0 {
-		dist := &models.RewardDistribution{
-			StageRewardID: reward.ID,
-			TerminalSN:    reward.TerminalSN,
-			AgentID:       progress.BindAgentID,
-			AgentLevel:    1,
-			RewardRate:    float64(remainAmount) / float64(totalReward),
-			RewardAmount:  remainAmount,
-			WalletStatus:  0,
-			CreatedAt:     time.Now(),
-		}
-		distributions = append(distributions, dist)
-	}
-
-	// 5. 批量创建分配记录
+	// 6. 批量创建分配记录
 	if len(distributions) > 0 {
 		if err := tx.Create(&distributions).Error; err != nil {
 			return fmt.Errorf("创建分配记录失败: %w", err)
 		}
 	}
 
-	log.Printf("[RewardService] 奖励分配完成: StageRewardID=%d, Total=%d, Distributions=%d",
-		reward.ID, totalReward, len(distributions))
+	log.Printf("[RewardService] 差额分配完成: StageRewardID=%d, Total=%d, Distributed=%d, Records=%d",
+		reward.ID, *reward.RewardAmount, totalDistributed, len(distributions))
 	return nil
 }
 

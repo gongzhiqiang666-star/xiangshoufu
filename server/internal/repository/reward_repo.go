@@ -30,14 +30,15 @@ type RewardStageRepository interface {
 	DeleteByTemplateID(templateID int64) error
 }
 
-// AgentRewardRateRepository 代理商奖励比例仓库接口
+// AgentRewardRateRepository 代理商奖励金额仓库接口
 type AgentRewardRateRepository interface {
 	Create(rate *models.AgentRewardRate) error
 	Update(rate *models.AgentRewardRate) error
 	Upsert(rate *models.AgentRewardRate) error
-	FindByAgentID(agentID int64) (*models.AgentRewardRate, error)
+	FindByAgentAndTemplate(agentID, templateID int64) (*models.AgentRewardRate, error)
 	FindByAgentIDs(agentIDs []int64) ([]*models.AgentRewardRate, error)
-	Delete(agentID int64) error
+	FindByAgentIDsAndTemplate(agentIDs []int64, templateID int64) ([]*models.AgentRewardRate, error)
+	Delete(agentID, templateID int64) error
 }
 
 // TerminalRewardProgressRepository 终端奖励进度仓库接口
@@ -189,7 +190,7 @@ func (r *GormRewardStageRepository) DeleteByTemplateID(templateID int64) error {
 var _ RewardStageRepository = (*GormRewardStageRepository)(nil)
 
 // ============================================================
-// 代理商奖励比例仓库实现
+// 代理商奖励金额仓库实现（差额分配模式）
 // ============================================================
 
 // GormAgentRewardRateRepository GORM实现
@@ -212,16 +213,16 @@ func (r *GormAgentRewardRateRepository) Update(rate *models.AgentRewardRate) err
 }
 
 func (r *GormAgentRewardRateRepository) Upsert(rate *models.AgentRewardRate) error {
-	return r.db.Where("agent_id = ?", rate.AgentID).
+	return r.db.Where("agent_id = ? AND template_id = ?", rate.AgentID, rate.TemplateID).
 		Assign(map[string]interface{}{
-			"reward_rate": rate.RewardRate,
-			"updated_at":  time.Now(),
+			"reward_amount": rate.RewardAmount,
+			"updated_at":    time.Now(),
 		}).FirstOrCreate(rate).Error
 }
 
-func (r *GormAgentRewardRateRepository) FindByAgentID(agentID int64) (*models.AgentRewardRate, error) {
+func (r *GormAgentRewardRateRepository) FindByAgentAndTemplate(agentID, templateID int64) (*models.AgentRewardRate, error) {
 	var rate models.AgentRewardRate
-	if err := r.db.Where("agent_id = ?", agentID).First(&rate).Error; err != nil {
+	if err := r.db.Where("agent_id = ? AND template_id = ?", agentID, templateID).First(&rate).Error; err != nil {
 		return nil, err
 	}
 	return &rate, nil
@@ -236,8 +237,17 @@ func (r *GormAgentRewardRateRepository) FindByAgentIDs(agentIDs []int64) ([]*mod
 	return rates, err
 }
 
-func (r *GormAgentRewardRateRepository) Delete(agentID int64) error {
-	return r.db.Where("agent_id = ?", agentID).Delete(&models.AgentRewardRate{}).Error
+func (r *GormAgentRewardRateRepository) FindByAgentIDsAndTemplate(agentIDs []int64, templateID int64) ([]*models.AgentRewardRate, error) {
+	if len(agentIDs) == 0 {
+		return nil, nil
+	}
+	var rates []*models.AgentRewardRate
+	err := r.db.Where("agent_id IN ? AND template_id = ?", agentIDs, templateID).Find(&rates).Error
+	return rates, err
+}
+
+func (r *GormAgentRewardRateRepository) Delete(agentID, templateID int64) error {
+	return r.db.Where("agent_id = ? AND template_id = ?", agentID, templateID).Delete(&models.AgentRewardRate{}).Error
 }
 
 var _ AgentRewardRateRepository = (*GormAgentRewardRateRepository)(nil)

@@ -277,19 +277,20 @@ func (h *RewardHandler) UpdateRewardTemplateStatus(c *gin.Context) {
 }
 
 // ============================================================
-// 代理商奖励比例配置
+// 代理商奖励金额配置（差额分配模式）
 // ============================================================
 
-// GetAgentRewardRate 获取代理商奖励比例
-// @Summary 获取代理商奖励比例
-// @Description 获取指定代理商的奖励比例配置
+// GetAgentRewardAmount 获取代理商奖励金额配置
+// @Summary 获取代理商奖励金额配置
+// @Description 获取指定代理商针对某模版的奖励金额配置
 // @Tags 奖励管理
 // @Produce json
 // @Security ApiKeyAuth
 // @Param id path int true "代理商ID"
+// @Param template_id query int true "模版ID"
 // @Success 200 {object} map[string]interface{}
-// @Router /api/v1/rewards/agents/{id}/rate [get]
-func (h *RewardHandler) GetAgentRewardRate(c *gin.Context) {
+// @Router /api/v1/rewards/agents/{id}/amount [get]
+func (h *RewardHandler) GetAgentRewardAmount(c *gin.Context) {
 	idStr := c.Param("id")
 	agentID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
@@ -300,15 +301,26 @@ func (h *RewardHandler) GetAgentRewardRate(c *gin.Context) {
 		return
 	}
 
-	rate, err := h.rewardService.GetAgentRewardRate(agentID)
+	templateIDStr := c.Query("template_id")
+	templateID, err := strconv.ParseInt(templateIDStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "无效的模版ID",
+		})
+		return
+	}
+
+	rate, err := h.rewardService.GetAgentRewardAmount(agentID, templateID)
 	if err != nil {
 		// 未配置时返回默认值
 		c.JSON(http.StatusOK, gin.H{
 			"code":    0,
 			"message": "success",
 			"data": gin.H{
-				"agent_id":    agentID,
-				"reward_rate": 0,
+				"agent_id":      agentID,
+				"template_id":   templateID,
+				"reward_amount": 0,
 			},
 		})
 		return
@@ -321,18 +333,18 @@ func (h *RewardHandler) GetAgentRewardRate(c *gin.Context) {
 	})
 }
 
-// SetAgentRewardRate 设置代理商奖励比例
-// @Summary 设置代理商奖励比例
-// @Description 设置指定代理商的奖励比例配置
+// SetAgentRewardAmount 设置代理商奖励金额
+// @Summary 设置代理商奖励金额
+// @Description 设置上级给下级代理商的奖励金额配置（差额分配模式）
 // @Tags 奖励管理
 // @Accept json
 // @Produce json
 // @Security ApiKeyAuth
 // @Param id path int true "代理商ID"
-// @Param request body models.AgentRewardRateRequest true "奖励比例"
+// @Param request body models.AgentRewardRateRequest true "奖励金额配置"
 // @Success 200 {object} map[string]interface{}
-// @Router /api/v1/rewards/agents/{id}/rate [put]
-func (h *RewardHandler) SetAgentRewardRate(c *gin.Context) {
+// @Router /api/v1/rewards/agents/{id}/amount [put]
+func (h *RewardHandler) SetAgentRewardAmount(c *gin.Context) {
 	idStr := c.Param("id")
 	agentID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
@@ -353,7 +365,7 @@ func (h *RewardHandler) SetAgentRewardRate(c *gin.Context) {
 	}
 	req.AgentID = agentID
 
-	if err := h.rewardService.SetAgentRewardRate(&req); err != nil {
+	if err := h.rewardService.SetAgentRewardAmount(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
 			"message": err.Error(),
@@ -551,9 +563,9 @@ func RegisterRewardRoutes(r *gin.RouterGroup, h *RewardHandler, authService *ser
 		rewards.DELETE("/templates/:id", h.DeleteRewardTemplate)
 		rewards.PUT("/templates/:id/status", h.UpdateRewardTemplateStatus)
 
-		// 代理商奖励比例
-		rewards.GET("/agents/:id/rate", h.GetAgentRewardRate)
-		rewards.PUT("/agents/:id/rate", h.SetAgentRewardRate)
+		// 代理商奖励金额配置（差额分配模式）
+		rewards.GET("/agents/:id/amount", h.GetAgentRewardAmount)
+		rewards.PUT("/agents/:id/amount", h.SetAgentRewardAmount)
 
 		// 终端奖励进度
 		rewards.GET("/terminals/:terminal_sn/progress", h.GetTerminalRewardProgress)

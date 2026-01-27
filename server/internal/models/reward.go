@@ -97,16 +97,19 @@ func (RewardStage) TableName() string {
 }
 
 // ============================================================
-// 代理商奖励比例配置
+// 代理商奖励金额配置（差额分配模式）
 // ============================================================
 
-// AgentRewardRate 代理商奖励比例配置
+// AgentRewardRate 代理商奖励金额配置
+// 上级给下级配置的奖励金额，终端达标时下级拿配置金额，上级拿差额
+// 例如：A给B配置100元，B给C配置30元，C达标时：C得30，B得70（100-30）
 type AgentRewardRate struct {
-	ID         int64     `json:"id" gorm:"primaryKey"`
-	AgentID    int64     `json:"agent_id" gorm:"not null;uniqueIndex"`     // 代理商ID
-	RewardRate float64   `json:"reward_rate" gorm:"type:decimal(5,4)"`     // 奖励比例（0.10表示10%）
-	CreatedAt  time.Time `json:"created_at" gorm:"default:now()"`
-	UpdatedAt  time.Time `json:"updated_at" gorm:"default:now()"`
+	ID           int64     `json:"id" gorm:"primaryKey"`
+	AgentID      int64     `json:"agent_id" gorm:"not null;index"`                          // 代理商ID
+	TemplateID   int64     `json:"template_id" gorm:"not null;index"`                       // 奖励模版ID
+	RewardAmount int64     `json:"reward_amount" gorm:"not null"`                           // 奖励金额（分）
+	CreatedAt    time.Time `json:"created_at" gorm:"default:now()"`
+	UpdatedAt    time.Time `json:"updated_at" gorm:"default:now()"`
 }
 
 // TableName 表名
@@ -356,10 +359,11 @@ type RewardTemplateDetail struct {
 	Stages []*RewardStage `json:"stages"`
 }
 
-// AgentRewardRateRequest 代理商奖励比例请求
+// AgentRewardRateRequest 代理商奖励金额配置请求
 type AgentRewardRateRequest struct {
-	AgentID    int64   `json:"agent_id" binding:"required"`
-	RewardRate float64 `json:"reward_rate" binding:"required,min=0,max=1"`
+	AgentID      int64 `json:"agent_id" binding:"required"`
+	TemplateID   int64 `json:"template_id" binding:"required"`
+	RewardAmount int64 `json:"reward_amount" binding:"min=0"` // 奖励金额（分）
 }
 
 // TerminalRewardProgressDetail 终端奖励进度详情
