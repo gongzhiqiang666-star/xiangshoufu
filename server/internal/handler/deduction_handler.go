@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"xiangshoufu/internal/models"
 	"xiangshoufu/internal/service"
@@ -404,6 +405,331 @@ func (h *DeductionHandler) ExecuteDailyDeduction(c *gin.Context) {
 	})
 }
 
+// CreateDeductionPlanWithAcceptRequest 创建需要确认的代扣计划请求
+type CreateDeductionPlanWithAcceptRequest struct {
+	DeductorID      int64  `json:"deductor_id" binding:"required"`      // 扣款方代理商ID
+	DeducteeID      int64  `json:"deductee_id" binding:"required"`      // 被扣款方代理商ID
+	PlanType        int16  `json:"plan_type" binding:"required"`        // 计划类型
+	TotalAmount     int64  `json:"total_amount" binding:"required"`     // 总金额（分）
+	TotalPeriods    int    `json:"total_periods" binding:"required"`    // 总期数
+	DeductionSource int16  `json:"deduction_source" binding:"required"` // 扣款来源：1分润 2服务费 3两者
+	Remark          string `json:"remark"`                              // 备注
+}
+
+// CreateDeductionPlanWithAccept 创建需要接收确认的代扣计划
+// @Summary 创建需要接收确认的代扣计划
+// @Description 创建代扣计划，被扣款方需要确认后才会开始冻结和扣款
+// @Tags 代扣管理
+// @Accept json
+// @Produce json
+// @Param request body CreateDeductionPlanWithAcceptRequest true "创建代扣计划请求"
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/deduction/plans/with-accept [post]
+func (h *DeductionHandler) CreateDeductionPlanWithAccept(c *gin.Context) {
+	var req CreateDeductionPlanWithAcceptRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "参数错误: " + err.Error(),
+		})
+		return
+	}
+
+	createdBy := getCurrentUserID(c)
+
+	serviceReq := &models.CreateDeductionPlanWithAcceptRequest{
+		DeductorID:      req.DeductorID,
+		DeducteeID:      req.DeducteeID,
+		PlanType:        req.PlanType,
+		TotalAmount:     req.TotalAmount,
+		TotalPeriods:    req.TotalPeriods,
+		DeductionSource: req.DeductionSource,
+		Remark:          req.Remark,
+	}
+
+	plan, err := h.deductionService.CreateDeductionPlanWithAccept(serviceReq, createdBy)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "创建成功，等待对方确认",
+		"data":    plan,
+	})
+}
+
+// AcceptDeductionPlan 接收确认代扣计划
+// @Summary 接收确认代扣计划
+// @Description 被扣款方确认接收代扣计划，确认后开始冻结余额
+// @Tags 代扣管理
+// @Produce json
+// @Param id path int true "计划ID"
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/deduction/plans/{id}/accept [post]
+func (h *DeductionHandler) AcceptDeductionPlan(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "无效的ID",
+		})
+		return
+	}
+
+	// 获取当前登录的代理商ID
+	agentID := getCurrentAgentID(c)
+	if agentID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"code":    401,
+			"message": "未登录或无权操作",
+		})
+		return
+	}
+
+	if err := h.deductionService.AcceptDeductionPlan(id, agentID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "接收成功",
+	})
+}
+
+// RejectDeductionPlan 拒绝代扣计划
+// @Summary 拒绝代扣计划
+// @Description 被扣款方拒绝代扣计划
+// @Tags 代扣管理
+// @Produce json
+// @Param id path int true "计划ID"
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/deduction/plans/{id}/reject [post]
+func (h *DeductionHandler) RejectDeductionPlan(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "无效的ID",
+		})
+		return
+	}
+
+	// 获取当前登录的代理商ID
+	agentID := getCurrentAgentID(c)
+	if agentID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"code":    401,
+			"message": "未登录或无权操作",
+		})
+		return
+	}
+
+	if err := h.deductionService.RejectDeductionPlan(id, agentID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "已拒绝",
+	})
+}
+
+// GetReceivedDeductions 获取我接收的代扣列表
+// @Summary 获取我接收的代扣列表
+// @Description 获取当前代理商作为被扣款方的代扣计划列表
+// @Tags 代扣管理
+// @Produce json
+// @Param page query int false "页码" default(1)
+// @Param page_size query int false "每页数量" default(10)
+// @Param status query string false "状态筛选，多个用逗号分隔"
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/deduction/received [get]
+func (h *DeductionHandler) GetReceivedDeductions(c *gin.Context) {
+	agentID := getCurrentAgentID(c)
+	if agentID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"code":    401,
+			"message": "未登录",
+		})
+		return
+	}
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	statusStr := c.Query("status")
+
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 10
+	}
+
+	// 解析状态参数
+	var status []int16
+	if statusStr != "" {
+		for _, s := range splitAndTrim(statusStr, ",") {
+			if v, err := strconv.Atoi(s); err == nil {
+				status = append(status, int16(v))
+			}
+		}
+	}
+
+	plans, total, err := h.deductionService.GetReceivedPlans(agentID, status, page, pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "查询失败: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"list":      plans,
+			"total":     total,
+			"page":      page,
+			"page_size": pageSize,
+		},
+	})
+}
+
+// GetSentDeductions 获取我发起的代扣列表
+// @Summary 获取我发起的代扣列表
+// @Description 获取当前代理商作为扣款方发起的代扣计划列表
+// @Tags 代扣管理
+// @Produce json
+// @Param page query int false "页码" default(1)
+// @Param page_size query int false "每页数量" default(10)
+// @Param status query string false "状态筛选，多个用逗号分隔"
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/deduction/sent [get]
+func (h *DeductionHandler) GetSentDeductions(c *gin.Context) {
+	agentID := getCurrentAgentID(c)
+	if agentID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"code":    401,
+			"message": "未登录",
+		})
+		return
+	}
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	statusStr := c.Query("status")
+
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 10
+	}
+
+	// 解析状态参数
+	var status []int16
+	if statusStr != "" {
+		for _, s := range splitAndTrim(statusStr, ",") {
+			if v, err := strconv.Atoi(s); err == nil {
+				status = append(status, int16(v))
+			}
+		}
+	}
+
+	plans, total, err := h.deductionService.GetSentPlans(agentID, status, page, pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "查询失败: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"list":      plans,
+			"total":     total,
+			"page":      page,
+			"page_size": pageSize,
+		},
+	})
+}
+
+// GetDeductionSummary 获取代扣统计摘要
+// @Summary 获取代扣统计摘要
+// @Description 获取当前代理商作为被扣款方的代扣统计
+// @Tags 代扣管理
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/deduction/summary [get]
+func (h *DeductionHandler) GetDeductionSummary(c *gin.Context) {
+	agentID := getCurrentAgentID(c)
+	if agentID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"code":    401,
+			"message": "未登录",
+		})
+		return
+	}
+
+	summary, err := h.deductionService.GetDeductionSummary(agentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "获取统计失败: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    summary,
+	})
+}
+
+// splitAndTrim 分割字符串并去除空格
+func splitAndTrim(s, sep string) []string {
+	parts := make([]string, 0)
+	for _, p := range strings.Split(s, sep) {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			parts = append(parts, p)
+		}
+	}
+	return parts
+}
+
+// getCurrentAgentID 获取当前登录的代理商ID
+func getCurrentAgentID(c *gin.Context) int64 {
+	// 从JWT或session中获取代理商ID
+	// 这里假设已经通过中间件设置了agent_id
+	if agentID, exists := c.Get("agent_id"); exists {
+		if id, ok := agentID.(int64); ok {
+			return id
+		}
+	}
+	return 0
+}
+
 // GetDeductionStats 获取代扣统计
 // @Summary 获取代扣统计
 // @Description 获取代扣计划的统计数据
@@ -438,10 +764,18 @@ func RegisterDeductionRoutes(r *gin.RouterGroup, h *DeductionHandler) {
 		deduction.GET("/plans", h.ListDeductionPlans)
 		deduction.GET("/plans/stats", h.GetDeductionStats) // 统计接口必须在 :id 之前
 		deduction.POST("/plans", h.CreateDeductionPlan)
+		deduction.POST("/plans/with-accept", h.CreateDeductionPlanWithAccept) // 创建需确认的代扣
 		deduction.GET("/plans/:id", h.GetDeductionPlan)
 		deduction.POST("/plans/:id/pause", h.PauseDeductionPlan)
 		deduction.POST("/plans/:id/resume", h.ResumeDeductionPlan)
 		deduction.POST("/plans/:id/cancel", h.CancelDeductionPlan)
+		deduction.POST("/plans/:id/accept", h.AcceptDeductionPlan) // 接收确认
+		deduction.POST("/plans/:id/reject", h.RejectDeductionPlan) // 拒绝
+
+		// 我的代扣（代理商端）
+		deduction.GET("/received", h.GetReceivedDeductions) // 我接收的代扣
+		deduction.GET("/sent", h.GetSentDeductions)         // 我发起的代扣
+		deduction.GET("/summary", h.GetDeductionSummary)    // 代扣统计摘要
 
 		// 代扣链
 		deduction.POST("/chains", h.CreateDeductionChain)
@@ -468,6 +802,8 @@ func DeductionPlanTypeDesc(planType int16) string {
 // DeductionPlanStatusDesc 代扣计划状态描述
 func DeductionPlanStatusDesc(status int16) string {
 	switch status {
+	case models.DeductionPlanStatusPendingAccept:
+		return "待接收"
 	case models.DeductionPlanStatusActive:
 		return "进行中"
 	case models.DeductionPlanStatusCompleted:
@@ -476,6 +812,8 @@ func DeductionPlanStatusDesc(status int16) string {
 		return "已暂停"
 	case models.DeductionPlanStatusCancelled:
 		return "已取消"
+	case models.DeductionPlanStatusRejected:
+		return "已拒绝"
 	default:
 		return "未知状态"
 	}

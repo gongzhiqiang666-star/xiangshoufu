@@ -27,14 +27,13 @@ type Merchant struct {
 	UpdatedAt       time.Time  `json:"updated_at"`
 }
 
-// 商户类型常量
+// 商户类型常量（5档分类）
 const (
-	MerchantTypeLoyal     = "loyal"      // 忠诚商户: 月均交易 > 5万
-	MerchantTypeQuality   = "quality"    // 优质商户: 3万 ≤ 月均交易 < 5万
-	MerchantTypePotential = "potential"  // 潜力商户: 2万 ≤ 月均交易 < 3万
-	MerchantTypeNormal    = "normal"     // 一般商户: 1万 ≤ 月均交易 < 2万
-	MerchantTypeLowActive = "low_active" // 低活跃: 0 < 月均交易 < 1万
-	MerchantTypeInactive  = "inactive"   // 30天无交易
+	MerchantTypeQuality = "quality" // 优质: 月均交易 ≥ 5万
+	MerchantTypeMedium  = "medium"  // 中等: 3万 ≤ 月均交易 < 5万
+	MerchantTypeNormal  = "normal"  // 普通: 月均交易 < 3万（有交易）
+	MerchantTypeWarning = "warning" // 预警: 30天无交易
+	MerchantTypeChurned = "churned" // 流失: 60天无交易
 )
 
 // 商户状态常量

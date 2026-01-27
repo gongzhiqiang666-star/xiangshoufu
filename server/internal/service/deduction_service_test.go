@@ -355,6 +355,53 @@ func (m *MockWalletRepository) BatchUpdateBalance(updates map[int64]int64) error
 	return nil
 }
 
+func (m *MockWalletRepository) UpdateFrozenAmount(id int64, amount int64) error {
+	if wallet, ok := m.wallets[id]; ok {
+		wallet.FrozenAmount += amount
+	}
+	return nil
+}
+
+// MockDeductionFreezeLogRepository 模拟代扣冻结日志仓库
+type MockDeductionFreezeLogRepository struct {
+	logs   map[int64]*models.DeductionFreezeLog
+	nextID int64
+}
+
+func NewMockDeductionFreezeLogRepository() *MockDeductionFreezeLogRepository {
+	return &MockDeductionFreezeLogRepository{
+		logs:   make(map[int64]*models.DeductionFreezeLog),
+		nextID: 1,
+	}
+}
+
+func (m *MockDeductionFreezeLogRepository) Create(log *models.DeductionFreezeLog) error {
+	log.ID = m.nextID
+	m.nextID++
+	m.logs[log.ID] = log
+	return nil
+}
+
+func (m *MockDeductionFreezeLogRepository) FindByPlanID(planID int64) ([]*models.DeductionFreezeLog, error) {
+	var result []*models.DeductionFreezeLog
+	for _, log := range m.logs {
+		if log.PlanID == planID {
+			result = append(result, log)
+		}
+	}
+	return result, nil
+}
+
+func (m *MockDeductionFreezeLogRepository) FindByAgentID(agentID int64, limit, offset int) ([]*models.DeductionFreezeLog, int64, error) {
+	var result []*models.DeductionFreezeLog
+	for _, log := range m.logs {
+		if log.AgentID == agentID {
+			result = append(result, log)
+		}
+	}
+	return result, int64(len(result)), nil
+}
+
 // MockWalletLogRepository 模拟钱包流水仓库
 type MockWalletLogRepository struct {
 	logs   []*repository.WalletLog
@@ -463,6 +510,7 @@ func TestCreateDeductionPlan_Success(t *testing.T) {
 
 	service := NewDeductionService(
 		planRepo, recordRepo, chainRepo, chainItemRepo,
+		NewMockDeductionFreezeLogRepository(),
 		walletRepo, walletLogRepo, agentRepo,
 	)
 
@@ -529,6 +577,7 @@ func TestCreateDeductionPlan_PartnerDeduction_AnyAgent(t *testing.T) {
 
 	service := NewDeductionService(
 		planRepo, recordRepo, chainRepo, chainItemRepo,
+		NewMockDeductionFreezeLogRepository(),
 		walletRepo, walletLogRepo, agentRepo,
 	)
 
@@ -580,6 +629,7 @@ func TestCreateDeductionPlan_InvalidAgent(t *testing.T) {
 
 	service := NewDeductionService(
 		planRepo, recordRepo, chainRepo, chainItemRepo,
+		NewMockDeductionFreezeLogRepository(),
 		walletRepo, walletLogRepo, agentRepo,
 	)
 
@@ -614,6 +664,7 @@ func TestPauseAndResumeDeductionPlan(t *testing.T) {
 
 	service := NewDeductionService(
 		planRepo, recordRepo, chainRepo, chainItemRepo,
+		NewMockDeductionFreezeLogRepository(),
 		walletRepo, walletLogRepo, agentRepo,
 	)
 
@@ -666,6 +717,7 @@ func TestCancelDeductionPlan(t *testing.T) {
 
 	service := NewDeductionService(
 		planRepo, recordRepo, chainRepo, chainItemRepo,
+		NewMockDeductionFreezeLogRepository(),
 		walletRepo, walletLogRepo, agentRepo,
 	)
 
@@ -709,6 +761,7 @@ func TestCreateDeductionChain_CrossLevel(t *testing.T) {
 
 	service := NewDeductionService(
 		planRepo, recordRepo, chainRepo, chainItemRepo,
+		NewMockDeductionFreezeLogRepository(),
 		walletRepo, walletLogRepo, agentRepo,
 	)
 
@@ -761,6 +814,7 @@ func TestCreateDeductionChain_MinimumAgents(t *testing.T) {
 
 	service := NewDeductionService(
 		planRepo, recordRepo, chainRepo, chainItemRepo,
+		NewMockDeductionFreezeLogRepository(),
 		walletRepo, walletLogRepo, agentRepo,
 	)
 

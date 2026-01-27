@@ -7,7 +7,7 @@ import type {
   PaginatedResponse,
 } from '@/types'
 
-// 扩展统计类型
+// 扩展统计类型（5档分类）
 export interface ExtendedMerchantStats {
   total_count: number
   active_count: number
@@ -16,12 +16,11 @@ export interface ExtendedMerchantStats {
   direct_count: number
   team_count: number
   today_new_count: number
-  loyal_count: number
-  quality_count: number
-  potential_count: number
-  normal_count: number
-  low_active_count: number
-  inactive_count: number
+  quality_count: number   // 优质
+  medium_count: number    // 中等
+  normal_count: number    // 普通
+  warning_count: number   // 预警
+  churned_count: number   // 流失
 }
 
 /**

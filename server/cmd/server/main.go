@@ -142,11 +142,13 @@ func main() {
 	deductionChainRepo := repository.NewGormDeductionChainRepository(db)
 	deductionChainItemRepo := repository.NewGormDeductionChainItemRepository(db)
 
+	deductionFreezeLogRepo := repository.NewGormDeductionFreezeLogRepository(db)
 	deductionService := service.NewDeductionService(
 		deductionPlanRepo,
 		deductionRecordRepo,
 		deductionChainRepo,
 		deductionChainItemRepo,
+		deductionFreezeLogRepo,
 		walletRepo,
 		walletLogRepo,
 		agentRepo,
@@ -254,6 +256,7 @@ func main() {
 	merchantService := service.NewMerchantService(merchantRepo, agentRepo, transactionRepo, terminalRepo)
 	merchantHandler := handler.NewMerchantHandler(merchantRepo, transactionRepo, merchantService)
 	terminalHandler := handler.NewTerminalHandler(terminalRepo, transactionRepo, terminalService)
+	terminalRateHandler := handler.NewTerminalRateHandler(terminalService)
 
 	// 16.1 初始化费率同步服务和Handler
 	rateSyncLogRepo := repository.NewGormRateSyncLogRepository(db)
@@ -357,6 +360,25 @@ func main() {
 	)
 	settlementWalletHandler := handler.NewSettlementWalletHandler(settlementWalletService)
 
+	// 20.3.1 初始化钱包拆分配置服务
+	walletSplitConfigRepo := repository.NewGormWalletSplitConfigRepository(db)
+	withdrawThresholdRepo := repository.NewGormPolicyWithdrawThresholdRepository(db)
+	withdrawRepo := repository.NewGormWithdrawRepository(db)
+	walletSplitService := service.NewWalletSplitService(
+		walletSplitConfigRepo,
+		withdrawThresholdRepo,
+		agentRepo,
+		walletRepo,
+		agentPolicyRepo,
+		withdrawRepo,
+	)
+	walletSplitHandler := handler.NewWalletSplitHandler(walletSplitService)
+
+	// 注入拆分配置仓库到钱包服务（用于展示逻辑）
+	walletService.SetSplitConfigRepo(walletSplitConfigRepo)
+	walletService.SetThresholdRepo(withdrawThresholdRepo)
+	walletService.SetAgentPolicyRepo(agentPolicyRepo)
+
 	// 20.4 初始化税筹通道服务
 	taxChannelRepo := repository.NewGormTaxChannelRepository(db)
 	taxChannelService := service.NewTaxChannelService(taxChannelRepo)
@@ -427,6 +449,26 @@ func main() {
 	// 21.3 初始化奖励Handler
 	rewardHandler := handler.NewRewardHandler(rewardService)
 
+	// 21.4 初始化结算价相关Repository、Service、Handler
+	settlementPriceRepo := repository.NewGormSettlementPriceRepository(db)
+	agentRewardSettingRepo := repository.NewGormAgentRewardSettingRepository(db)
+	priceChangeLogRepo := repository.NewGormPriceChangeLogRepository(db)
+
+	settlementPriceService := service.NewSettlementPriceService(
+		settlementPriceRepo,
+		priceChangeLogRepo,
+		db,
+	)
+	agentRewardSettingService := service.NewAgentRewardSettingService(
+		agentRewardSettingRepo,
+		priceChangeLogRepo,
+	)
+	priceChangeLogService := service.NewPriceChangeLogService(priceChangeLogRepo)
+
+	settlementPriceHandler := handler.NewSettlementPriceHandler(settlementPriceService, priceChangeLogService)
+	agentRewardSettingHandler := handler.NewAgentRewardSettingHandler(agentRewardSettingService, priceChangeLogService)
+	priceChangeLogHandler := handler.NewPriceChangeLogHandler(priceChangeLogService)
+
 	// 添加depositCashbackService到定时任务
 	_ = depositCashbackService // 将在后续定时任务中使用
 
@@ -458,14 +500,16 @@ func main() {
 		goodsDeductionHandler,
 		authHandler, agentHandler, walletHandler, transactionHandler, profitHandler, dashboardHandler, messageHandler,
 		adminMessageHandler,
-		merchantHandler, terminalHandler, policyHandler, agentChannelHandler,
+		merchantHandler, terminalHandler, terminalRateHandler, policyHandler, agentChannelHandler,
 		chargingWalletHandler, settlementWalletHandler, taxChannelHandler,
+		walletSplitHandler, // 新增：钱包拆分配置Handler
 		channelHandler, // 新增：通道费率类型Handler
 		uploadHandler, bannerHandler, posterHandler,
 		jobHandler, alertHandler, // 新增：任务管理和告警Handler
 		analyticsHandler,         // 新增：分析统计Handler
 		rateSyncHandler,          // 新增：费率同步Handler
 		rewardHandler,            // 新增：奖励模块Handler
+		settlementPriceHandler, agentRewardSettingHandler, priceChangeLogHandler, // 新增：结算价相关Handler
 		authService, metricsService, config.SwaggerEnabled,
 	)
 
@@ -708,11 +752,13 @@ func setupRouter(
 	adminMessageHandler *handler.AdminMessageHandler,
 	merchantHandler *handler.MerchantHandler,
 	terminalHandler *handler.TerminalHandler,
+	terminalRateHandler *handler.TerminalRateHandler,
 	policyHandler *handler.PolicyHandler,
 	agentChannelHandler *handler.AgentChannelHandler,
 	chargingWalletHandler *handler.ChargingWalletHandler,
 	settlementWalletHandler *handler.SettlementWalletHandler,
 	taxChannelHandler *handler.TaxChannelHandler,
+	walletSplitHandler *handler.WalletSplitHandler, // 新增：钱包拆分配置Handler
 	channelHandler *handler.ChannelHandler, // 新增：通道费率类型Handler
 	uploadHandler *handler.UploadHandler,
 	bannerHandler *handler.BannerHandler,
@@ -722,6 +768,9 @@ func setupRouter(
 	analyticsHandler *handler.AnalyticsHandler,
 	rateSyncHandler *handler.RateSyncHandler,
 	rewardHandler *handler.RewardHandler, // 新增：奖励模块Handler
+	settlementPriceHandler *handler.SettlementPriceHandler, // 新增：结算价Handler
+	agentRewardSettingHandler *handler.AgentRewardSettingHandler, // 新增：代理商奖励配置Handler
+	priceChangeLogHandler *handler.PriceChangeLogHandler, // 新增：调价记录Handler
 	authService *service.AuthService,
 	metricsService *service.MetricsService,
 	swaggerEnabled bool,
@@ -806,6 +855,7 @@ func setupRouter(
 		// 注册商户、终端、政策路由
 		handler.RegisterMerchantRoutes(apiV1, merchantHandler, authService)
 		handler.RegisterTerminalRoutes(apiV1, terminalHandler, authService)
+		handler.RegisterTerminalRateRoutes(apiV1, terminalRateHandler, authService)
 		handler.RegisterPolicyRoutes(apiV1, policyHandler, authService)
 
 		// 注册代理商通道路由
@@ -815,6 +865,7 @@ func setupRouter(
 		handler.RegisterChargingWalletRoutes(apiV1, chargingWalletHandler, authService)
 		handler.RegisterSettlementWalletRoutes(apiV1, settlementWalletHandler, authService)
 		handler.RegisterTaxChannelRoutes(apiV1, taxChannelHandler, authService)
+		handler.RegisterWalletSplitRoutes(apiV1, walletSplitHandler, authService) // 新增：钱包拆分配置路由
 
 		// 注册营销模块路由（Banner、海报、上传）
 		handler.RegisterUploadRoutes(apiV1, uploadHandler, authService)
@@ -847,6 +898,11 @@ func setupRouter(
 
 		// 注册奖励管理路由
 		handler.RegisterRewardRoutes(apiV1, rewardHandler, authService)
+
+		// 注册结算价管理路由
+		handler.RegisterSettlementPriceRoutes(apiV1, settlementPriceHandler, authService)
+		handler.RegisterAgentRewardSettingRoutes(apiV1, agentRewardSettingHandler, authService)
+		handler.RegisterPriceChangeLogRoutes(apiV1, priceChangeLogHandler, authService)
 	}
 
 	// Swagger UI (可通过环境变量关闭)

@@ -318,3 +318,45 @@ func (r *GormDeductionChainItemRepository) UpdateStatus(id int64, status int16) 
 }
 
 var _ DeductionChainItemRepository = (*GormDeductionChainItemRepository)(nil)
+
+// DeductionFreezeLogRepository 代扣冻结日志仓库接口
+type DeductionFreezeLogRepository interface {
+	Create(log *models.DeductionFreezeLog) error
+	FindByPlanID(planID int64) ([]*models.DeductionFreezeLog, error)
+	FindByAgentID(agentID int64, limit, offset int) ([]*models.DeductionFreezeLog, int64, error)
+}
+
+// GormDeductionFreezeLogRepository GORM实现
+type GormDeductionFreezeLogRepository struct {
+	db *gorm.DB
+}
+
+func NewGormDeductionFreezeLogRepository(db *gorm.DB) *GormDeductionFreezeLogRepository {
+	return &GormDeductionFreezeLogRepository{db: db}
+}
+
+func (r *GormDeductionFreezeLogRepository) Create(log *models.DeductionFreezeLog) error {
+	return r.db.Create(log).Error
+}
+
+func (r *GormDeductionFreezeLogRepository) FindByPlanID(planID int64) ([]*models.DeductionFreezeLog, error) {
+	var logs []*models.DeductionFreezeLog
+	err := r.db.Where("plan_id = ?", planID).Order("created_at DESC").Find(&logs).Error
+	return logs, err
+}
+
+func (r *GormDeductionFreezeLogRepository) FindByAgentID(agentID int64, limit, offset int) ([]*models.DeductionFreezeLog, int64, error) {
+	var logs []*models.DeductionFreezeLog
+	var total int64
+
+	query := r.db.Model(&models.DeductionFreezeLog{}).Where("agent_id = ?", agentID)
+	err := query.Count(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	err = query.Order("created_at DESC").Limit(limit).Offset(offset).Find(&logs).Error
+	return logs, total, err
+}
+
+var _ DeductionFreezeLogRepository = (*GormDeductionFreezeLogRepository)(nil)

@@ -22,7 +22,8 @@ type ProfitService struct {
 	messageService    *MessageService
 	queue             async.MessageQueue
 	rateStagingService *RateStagingService // 费率阶梯服务
-	goodsDeductionService *GoodsDeductionService // 货款代扣服务
+	goodsDeductionService *GoodsDeductionService // 货款代扣服务（保留兼容）
+	deductionService *DeductionService // 统一代扣服务
 }
 
 // NewProfitService 创建分润服务
@@ -56,6 +57,11 @@ func (s *ProfitService) SetRateStagingService(rss *RateStagingService) {
 // SetGoodsDeductionService 设置货款代扣服务（延迟注入，避免循环依赖）
 func (s *ProfitService) SetGoodsDeductionService(gds *GoodsDeductionService) {
 	s.goodsDeductionService = gds
+}
+
+// SetDeductionService 设置统一代扣服务（延迟注入，避免循环依赖）
+func (s *ProfitService) SetDeductionService(ds *DeductionService) {
+	s.deductionService = ds
 }
 
 // ProcessMessage 处理分润计算消息
@@ -179,14 +185,30 @@ func (s *ProfitService) CalculateProfit(txID int64) error {
 		}
 	}
 
-	// 7.1 触发货款代扣（实时扣款）
-	if s.goodsDeductionService != nil && len(profitRecords) > 0 {
+	// 7.1 触发代扣冻结（替代原实时扣款）
+	// 优先使用统一代扣服务，如果未注入则使用旧的货款代扣服务
+	if s.deductionService != nil && len(profitRecords) > 0 {
 		for _, record := range profitRecords {
-			// 触发该代理商的货款代扣
-			deducted, err := s.goodsDeductionService.TriggerRealtimeDeduction(
+			// 触发该代理商的代扣冻结
+			frozen, err := s.deductionService.FreezeOnIncome(
 				record.AgentID,
 				record.ChannelID,
 				int16(record.WalletType), // 分润钱包
+				record.ProfitAmount,
+			)
+			if err != nil {
+				log.Printf("[ProfitService] Trigger deduction freeze failed for agent %d: %v", record.AgentID, err)
+			} else if frozen > 0 {
+				log.Printf("[ProfitService] Deduction freeze triggered: agent=%d, frozen=%d", record.AgentID, frozen)
+			}
+		}
+	} else if s.goodsDeductionService != nil && len(profitRecords) > 0 {
+		// 兼容旧的货款代扣服务
+		for _, record := range profitRecords {
+			deducted, err := s.goodsDeductionService.TriggerRealtimeDeduction(
+				record.AgentID,
+				record.ChannelID,
+				int16(record.WalletType),
 				record.ProfitAmount,
 				"profit_income",
 				&tx.ID,

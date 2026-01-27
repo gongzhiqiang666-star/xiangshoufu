@@ -256,3 +256,75 @@ export interface SettlementUsageQueryParams {
   page_size?: number
 }
 
+// ========== 钱包拆分相关类型 ==========
+
+// 代理商钱包拆分配置
+export interface AgentWalletSplitConfig {
+  id?: number
+  agent_id: number
+  split_by_channel: boolean
+  configured_by?: number
+  configured_at?: string
+  created_at?: string
+  updated_at?: string
+}
+
+// 政策模版提现门槛配置
+export interface PolicyWithdrawThreshold {
+  id?: number
+  template_id: number
+  wallet_type: number // 1=分润 2=服务费 3=奖励
+  channel_id: number // 0=通用
+  threshold_amount: number // 分
+  created_at?: string
+  updated_at?: string
+}
+
+// 子钱包（按通道拆分时的二级钱包）
+export interface SubWallet {
+  channel_id: number
+  channel_name: string
+  balance: number
+  frozen_amount: number
+  withdraw_threshold: number
+  can_withdraw: boolean
+}
+
+// 钱包展示（支持拆分模式）
+export interface WalletDisplay {
+  wallet_type: number
+  wallet_type_name: string
+  balance: number
+  frozen_amount: number
+  total_income: number
+  total_withdraw: number
+  withdraw_threshold: number
+  can_withdraw: boolean
+  sub_wallets?: SubWallet[]
+}
+
+// 钱包列表响应（支持拆分模式）
+export interface WalletListWithSplitResponse {
+  split_by_channel: boolean
+  wallets: WalletDisplay[]
+}
+
+// 设置拆分配置请求
+export interface SetSplitConfigRequest {
+  split_by_channel: boolean
+}
+
+// 设置提现门槛请求
+export interface SetWithdrawThresholdRequest {
+  wallet_type: number
+  channel_id: number
+  threshold_amount: number
+}
+
+// 带通道的提现请求
+export interface WithdrawWithChannelRequest {
+  wallet_id: number
+  channel_id?: number // 拆分模式下必填
+  amount: number
+}
+

@@ -159,6 +159,7 @@ type WalletRepository interface {
 	FindByAgentAndType(agentID int64, channelID int64, walletType int16) (*Wallet, error)
 	UpdateBalance(id int64, amount int64) error
 	BatchUpdateBalance(updates map[int64]int64) error
+	UpdateFrozenAmount(id int64, amount int64) error // 更新冻结金额（正数增加，负数减少）
 }
 
 // Wallet 钱包模型

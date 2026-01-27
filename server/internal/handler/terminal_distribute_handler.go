@@ -257,18 +257,6 @@ func RegisterTerminalDistributeRoutes(r *gin.RouterGroup, h *TerminalDistributeH
 	}
 }
 
-// getCurrentAgentID 获取当前代理商ID
-func getCurrentAgentID(c *gin.Context) int64 {
-	agentID, exists := c.Get("agent_id")
-	if !exists {
-		return 0
-	}
-	if id, ok := agentID.(int64); ok {
-		return id
-	}
-	return 0
-}
-
 // getRequestSource 获取请求来源
 func getRequestSource(c *gin.Context) int16 {
 	// 根据User-Agent或特定header判断来源

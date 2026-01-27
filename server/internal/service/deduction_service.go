@@ -12,16 +12,20 @@ import (
 	"xiangshoufu/internal/repository"
 )
 
-// DeductionService 代扣服务
+// DeductionService 代扣服务（统一代扣管理）
 // 业务规则：
-// - Q6: 伙伴代扣 - 任意代理商之间都可以发起（不限层级关系）
-// - Q7: 每日扣款 - 每天固定时间检查余额并扣款
-// - Q8: 多钱包扣款优先级 - 按余额从多到少扣
+// - 合并货款代扣和伙伴代扣为统一的代扣管理
+// - 接收确认: 下级需确认后代扣才生效并开始冻结
+// - 冻结时机: 接收确认后开始冻结现有余额，后续入账时继续冻结
+// - 扣款频率: 每天一次（8:00执行）
+// - 扣款优先级: 按创建时间先后（FIFO）
+// - 冻结上限: 冻结金额 ≤ 剩余待扣金额
 type DeductionService struct {
 	planRepo      repository.DeductionPlanRepository
 	recordRepo    repository.DeductionRecordRepository
 	chainRepo     repository.DeductionChainRepository
 	chainItemRepo repository.DeductionChainItemRepository
+	freezeLogRepo repository.DeductionFreezeLogRepository
 	walletRepo    repository.WalletRepository
 	walletLogRepo repository.WalletLogRepository
 	agentRepo     repository.AgentRepository
@@ -33,6 +37,7 @@ func NewDeductionService(
 	recordRepo repository.DeductionRecordRepository,
 	chainRepo repository.DeductionChainRepository,
 	chainItemRepo repository.DeductionChainItemRepository,
+	freezeLogRepo repository.DeductionFreezeLogRepository,
 	walletRepo repository.WalletRepository,
 	walletLogRepo repository.WalletLogRepository,
 	agentRepo repository.AgentRepository,
@@ -42,6 +47,7 @@ func NewDeductionService(
 		recordRepo:    recordRepo,
 		chainRepo:     chainRepo,
 		chainItemRepo: chainItemRepo,
+		freezeLogRepo: freezeLogRepo,
 		walletRepo:    walletRepo,
 		walletLogRepo: walletLogRepo,
 		agentRepo:     agentRepo,
@@ -209,10 +215,10 @@ type WalletInfo struct {
 	WalletType int16
 }
 
-// ExecuteDailyDeduction 执行每日扣款
-// 业务规则：每天固定时间检查余额并扣款
+// ExecuteDailyDeduction 执行每日扣款（使用冻结机制）
+// 业务规则：从冻结金额中扣款，而非直接从余额扣
 func (s *DeductionService) ExecuteDailyDeduction() error {
-	log.Printf("[DeductionService] Starting daily deduction job...")
+	log.Printf("[DeductionService] Starting daily deduction job with freeze mechanism...")
 
 	// 获取今天待扣款的记录
 	now := time.Now()
@@ -227,7 +233,8 @@ func (s *DeductionService) ExecuteDailyDeduction() error {
 	failCount := 0
 
 	for _, record := range pendingRecords {
-		if err := s.executeDeduction(record); err != nil {
+		// 使用新的冻结扣款方法
+		if err := s.ExecuteDeductionWithUnfreeze(record); err != nil {
 			log.Printf("[DeductionService] Deduction failed for record %d: %v", record.ID, err)
 			failCount++
 		} else {
@@ -648,4 +655,544 @@ func (s *DeductionService) GetAgentPathBetween(fromAgentID, toAgentID int64) ([]
 	}
 
 	return agentPath, nil
+}
+
+// CreateDeductionPlanWithAccept 创建需要接收确认的代扣计划
+func (s *DeductionService) CreateDeductionPlanWithAccept(req *models.CreateDeductionPlanWithAcceptRequest, createdBy int64) (*models.DeductionPlan, error) {
+	// 验证扣款方和被扣款方是否存在
+	deductor, err := s.agentRepo.FindByID(req.DeductorID)
+	if err != nil || deductor == nil {
+		return nil, fmt.Errorf("扣款方代理商不存在: %d", req.DeductorID)
+	}
+
+	deductee, err := s.agentRepo.FindByID(req.DeducteeID)
+	if err != nil || deductee == nil {
+		return nil, fmt.Errorf("被扣款方代理商不存在: %d", req.DeducteeID)
+	}
+
+	// 验证扣款来源
+	if req.DeductionSource < 1 || req.DeductionSource > 3 {
+		return nil, fmt.Errorf("无效的扣款来源")
+	}
+
+	// 计算每期金额
+	periodAmount := req.TotalAmount / int64(req.TotalPeriods)
+	if periodAmount <= 0 {
+		return nil, fmt.Errorf("每期金额必须大于0")
+	}
+
+	// 生成计划编号
+	planNo := fmt.Sprintf("DP%s%06d", time.Now().Format("20060102150405"), time.Now().UnixNano()%1000000)
+
+	plan := &models.DeductionPlan{
+		PlanNo:          planNo,
+		DeductorID:      req.DeductorID,
+		DeducteeID:      req.DeducteeID,
+		PlanType:        req.PlanType,
+		TotalAmount:     req.TotalAmount,
+		DeductedAmount:  0,
+		RemainingAmount: req.TotalAmount,
+		TotalPeriods:    req.TotalPeriods,
+		CurrentPeriod:   0,
+		PeriodAmount:    periodAmount,
+		Status:          models.DeductionPlanStatusPendingAccept, // 待接收状态
+		NeedAccept:      true,
+		DeductionSource: req.DeductionSource,
+		Remark:          req.Remark,
+		CreatedBy:       createdBy,
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
+	}
+
+	if err := s.planRepo.Create(plan); err != nil {
+		return nil, fmt.Errorf("创建代扣计划失败: %w", err)
+	}
+
+	log.Printf("[DeductionService] Created deduction plan with accept: %s, deductor: %d, deductee: %d, amount: %d",
+		planNo, req.DeductorID, req.DeducteeID, req.TotalAmount)
+
+	return plan, nil
+}
+
+// AcceptDeductionPlan 接收确认代扣计划，触发初始冻结
+func (s *DeductionService) AcceptDeductionPlan(planID int64, agentID int64) error {
+	plan, err := s.planRepo.FindByID(planID)
+	if err != nil || plan == nil {
+		return fmt.Errorf("代扣计划不存在: %d", planID)
+	}
+
+	// 验证是否为被扣款方
+	if plan.DeducteeID != agentID {
+		return fmt.Errorf("无权操作此代扣计划")
+	}
+
+	// 验证状态
+	if plan.Status != models.DeductionPlanStatusPendingAccept {
+		return fmt.Errorf("代扣计划状态不允许接收")
+	}
+
+	// 更新状态为进行中
+	now := time.Now()
+	plan.Status = models.DeductionPlanStatusActive
+	plan.AcceptedAt = &now
+	plan.UpdatedAt = now
+
+	if err := s.planRepo.Update(plan); err != nil {
+		return fmt.Errorf("更新状态失败: %w", err)
+	}
+
+	// 触发初始冻结（冻结现有余额）
+	frozenAmount, err := s.freezeExistingBalance(plan)
+	if err != nil {
+		log.Printf("[DeductionService] Initial freeze failed for plan %d: %v", planID, err)
+	} else {
+		log.Printf("[DeductionService] Initial freeze completed for plan %d, frozen: %d", planID, frozenAmount)
+	}
+
+	// 生成代扣记录（按期数）
+	if err := s.generateDeductionRecords(plan); err != nil {
+		log.Printf("[DeductionService] Generate deduction records failed: %v", err)
+	}
+
+	log.Printf("[DeductionService] Accepted deduction plan: %d, agent: %d", planID, agentID)
+
+	return nil
+}
+
+// RejectDeductionPlan 拒绝代扣计划
+func (s *DeductionService) RejectDeductionPlan(planID int64, agentID int64) error {
+	plan, err := s.planRepo.FindByID(planID)
+	if err != nil || plan == nil {
+		return fmt.Errorf("代扣计划不存在: %d", planID)
+	}
+
+	// 验证是否为被扣款方
+	if plan.DeducteeID != agentID {
+		return fmt.Errorf("无权操作此代扣计划")
+	}
+
+	// 验证状态
+	if plan.Status != models.DeductionPlanStatusPendingAccept {
+		return fmt.Errorf("代扣计划状态不允许拒绝")
+	}
+
+	// 更新状态为已拒绝
+	if err := s.planRepo.UpdateStatus(planID, models.DeductionPlanStatusRejected); err != nil {
+		return fmt.Errorf("更新状态失败: %w", err)
+	}
+
+	log.Printf("[DeductionService] Rejected deduction plan: %d, agent: %d", planID, agentID)
+
+	return nil
+}
+
+// freezeExistingBalance 冻结现有余额
+func (s *DeductionService) freezeExistingBalance(plan *models.DeductionPlan) (int64, error) {
+	// 获取被扣款方的所有钱包
+	wallets, err := s.getAgentWalletsForDeduction(plan.DeducteeID, plan.DeductionSource)
+	if err != nil {
+		return 0, fmt.Errorf("获取钱包失败: %w", err)
+	}
+
+	var totalFrozen int64
+	remainingToFreeze := plan.RemainingAmount - plan.FrozenAmount
+
+	for _, wallet := range wallets {
+		if remainingToFreeze <= 0 {
+			break
+		}
+
+		// 计算可冻结金额（钱包余额 - 已冻结金额）
+		availableToFreeze := wallet.Balance - wallet.FrozenAmount
+		if availableToFreeze <= 0 {
+			continue
+		}
+
+		freezeAmount := availableToFreeze
+		if freezeAmount > remainingToFreeze {
+			freezeAmount = remainingToFreeze
+		}
+
+		// 更新钱包冻结金额
+		if err := s.walletRepo.UpdateFrozenAmount(wallet.ID, freezeAmount); err != nil {
+			log.Printf("[DeductionService] Freeze wallet %d failed: %v", wallet.ID, err)
+			continue
+		}
+
+		// 更新计划冻结金额
+		plan.FrozenAmount += freezeAmount
+		if err := s.planRepo.Update(plan); err != nil {
+			log.Printf("[DeductionService] Update plan frozen amount failed: %v", err)
+		}
+
+		// 记录冻结日志
+		freezeLog := &models.DeductionFreezeLog{
+			PlanID:       plan.ID,
+			AgentID:      plan.DeducteeID,
+			WalletID:     wallet.ID,
+			WalletType:   wallet.WalletType,
+			ChannelID:    wallet.ChannelID,
+			FreezeAmount: freezeAmount,
+			TotalFrozen:  plan.FrozenAmount,
+			TriggerType:  models.DeductionFreezeTriggerTypeAccept,
+			CreatedAt:    time.Now(),
+		}
+		s.freezeLogRepo.Create(freezeLog)
+
+		totalFrozen += freezeAmount
+		remainingToFreeze -= freezeAmount
+	}
+
+	return totalFrozen, nil
+}
+
+// getAgentWalletsForDeduction 获取代理商钱包用于代扣（按扣款来源过滤）
+func (s *DeductionService) getAgentWalletsForDeduction(agentID int64, deductionSource int16) ([]*repository.Wallet, error) {
+	wallets := make([]*repository.Wallet, 0)
+
+	// 根据扣款来源确定钱包类型
+	var walletTypes []int16
+	switch deductionSource {
+	case models.DeductionSourceProfit:
+		walletTypes = []int16{models.WalletTypeProfit}
+	case models.DeductionSourceServiceFee:
+		walletTypes = []int16{models.WalletTypeServiceFee}
+	case models.DeductionSourceBoth:
+		walletTypes = []int16{models.WalletTypeProfit, models.WalletTypeServiceFee} // 优先分润
+	default:
+		walletTypes = []int16{models.WalletTypeProfit, models.WalletTypeServiceFee}
+	}
+
+	// 获取所有通道的钱包
+	channelIDs := []int64{1} // TODO: 从数据库获取所有通道
+
+	for _, channelID := range channelIDs {
+		for _, walletType := range walletTypes {
+			wallet, err := s.walletRepo.FindByAgentAndType(agentID, channelID, walletType)
+			if err == nil && wallet != nil && wallet.Balance > 0 {
+				wallets = append(wallets, wallet)
+			}
+		}
+	}
+
+	return wallets, nil
+}
+
+// FreezeOnIncome 入账时触发冻结（替代原实时扣款）
+// 当代理商有分润或服务费入账时调用此方法
+func (s *DeductionService) FreezeOnIncome(agentID int64, channelID int64, walletType int16, incomeAmount int64) (int64, error) {
+	// 获取该代理商所有进行中的代扣计划
+	plans, _, err := s.planRepo.FindByDeductee(agentID, []int16{models.DeductionPlanStatusActive}, 100, 0)
+	if err != nil {
+		return 0, fmt.Errorf("查询代扣计划失败: %w", err)
+	}
+
+	if len(plans) == 0 {
+		return 0, nil // 无待冻结
+	}
+
+	// 按创建时间排序（FIFO）
+	sort.Slice(plans, func(i, j int) bool {
+		return plans[i].CreatedAt.Before(plans[j].CreatedAt)
+	})
+
+	var totalFrozen int64
+	remainingIncome := incomeAmount
+
+	for _, plan := range plans {
+		if remainingIncome <= 0 {
+			break
+		}
+
+		// 检查扣款来源是否匹配
+		if !s.isWalletTypeAllowedForDeduction(plan.DeductionSource, walletType) {
+			continue
+		}
+
+		// 计算需要冻结的金额
+		needToFreeze := plan.RemainingAmount - plan.FrozenAmount
+		if needToFreeze <= 0 {
+			continue // 已完全冻结
+		}
+
+		freezeAmount := remainingIncome
+		if freezeAmount > needToFreeze {
+			freezeAmount = needToFreeze
+		}
+
+		// 获取钱包
+		wallet, err := s.walletRepo.FindByAgentAndType(agentID, channelID, walletType)
+		if err != nil || wallet == nil {
+			continue
+		}
+
+		// 更新钱包冻结金额
+		if err := s.walletRepo.UpdateFrozenAmount(wallet.ID, freezeAmount); err != nil {
+			log.Printf("[DeductionService] Freeze on income failed for wallet %d: %v", wallet.ID, err)
+			continue
+		}
+
+		// 更新计划冻结金额
+		plan.FrozenAmount += freezeAmount
+		plan.UpdatedAt = time.Now()
+		if err := s.planRepo.Update(plan); err != nil {
+			log.Printf("[DeductionService] Update plan frozen amount failed: %v", err)
+		}
+
+		// 记录冻结日志
+		freezeLog := &models.DeductionFreezeLog{
+			PlanID:       plan.ID,
+			AgentID:      agentID,
+			WalletID:     wallet.ID,
+			WalletType:   walletType,
+			ChannelID:    channelID,
+			FreezeAmount: freezeAmount,
+			TotalFrozen:  plan.FrozenAmount,
+			TriggerType:  models.DeductionFreezeTriggerTypeIncome,
+			CreatedAt:    time.Now(),
+		}
+		s.freezeLogRepo.Create(freezeLog)
+
+		totalFrozen += freezeAmount
+		remainingIncome -= freezeAmount
+
+		log.Printf("[DeductionService] Frozen on income: plan=%d, amount=%d, total_frozen=%d",
+			plan.ID, freezeAmount, plan.FrozenAmount)
+	}
+
+	return totalFrozen, nil
+}
+
+// isWalletTypeAllowedForDeduction 检查钱包类型是否允许扣款
+func (s *DeductionService) isWalletTypeAllowedForDeduction(deductionSource int16, walletType int16) bool {
+	switch deductionSource {
+	case models.DeductionSourceProfit:
+		return walletType == models.WalletTypeProfit
+	case models.DeductionSourceServiceFee:
+		return walletType == models.WalletTypeServiceFee
+	case models.DeductionSourceBoth:
+		return walletType == models.WalletTypeProfit || walletType == models.WalletTypeServiceFee
+	default:
+		return false
+	}
+}
+
+// ExecuteDeductionWithUnfreeze 执行扣款并解冻（定时任务调用）
+// 从冻结金额中扣款，而非直接从余额扣
+func (s *DeductionService) ExecuteDeductionWithUnfreeze(record *models.DeductionRecord) error {
+	// 获取代扣计划
+	plan, err := s.planRepo.FindByID(record.PlanID)
+	if err != nil || plan == nil {
+		return fmt.Errorf("代扣计划不存在: %d", record.PlanID)
+	}
+
+	// 检查计划状态
+	if plan.Status != models.DeductionPlanStatusActive {
+		return fmt.Errorf("代扣计划状态异常: %d", plan.Status)
+	}
+
+	// 计算实际可扣金额（取冻结金额和应扣金额的较小值）
+	deductAmount := record.Amount
+	if deductAmount > plan.FrozenAmount {
+		deductAmount = plan.FrozenAmount
+	}
+
+	if deductAmount <= 0 {
+		// 冻结金额不足，标记为失败
+		s.recordRepo.UpdateStatus(record.ID, models.DeductionRecordStatusFailed, 0, "", "冻结金额不足")
+		return fmt.Errorf("冻结金额不足")
+	}
+
+	// 获取被扣款方的钱包并执行扣款
+	wallets, err := s.getAgentWalletsForDeduction(record.DeducteeID, plan.DeductionSource)
+	if err != nil {
+		return fmt.Errorf("获取钱包失败: %w", err)
+	}
+
+	var totalDeducted int64
+	walletDetails := make([]models.WalletDeductDetail, 0)
+	remainingAmount := deductAmount
+
+	for _, wallet := range wallets {
+		if remainingAmount <= 0 {
+			break
+		}
+
+		// 从冻结金额中扣款
+		walletFrozen := wallet.FrozenAmount
+		if walletFrozen <= 0 {
+			continue
+		}
+
+		deductFromWallet := walletFrozen
+		if deductFromWallet > remainingAmount {
+			deductFromWallet = remainingAmount
+		}
+
+		// 扣减钱包余额和冻结金额
+		if err := s.walletRepo.UpdateBalance(wallet.ID, -deductFromWallet); err != nil {
+			log.Printf("[DeductionService] Deduct from wallet %d failed: %v", wallet.ID, err)
+			continue
+		}
+		if err := s.walletRepo.UpdateFrozenAmount(wallet.ID, -deductFromWallet); err != nil {
+			log.Printf("[DeductionService] Unfreeze wallet %d failed: %v", wallet.ID, err)
+		}
+
+		// 记录钱包流水
+		walletLog := &repository.WalletLog{
+			WalletID:      wallet.ID,
+			AgentID:       wallet.AgentID,
+			WalletType:    wallet.WalletType,
+			LogType:       6, // 代扣
+			Amount:        -deductFromWallet,
+			BalanceBefore: wallet.Balance,
+			BalanceAfter:  wallet.Balance - deductFromWallet,
+			RefType:       "deduction_record",
+			RefID:         record.ID,
+			Remark:        "代扣扣款",
+			CreatedAt:     time.Now(),
+		}
+		s.walletLogRepo.Create(walletLog)
+
+		// 记录扣款明细
+		detail := models.WalletDeductDetail{
+			WalletID:      wallet.ID,
+			WalletType:    wallet.WalletType,
+			WalletName:    getWalletTypeName(wallet.WalletType),
+			BalanceBefore: wallet.Balance,
+			DeductAmount:  deductFromWallet,
+			BalanceAfter:  wallet.Balance - deductFromWallet,
+		}
+		walletDetails = append(walletDetails, detail)
+
+		totalDeducted += deductFromWallet
+		remainingAmount -= deductFromWallet
+	}
+
+	// 转换为JSON
+	detailsJSON, _ := json.Marshal(walletDetails)
+
+	// 判断扣款结果
+	var status int16
+	var failReason string
+	if totalDeducted >= record.Amount {
+		status = models.DeductionRecordStatusSuccess
+	} else if totalDeducted > 0 {
+		status = models.DeductionRecordStatusPartialSuccess
+		failReason = fmt.Sprintf("部分成功，应扣%d分，实扣%d分", record.Amount, totalDeducted)
+	} else {
+		status = models.DeductionRecordStatusFailed
+		failReason = "扣款失败"
+	}
+
+	// 更新代扣记录状态
+	if err := s.recordRepo.UpdateStatus(record.ID, status, totalDeducted, string(detailsJSON), failReason); err != nil {
+		return fmt.Errorf("更新代扣记录状态失败: %w", err)
+	}
+
+	// 更新代扣计划进度
+	if totalDeducted > 0 {
+		plan.DeductedAmount += totalDeducted
+		plan.RemainingAmount -= totalDeducted
+		plan.FrozenAmount -= totalDeducted
+		plan.CurrentPeriod = record.PeriodNum
+		plan.UpdatedAt = time.Now()
+
+		// 检查是否已完成
+		if plan.RemainingAmount <= 0 {
+			plan.Status = models.DeductionPlanStatusCompleted
+			now := time.Now()
+			plan.CompletedAt = &now
+		}
+
+		if err := s.planRepo.Update(plan); err != nil {
+			return fmt.Errorf("更新代扣计划进度失败: %w", err)
+		}
+	}
+
+	// 扣款成功后，将金额转入扣款方钱包
+	if totalDeducted > 0 {
+		if err := s.transferToDeductor(record.DeductorID, totalDeducted, record.ID); err != nil {
+			log.Printf("[DeductionService] Transfer to deductor failed: %v", err)
+		}
+	}
+
+	log.Printf("[DeductionService] Deduction with unfreeze executed: record=%d, amount=%d, deducted=%d, status=%d",
+		record.ID, record.Amount, totalDeducted, status)
+
+	return nil
+}
+
+// GetReceivedPlans 获取我接收的代扣列表
+func (s *DeductionService) GetReceivedPlans(agentID int64, status []int16, page, pageSize int) ([]*models.DeductionPlanListResponse, int64, error) {
+	offset := (page - 1) * pageSize
+	plans, total, err := s.planRepo.FindByDeductee(agentID, status, pageSize, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("查询失败: %w", err)
+	}
+
+	// 转换为响应格式
+	result := make([]*models.DeductionPlanListResponse, 0, len(plans))
+	for _, p := range plans {
+		s.fillAgentNames(p)
+		result = append(result, p.ToListResponse())
+	}
+
+	return result, total, nil
+}
+
+// GetSentPlans 获取我发起的代扣列表
+func (s *DeductionService) GetSentPlans(agentID int64, status []int16, page, pageSize int) ([]*models.DeductionPlanListResponse, int64, error) {
+	offset := (page - 1) * pageSize
+	plans, total, err := s.planRepo.FindByDeductor(agentID, status, pageSize, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("查询失败: %w", err)
+	}
+
+	// 转换为响应格式
+	result := make([]*models.DeductionPlanListResponse, 0, len(plans))
+	for _, p := range plans {
+		s.fillAgentNames(p)
+		result = append(result, p.ToListResponse())
+	}
+
+	return result, total, nil
+}
+
+// fillAgentNames 填充代理商名称
+func (s *DeductionService) fillAgentNames(plan *models.DeductionPlan) {
+	if deductor, err := s.agentRepo.FindByID(plan.DeductorID); err == nil && deductor != nil {
+		plan.DeductorName = deductor.AgentName
+	}
+	if deductee, err := s.agentRepo.FindByID(plan.DeducteeID); err == nil && deductee != nil {
+		plan.DeducteeName = deductee.AgentName
+	}
+}
+
+// GetDeductionSummary 获取代扣统计（作为被扣款方）
+func (s *DeductionService) GetDeductionSummary(agentID int64) (*models.DeductionSummary, error) {
+	summary := &models.DeductionSummary{}
+
+	// 获取各状态计划数
+	_, pendingCount, _ := s.planRepo.FindByDeductee(agentID, []int16{models.DeductionPlanStatusPendingAccept}, 1, 0)
+	_, activeCount, _ := s.planRepo.FindByDeductee(agentID, []int16{models.DeductionPlanStatusActive}, 1, 0)
+	_, completedCount, _ := s.planRepo.FindByDeductee(agentID, []int16{models.DeductionPlanStatusCompleted}, 1, 0)
+
+	summary.PendingCount = pendingCount
+	summary.InProgressCount = activeCount
+	summary.CompletedCount = completedCount
+	summary.TotalCount = pendingCount + activeCount + completedCount
+
+	// 获取金额统计
+	plans, _, err := s.planRepo.FindByDeductee(agentID, []int16{models.DeductionPlanStatusActive}, 1000, 0)
+	if err == nil {
+		for _, plan := range plans {
+			summary.TotalAmount += plan.TotalAmount
+			summary.DeductedAmount += plan.DeductedAmount
+			summary.RemainingAmount += plan.RemainingAmount
+			summary.TotalFrozenAmount += plan.FrozenAmount
+		}
+	}
+
+	return summary, nil
 }

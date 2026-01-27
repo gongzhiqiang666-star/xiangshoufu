@@ -251,4 +251,46 @@ class WalletService {
       (json) => SettlementUsageModel.fromJson(json),
     );
   }
+
+  // ========== 钱包拆分相关 ==========
+
+  /// 获取钱包列表（支持拆分模式）
+  Future<WalletListWithSplitResponse> getWalletsWithSplit() async {
+    final response = await _apiClient.get('/api/v1/wallets/with-split');
+    final apiResponse = ApiResponse.fromJson(response.data, null);
+    if (!apiResponse.isSuccess) {
+      throw ApiException(apiResponse.code, apiResponse.message);
+    }
+    return WalletListWithSplitResponse.fromJson(apiResponse.data);
+  }
+
+  /// 检查是否按通道拆分
+  Future<bool> checkSplitStatus() async {
+    final response = await _apiClient.get('/api/v1/wallets/split-status');
+    final apiResponse = ApiResponse.fromJson(response.data, null);
+    if (!apiResponse.isSuccess) {
+      throw ApiException(apiResponse.code, apiResponse.message);
+    }
+    return apiResponse.data['split_by_channel'] ?? false;
+  }
+
+  /// 申请提现（支持拆分模式）
+  Future<void> applyWithdrawWithChannel({
+    required int walletId,
+    required int amount,
+    int? channelId,
+  }) async {
+    final response = await _apiClient.post(
+      '/api/v1/wallets/withdraw',
+      data: {
+        'wallet_id': walletId,
+        'amount': amount,
+        if (channelId != null) 'channel_id': channelId,
+      },
+    );
+    final apiResponse = ApiResponse.fromJson(response.data, null);
+    if (!apiResponse.isSuccess) {
+      throw ApiException(apiResponse.code, apiResponse.message);
+    }
+  }
 }

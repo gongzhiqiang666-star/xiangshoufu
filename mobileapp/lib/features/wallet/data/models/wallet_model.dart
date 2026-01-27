@@ -350,3 +350,140 @@ class SettlementUsageModel {
 
   double get amountYuan => amount / 100;
 }
+
+// ========== 钱包拆分相关模型 ==========
+
+/// 子钱包（按通道拆分时的二级钱包）
+class SubWalletModel {
+  final int channelId;
+  final String channelName;
+  final int balance;
+  final int frozenAmount;
+  final int withdrawThreshold;
+  final bool canWithdraw;
+
+  SubWalletModel({
+    required this.channelId,
+    required this.channelName,
+    required this.balance,
+    required this.frozenAmount,
+    required this.withdrawThreshold,
+    required this.canWithdraw,
+  });
+
+  factory SubWalletModel.fromJson(Map<String, dynamic> json) {
+    return SubWalletModel(
+      channelId: json['channel_id'] ?? 0,
+      channelName: json['channel_name'] ?? '',
+      balance: json['balance'] ?? 0,
+      frozenAmount: json['frozen_amount'] ?? 0,
+      withdrawThreshold: json['withdraw_threshold'] ?? 0,
+      canWithdraw: json['can_withdraw'] ?? false,
+    );
+  }
+
+  double get balanceYuan => balance / 100;
+  double get frozenAmountYuan => frozenAmount / 100;
+  double get withdrawThresholdYuan => withdrawThreshold / 100;
+  int get availableAmount => balance - frozenAmount;
+  double get availableAmountYuan => availableAmount / 100;
+}
+
+/// 钱包展示（支持拆分模式）
+class WalletDisplayModel {
+  final int walletType;
+  final String walletTypeName;
+  final int balance;
+  final int frozenAmount;
+  final int totalIncome;
+  final int totalWithdraw;
+  final int withdrawThreshold;
+  final bool canWithdraw;
+  final List<SubWalletModel>? subWallets;
+
+  WalletDisplayModel({
+    required this.walletType,
+    required this.walletTypeName,
+    required this.balance,
+    required this.frozenAmount,
+    required this.totalIncome,
+    required this.totalWithdraw,
+    required this.withdrawThreshold,
+    required this.canWithdraw,
+    this.subWallets,
+  });
+
+  factory WalletDisplayModel.fromJson(Map<String, dynamic> json) {
+    List<SubWalletModel>? subWallets;
+    if (json['sub_wallets'] != null) {
+      subWallets = (json['sub_wallets'] as List)
+          .map((e) => SubWalletModel.fromJson(e))
+          .toList();
+    }
+
+    return WalletDisplayModel(
+      walletType: json['wallet_type'] ?? 1,
+      walletTypeName: json['wallet_type_name'] ?? '',
+      balance: json['balance'] ?? 0,
+      frozenAmount: json['frozen_amount'] ?? 0,
+      totalIncome: json['total_income'] ?? 0,
+      totalWithdraw: json['total_withdraw'] ?? 0,
+      withdrawThreshold: json['withdraw_threshold'] ?? 0,
+      canWithdraw: json['can_withdraw'] ?? false,
+      subWallets: subWallets,
+    );
+  }
+
+  double get balanceYuan => balance / 100;
+  double get frozenAmountYuan => frozenAmount / 100;
+  double get totalIncomeYuan => totalIncome / 100;
+  double get totalWithdrawYuan => totalWithdraw / 100;
+  double get withdrawThresholdYuan => withdrawThreshold / 100;
+  int get availableAmount => balance - frozenAmount;
+  double get availableAmountYuan => availableAmount / 100;
+  bool get hasSplit => subWallets != null && subWallets!.isNotEmpty;
+}
+
+/// 钱包列表响应（支持拆分模式）
+class WalletListWithSplitResponse {
+  final bool splitByChannel;
+  final List<WalletDisplayModel> wallets;
+
+  WalletListWithSplitResponse({
+    required this.splitByChannel,
+    required this.wallets,
+  });
+
+  factory WalletListWithSplitResponse.fromJson(Map<String, dynamic> json) {
+    return WalletListWithSplitResponse(
+      splitByChannel: json['split_by_channel'] ?? false,
+      wallets: (json['wallets'] as List? ?? [])
+          .map((e) => WalletDisplayModel.fromJson(e))
+          .toList(),
+    );
+  }
+}
+
+/// 代理商钱包拆分配置
+class AgentWalletSplitConfigModel {
+  final int agentId;
+  final bool splitByChannel;
+  final int? configuredBy;
+  final String? configuredAt;
+
+  AgentWalletSplitConfigModel({
+    required this.agentId,
+    required this.splitByChannel,
+    this.configuredBy,
+    this.configuredAt,
+  });
+
+  factory AgentWalletSplitConfigModel.fromJson(Map<String, dynamic> json) {
+    return AgentWalletSplitConfigModel(
+      agentId: json['agent_id'] ?? 0,
+      splitByChannel: json['split_by_channel'] ?? false,
+      configuredBy: json['configured_by'],
+      configuredAt: json['configured_at'],
+    );
+  }
+}

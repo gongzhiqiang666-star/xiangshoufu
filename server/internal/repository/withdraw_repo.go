@@ -172,3 +172,12 @@ func (r *GormWithdrawRepository) GetStatsByAgent(agentID int64) (*models.Withdra
 func GenerateWithdrawNo() string {
 	return fmt.Sprintf("WD%s%04d", time.Now().Format("20060102150405"), time.Now().Nanosecond()/1000000)
 }
+
+// CountPendingByAgentID 统计代理商待处理的提现数量（待审核+待打款）
+func (r *GormWithdrawRepository) CountPendingByAgentID(agentID int64) (int64, error) {
+	var count int64
+	err := r.db.Model(&models.WithdrawRecord{}).
+		Where("agent_id = ? AND status IN (?, ?)", agentID, models.WithdrawStatusPending, models.WithdrawStatusApproved).
+		Count(&count).Error
+	return count, err
+}

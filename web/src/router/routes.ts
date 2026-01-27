@@ -407,6 +407,36 @@ export const privateRoutes: RouteRecordRaw[] = [
           },
         ],
       },
+      // 结算价管理
+      {
+        path: 'settlement-prices',
+        name: 'SettlementPrices',
+        redirect: '/settlement-prices/list',
+        meta: {
+          title: '结算价管理',
+          icon: 'PriceTag',
+        },
+        children: [
+          {
+            path: 'list',
+            name: 'SettlementPriceList',
+            component: () => import('@/views/agent/settlement-prices/index.vue'),
+            meta: {
+              title: '结算价列表',
+              breadcrumb: [{ title: '首页' }, { title: '结算价管理' }, { title: '结算价列表' }],
+            },
+          },
+          {
+            path: 'change-logs',
+            name: 'PriceChangeLogs',
+            component: () => import('@/views/agent/price-change-logs/index.vue'),
+            meta: {
+              title: '调价记录',
+              breadcrumb: [{ title: '首页' }, { title: '结算价管理' }, { title: '调价记录' }],
+            },
+          },
+        ],
+      },
       // 奖励管理
       {
         path: 'rewards',

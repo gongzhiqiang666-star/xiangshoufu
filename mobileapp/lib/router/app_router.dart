@@ -40,6 +40,12 @@ import '../features/profile/presentation/settings_page.dart';
 import '../features/profile/presentation/bank_card_edit_page.dart';
 import '../features/profile/presentation/invite_code_page.dart';
 import '../features/transaction/presentation/transaction_page.dart';
+import '../features/settlement_price/presentation/settlement_price_list_page.dart';
+import '../features/settlement_price/presentation/settlement_price_detail_page.dart';
+import '../features/settlement_price/presentation/price_change_log_list_page.dart';
+import '../features/settlement_price/presentation/my_settlement_price_page.dart';
+import '../features/settlement_price/presentation/agent_settlement_price_list_page.dart';
+import '../features/settlement_price/presentation/agent_settlement_price_edit_page.dart';
 import '../shared/widgets/main_scaffold.dart';
 
 /// 路由路径常量
@@ -116,6 +122,15 @@ class RoutePaths {
   static const String settings = '/settings';
   static const String bankCard = '/settings/bank-card';
   static const String inviteCode = '/settings/invite-code';
+
+  // 结算价管理
+  static const String settlementPrice = '/settlement-prices';
+  static const String settlementPriceDetail = '/settlement-prices/:id';
+  static const String priceChangeLogs = '/price-change-logs';
+  static const String mySettlementPrice = '/my-settlement-prices';
+  static const String agentSettlementPrices = '/agents/:agentId/settlement-prices';
+  static const String agentSettlementPriceEdit = '/agents/:agentId/settlement-prices/:id/edit';
+  static const String agentPriceChangeLogs = '/agents/:agentId/price-change-logs';
 }
 
 /// 路由配置Provider
@@ -460,6 +475,75 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: RoutePaths.inviteCode,
         name: 'inviteCode',
         builder: (context, state) => const InviteCodePage(),
+      ),
+
+      // ==================== 结算价管理 ====================
+      GoRoute(
+        path: RoutePaths.settlementPrice,
+        name: 'settlementPrice',
+        builder: (context, state) => const SettlementPriceListPage(),
+      ),
+      GoRoute(
+        path: RoutePaths.settlementPriceDetail,
+        name: 'settlementPriceDetail',
+        builder: (context, state) {
+          final idStr = state.pathParameters['id'] ?? '0';
+          final id = int.tryParse(idStr) ?? 0;
+          return SettlementPriceDetailPage(id: id);
+        },
+      ),
+      GoRoute(
+        path: RoutePaths.priceChangeLogs,
+        name: 'priceChangeLogs',
+        builder: (context, state) => const PriceChangeLogListPage(),
+      ),
+      // 我的结算价（只读）
+      GoRoute(
+        path: RoutePaths.mySettlementPrice,
+        name: 'mySettlementPrice',
+        builder: (context, state) => const MySettlementPricePage(),
+      ),
+      // 下级代理商结算价管理
+      GoRoute(
+        path: RoutePaths.agentSettlementPrices,
+        name: 'agentSettlementPrices',
+        builder: (context, state) {
+          final agentIdStr = state.pathParameters['agentId'] ?? '0';
+          final agentId = int.tryParse(agentIdStr) ?? 0;
+          final extra = state.extra as Map<String, dynamic>?;
+          final agentName = extra?['agentName'] as String?;
+          return AgentSettlementPriceListPage(agentId: agentId, agentName: agentName);
+        },
+      ),
+      GoRoute(
+        path: RoutePaths.agentSettlementPriceEdit,
+        name: 'agentSettlementPriceEdit',
+        builder: (context, state) {
+          final agentIdStr = state.pathParameters['agentId'] ?? '0';
+          final idStr = state.pathParameters['id'] ?? '0';
+          final agentId = int.tryParse(agentIdStr) ?? 0;
+          final priceId = int.tryParse(idStr) ?? 0;
+          final extra = state.extra as Map<String, dynamic>?;
+          final agentName = extra?['agentName'] as String?;
+          final channelName = extra?['channelName'] as String?;
+          return AgentSettlementPriceEditPage(
+            agentId: agentId,
+            priceId: priceId,
+            agentName: agentName,
+            channelName: channelName,
+          );
+        },
+      ),
+      GoRoute(
+        path: RoutePaths.agentPriceChangeLogs,
+        name: 'agentPriceChangeLogs',
+        builder: (context, state) {
+          final agentIdStr = state.pathParameters['agentId'] ?? '0';
+          final agentId = int.tryParse(agentIdStr) ?? 0;
+          final extra = state.extra as Map<String, dynamic>?;
+          final agentName = extra?['agentName'] as String?;
+          return PriceChangeLogListPage(agentId: agentId, agentName: agentName);
+        },
       ),
     ],
 

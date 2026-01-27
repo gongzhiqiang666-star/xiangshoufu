@@ -58,20 +58,19 @@ class Merchant {
   Map<String, dynamic> toJson() => _$MerchantToJson(this);
 
   /// 获取商户类型显示名称
+  /// 5档分类：优质/中等/普通/预警/流失
   String get merchantTypeName {
     switch (merchantType) {
-      case 'loyal':
-        return '忠诚商户';
       case 'quality':
         return '优质商户';
-      case 'potential':
-        return '潜力商户';
+      case 'medium':
+        return '中等商户';
       case 'normal':
-        return '一般商户';
-      case 'low_active':
-        return '低活跃';
-      case 'inactive':
-        return '30天无交易';
+        return '普通商户';
+      case 'warning':
+        return '预警商户';
+      case 'churned':
+        return '流失商户';
       default:
         return merchantType;
     }

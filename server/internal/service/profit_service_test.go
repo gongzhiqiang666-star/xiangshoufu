@@ -173,6 +173,11 @@ func (m *ProfitMockWalletRepository) BatchUpdateBalance(updates map[int64]int64)
 	return nil
 }
 
+func (m *ProfitMockWalletRepository) UpdateFrozenAmount(id int64, amount int64) error {
+	// Mock实现，不做实际处理
+	return nil
+}
+
 // ProfitMockWalletLogRepository 模拟钱包流水仓库（分润专用）
 type ProfitMockWalletLogRepository struct {
 	logs []*repository.WalletLog

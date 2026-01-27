@@ -350,13 +350,13 @@ class _DataAnalysisPageState extends State<DataAnalysisPage>
   }
 
   Widget _buildMerchantTypeStats() {
+    // 5档分类：优质/中等/普通/预警/流失
     final types = [
-      {'name': '忠诚商户', 'count': 12, 'color': AppColors.primary},
-      {'name': '优质商户', 'count': 28, 'color': AppColors.success},
-      {'name': '潜力商户', 'count': 45, 'color': AppColors.warning},
-      {'name': '一般商户', 'count': 68, 'color': AppColors.textSecondary},
-      {'name': '低活跃', 'count': 23, 'color': AppColors.error},
-      {'name': '30天无交易', 'count': 15, 'color': Colors.grey},
+      {'name': '优质商户', 'count': 28, 'color': Colors.green},
+      {'name': '中等商户', 'count': 45, 'color': Colors.blue},
+      {'name': '普通商户', 'count': 68, 'color': Colors.grey},
+      {'name': '预警商户', 'count': 23, 'color': Colors.orange},
+      {'name': '流失商户', 'count': 15, 'color': Colors.red},
     ];
 
     return Container(

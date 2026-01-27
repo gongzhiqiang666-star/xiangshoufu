@@ -245,7 +245,7 @@ func (r *GormMerchantRepository) FindByTerminalSN(terminalSN string) (*models.Me
 	return &merchant, nil
 }
 
-// GetExtendedStats 获取扩展统计（包含直营/团队、商户类型分布）
+// GetExtendedStats 获取扩展统计（包含直营/团队、商户类型分布 - 5档分类）
 type ExtendedMerchantStats struct {
 	TotalCount    int64 `json:"total_count"`
 	ActiveCount   int64 `json:"active_count"`
@@ -254,13 +254,12 @@ type ExtendedMerchantStats struct {
 	DirectCount   int64 `json:"direct_count"`
 	TeamCount     int64 `json:"team_count"`
 	TodayNewCount int64 `json:"today_new_count"`
-	// 商户类型分布
-	LoyalCount     int64 `json:"loyal_count"`
-	QualityCount   int64 `json:"quality_count"`
-	PotentialCount int64 `json:"potential_count"`
-	NormalCount    int64 `json:"normal_count"`
-	LowActiveCount int64 `json:"low_active_count"`
-	InactiveCount  int64 `json:"inactive_count"`
+	// 商户类型分布（5档）
+	QualityCount int64 `json:"quality_count"` // 优质
+	MediumCount  int64 `json:"medium_count"`  // 中等
+	NormalCount  int64 `json:"normal_count"`  // 普通
+	WarningCount int64 `json:"warning_count"` // 预警
+	ChurnedCount int64 `json:"churned_count"` // 流失
 }
 
 func (r *GormMerchantRepository) GetExtendedStats(agentID int64) (*ExtendedMerchantStats, error) {
@@ -282,13 +281,12 @@ func (r *GormMerchantRepository) GetExtendedStats(agentID int64) (*ExtendedMerch
 	today := time.Now().Truncate(24 * time.Hour)
 	r.db.Model(&models.Merchant{}).Where("agent_id = ? AND created_at >= ?", agentID, today).Count(&stats.TodayNewCount)
 
-	// 商户类型分布
-	r.db.Model(&models.Merchant{}).Where("agent_id = ? AND merchant_type = ?", agentID, models.MerchantTypeLoyal).Count(&stats.LoyalCount)
+	// 商户类型分布（5档）
 	r.db.Model(&models.Merchant{}).Where("agent_id = ? AND merchant_type = ?", agentID, models.MerchantTypeQuality).Count(&stats.QualityCount)
-	r.db.Model(&models.Merchant{}).Where("agent_id = ? AND merchant_type = ?", agentID, models.MerchantTypePotential).Count(&stats.PotentialCount)
+	r.db.Model(&models.Merchant{}).Where("agent_id = ? AND merchant_type = ?", agentID, models.MerchantTypeMedium).Count(&stats.MediumCount)
 	r.db.Model(&models.Merchant{}).Where("agent_id = ? AND merchant_type = ?", agentID, models.MerchantTypeNormal).Count(&stats.NormalCount)
-	r.db.Model(&models.Merchant{}).Where("agent_id = ? AND merchant_type = ?", agentID, models.MerchantTypeLowActive).Count(&stats.LowActiveCount)
-	r.db.Model(&models.Merchant{}).Where("agent_id = ? AND merchant_type = ?", agentID, models.MerchantTypeInactive).Count(&stats.InactiveCount)
+	r.db.Model(&models.Merchant{}).Where("agent_id = ? AND merchant_type = ?", agentID, models.MerchantTypeWarning).Count(&stats.WarningCount)
+	r.db.Model(&models.Merchant{}).Where("agent_id = ? AND merchant_type = ?", agentID, models.MerchantTypeChurned).Count(&stats.ChurnedCount)
 
 	return stats, nil
 }

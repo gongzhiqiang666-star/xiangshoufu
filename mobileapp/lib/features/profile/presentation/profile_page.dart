@@ -532,6 +532,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         'route': RoutePaths.myPolicy,
       },
       {
+        'icon': Icons.price_change_outlined,
+        'label': '我的结算价',
+        'route': RoutePaths.mySettlementPrice,
+      },
+      {
         'icon': Icons.account_balance_wallet_outlined,
         'label': '我的钱包',
         'route': RoutePaths.wallet,

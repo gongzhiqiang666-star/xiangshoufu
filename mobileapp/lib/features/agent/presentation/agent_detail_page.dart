@@ -47,6 +47,26 @@ class AgentDetailPage extends ConsumerWidget {
                   ],
                 ),
               ),
+              const PopupMenuItem(
+                value: 'settlement_price',
+                child: Row(
+                  children: [
+                    Icon(Icons.price_change_outlined, size: 18, color: AppColors.success),
+                    SizedBox(width: 8),
+                    Text('结算价管理'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'price_change_logs',
+                child: Row(
+                  children: [
+                    Icon(Icons.history, size: 18, color: AppColors.warning),
+                    SizedBox(width: 8),
+                    Text('调价记录'),
+                  ],
+                ),
+              ),
             ],
           ),
         ],
@@ -436,6 +456,12 @@ class AgentDetailPage extends ConsumerWidget {
         break;
       case 'channels':
         context.push('/agent/$agentId/channels');
+        break;
+      case 'settlement_price':
+        context.push('/agents/$agentId/settlement-prices');
+        break;
+      case 'price_change_logs':
+        context.push('/agents/$agentId/price-change-logs');
         break;
     }
   }

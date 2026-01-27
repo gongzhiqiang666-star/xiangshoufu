@@ -106,23 +106,27 @@ class MerchantCard extends StatelessWidget {
   Widget _buildMerchantTypeTag() {
     Color bgColor;
     Color textColor;
+    // 5档分类颜色映射：优质/中等/普通/预警/流失
     switch (merchant.merchantType) {
-      case 'loyal':
+      case 'quality':
         bgColor = Colors.green.shade50;
         textColor = Colors.green.shade700;
         break;
-      case 'quality':
+      case 'medium':
         bgColor = Colors.blue.shade50;
         textColor = Colors.blue.shade700;
         break;
-      case 'potential':
+      case 'normal':
+        bgColor = Colors.grey.shade50;
+        textColor = Colors.grey.shade700;
+        break;
+      case 'warning':
         bgColor = Colors.orange.shade50;
         textColor = Colors.orange.shade700;
         break;
-      case 'low_active':
-      case 'inactive':
-        bgColor = Colors.grey.shade100;
-        textColor = Colors.grey.shade700;
+      case 'churned':
+        bgColor = Colors.red.shade50;
+        textColor = Colors.red.shade700;
         break;
       default:
         bgColor = Colors.grey.shade50;

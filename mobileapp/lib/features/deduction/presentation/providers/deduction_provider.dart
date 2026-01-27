@@ -21,6 +21,19 @@ final deductionStatsProvider = FutureProvider<DeductionPlanStats>((ref) async {
   return service.getStats();
 });
 
+/// 代扣摘要 Provider（我接收的/我发起的统计）
+final deductionSummaryProvider = FutureProvider<DeductionSummary>((ref) async {
+  final service = ref.watch(deductionServiceProvider);
+  return service.getDeductionSummary();
+});
+
+/// 代扣列表模式
+enum DeductionListMode {
+  received, // 我接收的
+  sent,     // 我发起的
+  all,      // 全部
+}
+
 /// 代扣计划列表状态
 class DeductionPlansState {
   final List<DeductionPlan> list;
@@ -29,9 +42,10 @@ class DeductionPlansState {
   final bool isLoadingMore;
   final String? error;
   final int currentPage;
-  final int? statusFilter;
+  final String? statusFilter; // 改为String支持多状态
   final int? typeFilter;
   final bool hasMore;
+  final DeductionListMode listMode;
 
   DeductionPlansState({
     this.list = const [],
@@ -43,6 +57,7 @@ class DeductionPlansState {
     this.statusFilter,
     this.typeFilter,
     this.hasMore = true,
+    this.listMode = DeductionListMode.received,
   });
 
   DeductionPlansState copyWith({
@@ -52,9 +67,10 @@ class DeductionPlansState {
     bool? isLoadingMore,
     String? error,
     int? currentPage,
-    int? statusFilter,
+    String? statusFilter,
     int? typeFilter,
     bool? hasMore,
+    DeductionListMode? listMode,
   }) {
     return DeductionPlansState(
       list: list ?? this.list,
@@ -66,6 +82,7 @@ class DeductionPlansState {
       statusFilter: statusFilter ?? this.statusFilter,
       typeFilter: typeFilter ?? this.typeFilter,
       hasMore: hasMore ?? this.hasMore,
+      listMode: listMode ?? this.listMode,
     );
   }
 }
@@ -75,6 +92,12 @@ class DeductionPlansNotifier extends StateNotifier<DeductionPlansState> {
   final DeductionService _service;
 
   DeductionPlansNotifier(this._service) : super(DeductionPlansState());
+
+  /// 设置列表模式
+  void setListMode(DeductionListMode mode) {
+    state = state.copyWith(listMode: mode, statusFilter: null);
+    loadPlans(refresh: true);
+  }
 
   /// 加载列表
   Future<void> loadPlans({bool refresh = false}) async {
@@ -88,12 +111,35 @@ class DeductionPlansNotifier extends StateNotifier<DeductionPlansState> {
 
     try {
       final page = refresh ? 1 : state.currentPage;
-      final response = await _service.getDeductionPlans(
-        page: page,
-        pageSize: 10,
-        planType: state.typeFilter,
-        status: state.statusFilter,
-      );
+      DeductionPlanListResponse response;
+
+      // 根据列表模式调用不同API
+      switch (state.listMode) {
+        case DeductionListMode.received:
+          response = await _service.getReceivedDeductions(
+            page: page,
+            pageSize: 10,
+            status: state.statusFilter,
+            planType: state.typeFilter,
+          );
+          break;
+        case DeductionListMode.sent:
+          response = await _service.getSentDeductions(
+            page: page,
+            pageSize: 10,
+            status: state.statusFilter,
+            planType: state.typeFilter,
+          );
+          break;
+        case DeductionListMode.all:
+          response = await _service.getDeductionPlans(
+            page: page,
+            pageSize: 10,
+            planType: state.typeFilter,
+            status: state.statusFilter != null ? int.tryParse(state.statusFilter!) : null,
+          );
+          break;
+      }
 
       final newList = refresh ? response.list : [...state.list, ...response.list];
       final hasMore = newList.length < response.total;
@@ -116,7 +162,7 @@ class DeductionPlansNotifier extends StateNotifier<DeductionPlansState> {
   }
 
   /// 设置状态筛选
-  void setStatusFilter(int? status) {
+  void setStatusFilter(String? status) {
     state = state.copyWith(statusFilter: status);
     loadPlans(refresh: true);
   }
@@ -125,6 +171,28 @@ class DeductionPlansNotifier extends StateNotifier<DeductionPlansState> {
   void setTypeFilter(int? type) {
     state = state.copyWith(typeFilter: type);
     loadPlans(refresh: true);
+  }
+
+  /// 接收确认代扣计划
+  Future<bool> acceptPlan(int id) async {
+    try {
+      await _service.acceptPlan(id);
+      loadPlans(refresh: true);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// 拒绝代扣计划
+  Future<bool> rejectPlan(int id, {String? reason}) async {
+    try {
+      await _service.rejectPlan(id, reason: reason);
+      loadPlans(refresh: true);
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   /// 暂停代扣计划

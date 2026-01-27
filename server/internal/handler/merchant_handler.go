@@ -8,6 +8,7 @@ import (
 	"xiangshoufu/internal/middleware"
 	"xiangshoufu/internal/repository"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/crypto"
 
 	"github.com/gin-gonic/gin"
 )
@@ -138,7 +139,7 @@ func (h *MerchantHandler) GetMerchantList(c *gin.Context) {
 			"is_direct":       m.IsDirect,
 			"owner_type":      getOwnerTypeName(m.IsDirect),
 			"activated_at":    m.ActivatedAt,
-			"registered_phone": maskPhone(m.RegisteredPhone),
+			"registered_phone": getPhoneDisplay(m.AgentID, agentID, m.RegisteredPhone),
 			"created_at":      m.CreatedAt,
 		})
 	}
@@ -266,7 +267,7 @@ func (h *MerchantHandler) GetMerchantDetail(c *gin.Context) {
 			"merchant_type":   merchant.MerchantType,
 			"is_direct":       merchant.IsDirect,
 			"activated_at":    activatedAtStr,
-			"registered_phone": maskPhone(merchant.RegisteredPhone),
+			"registered_phone": getPhoneDisplay(merchant.AgentID, agentID, merchant.RegisteredPhone),
 			"register_remark": merchant.RegisterRemark,
 			"month_amount":    monthAmount,
 			"month_count":     monthCount,
@@ -458,6 +459,53 @@ func maskPhone(phone string) string {
 	return phone[:3] + "****" + phone[len(phone)-4:]
 }
 
+// getPhoneDisplay 获取手机号显示（直属代理商可查看完整手机号）
+// merchantAgentID: 商户归属的代理商ID
+// currentAgentID: 当前登录的代理商ID
+// encryptedPhone: 加密存储的手机号
+func getPhoneDisplay(merchantAgentID, currentAgentID int64, encryptedPhone string) string {
+	if encryptedPhone == "" {
+		return ""
+	}
+
+	// 直属代理商可以查看完整手机号
+	if merchantAgentID == currentAgentID {
+		// 尝试解密
+		decrypted, err := decryptPhone(encryptedPhone)
+		if err == nil {
+			return decrypted
+		}
+		// 解密失败，可能是未加密的数据
+		return encryptedPhone
+	}
+
+	// 非直属代理商，返回脱敏手机号
+	decrypted, err := decryptPhone(encryptedPhone)
+	if err == nil {
+		return maskPhone(decrypted)
+	}
+	return maskPhone(encryptedPhone)
+}
+
+// decryptPhone 解密手机号（封装crypto包调用）
+func decryptPhone(encrypted string) (string, error) {
+	if encrypted == "" {
+		return "", nil
+	}
+	// 检查是否是加密数据
+	if len(encrypted) < 20 {
+		// 可能是未加密的明文
+		return encrypted, nil
+	}
+	// 调用crypto包解密
+	decrypted, err := crypto.DecryptPhone(encrypted)
+	if err != nil {
+		// 解密失败，返回原值（可能是未加密数据）
+		return encrypted, err
+	}
+	return decrypted, nil
+}
+
 // getOwnerTypeName 获取归属类型名称
 func getOwnerTypeName(isDirect bool) string {
 	if isDirect {
@@ -466,21 +514,19 @@ func getOwnerTypeName(isDirect bool) string {
 	return "team"
 }
 
-// getMerchantTypeName 商户类型名称
+// getMerchantTypeName 商户类型名称（5档分类）
 func getMerchantTypeName(merchantType string) string {
 	switch merchantType {
-	case "loyal":
-		return "忠诚商户"
 	case "quality":
 		return "优质商户"
-	case "potential":
-		return "潜力商户"
+	case "medium":
+		return "中等商户"
 	case "normal":
-		return "一般商户"
-	case "low_active":
-		return "低活跃"
-	case "inactive":
-		return "30天无交易"
+		return "普通商户"
+	case "warning":
+		return "预警商户"
+	case "churned":
+		return "流失商户"
 	default:
 		return "未知"
 	}

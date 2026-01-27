@@ -12,9 +12,12 @@ import (
 
 // WalletService 钱包服务
 type WalletService struct {
-	walletRepo    *repository.GormWalletRepository
-	walletLogRepo *repository.GormWalletLogRepository
-	agentRepo     *repository.GormAgentRepository
+	walletRepo      *repository.GormWalletRepository
+	walletLogRepo   *repository.GormWalletLogRepository
+	agentRepo       *repository.GormAgentRepository
+	splitConfigRepo *repository.GormWalletSplitConfigRepository
+	thresholdRepo   *repository.GormPolicyWithdrawThresholdRepository
+	agentPolicyRepo *repository.GormAgentPolicyRepository
 }
 
 // NewWalletService 创建钱包服务
@@ -28,6 +31,21 @@ func NewWalletService(
 		walletLogRepo: walletLogRepo,
 		agentRepo:     agentRepo,
 	}
+}
+
+// SetSplitConfigRepo 设置拆分配置仓库（可选注入）
+func (s *WalletService) SetSplitConfigRepo(repo *repository.GormWalletSplitConfigRepository) {
+	s.splitConfigRepo = repo
+}
+
+// SetThresholdRepo 设置门槛配置仓库（可选注入）
+func (s *WalletService) SetThresholdRepo(repo *repository.GormPolicyWithdrawThresholdRepository) {
+	s.thresholdRepo = repo
+}
+
+// SetAgentPolicyRepo 设置代理商政策仓库（可选注入）
+func (s *WalletService) SetAgentPolicyRepo(repo *repository.GormAgentPolicyRepository) {
+	s.agentPolicyRepo = repo
 }
 
 // WalletInfoDetail 钱包详细信息
@@ -375,6 +393,254 @@ func (s *WalletService) checkParentChargingWalletBalance(agentID int64, amount i
 		return fmt.Errorf("上级充值钱包余额不足，无法提现。上级可用余额：%.2f元，提现金额：%.2f元",
 			float64(parentAvailable)/100, float64(amount)/100)
 	}
+
+	return nil
+}
+
+// ============================================================
+// 钱包拆分展示逻辑（新增）
+// ============================================================
+
+// GetWalletListWithSplit 获取钱包列表（支持拆分模式）
+// 根据代理商的拆分配置，返回汇总或拆分的钱包展示
+func (s *WalletService) GetWalletListWithSplit(agentID int64) (*models.WalletListResponse, error) {
+	// 1. 查询所有钱包
+	wallets, err := s.walletRepo.FindByAgentID(agentID)
+	if err != nil {
+		return nil, fmt.Errorf("查询钱包失败: %w", err)
+	}
+
+	// 2. 检查是否按通道拆分
+	splitByChannel := s.isSplitByChannel(agentID)
+
+	// 3. 按钱包类型分组
+	walletsByType := make(map[int16][]*repository.Wallet)
+	for _, w := range wallets {
+		walletsByType[w.WalletType] = append(walletsByType[w.WalletType], w)
+	}
+
+	// 4. 构建响应
+	response := &models.WalletListResponse{
+		SplitByChannel: splitByChannel,
+		Wallets:        make([]models.WalletDisplay, 0),
+	}
+
+	// 处理分润钱包(1)、服务费钱包(2)、奖励钱包(3)
+	walletTypes := []int16{models.WalletTypeProfit, models.WalletTypeService, models.WalletTypeReward}
+
+	for _, walletType := range walletTypes {
+		typeWallets := walletsByType[walletType]
+		if len(typeWallets) == 0 {
+			continue
+		}
+
+		// 计算汇总
+		var totalBalance, totalFrozen, totalIncome, totalWithdraw int64
+		for _, w := range typeWallets {
+			totalBalance += w.Balance
+			totalFrozen += w.FrozenAmount
+			totalIncome += w.TotalIncome
+			totalWithdraw += w.TotalWithdraw
+		}
+
+		// 获取提现门槛
+		threshold := s.getWithdrawThreshold(agentID, walletType, 0)
+
+		display := models.WalletDisplay{
+			WalletType:        walletType,
+			WalletTypeName:    models.WalletTypeName(walletType),
+			Balance:           totalBalance,
+			FrozenAmount:      totalFrozen,
+			TotalIncome:       totalIncome,
+			TotalWithdraw:     totalWithdraw,
+			WithdrawThreshold: threshold,
+			CanWithdraw:       totalBalance-totalFrozen >= threshold,
+		}
+
+		// 奖励钱包不拆分，或者未开启拆分时
+		if walletType == models.WalletTypeReward || !splitByChannel {
+			response.Wallets = append(response.Wallets, display)
+			continue
+		}
+
+		// 按通道拆分：汇总钱包不可直接提现，需要选择子钱包
+		display.CanWithdraw = false
+		display.SubWallets = make([]models.SubWallet, 0, len(typeWallets))
+
+		for _, w := range typeWallets {
+			if w.ChannelID == 0 {
+				continue // 跳过通用钱包
+			}
+			channelThreshold := s.getWithdrawThreshold(agentID, walletType, w.ChannelID)
+			subWallet := models.SubWallet{
+				ChannelID:         w.ChannelID,
+				ChannelName:       getChannelName(w.ChannelID),
+				Balance:           w.Balance,
+				FrozenAmount:      w.FrozenAmount,
+				WithdrawThreshold: channelThreshold,
+				CanWithdraw:       w.Balance-w.FrozenAmount >= channelThreshold,
+			}
+			display.SubWallets = append(display.SubWallets, subWallet)
+		}
+
+		response.Wallets = append(response.Wallets, display)
+	}
+
+	return response, nil
+}
+
+// isSplitByChannel 检查代理商是否按通道拆分
+func (s *WalletService) isSplitByChannel(agentID int64) bool {
+	if s.splitConfigRepo == nil {
+		return false
+	}
+
+	// 检查自己的配置
+	config, err := s.splitConfigRepo.FindByAgentID(agentID)
+	if err == nil && config != nil && config.SplitByChannel {
+		return true
+	}
+
+	// 检查上级链路
+	ancestors, err := s.agentRepo.FindAncestors(agentID)
+	if err != nil {
+		return false
+	}
+
+	for _, ancestor := range ancestors {
+		ancestorConfig, err := s.splitConfigRepo.FindByAgentID(ancestor.ID)
+		if err == nil && ancestorConfig != nil && ancestorConfig.SplitByChannel {
+			return true
+		}
+	}
+
+	return false
+}
+
+// getWithdrawThreshold 获取提现门槛
+func (s *WalletService) getWithdrawThreshold(agentID int64, walletType int16, channelID int64) int64 {
+	// 默认门槛
+	defaultThreshold := int64(10000) // 100元
+	if walletType == models.WalletTypeService {
+		defaultThreshold = 5000 // 50元
+	}
+
+	if s.thresholdRepo == nil || s.agentPolicyRepo == nil {
+		return defaultThreshold
+	}
+
+	// 获取代理商政策
+	var templateID int64
+	if channelID > 0 {
+		policy, err := s.agentPolicyRepo.FindByAgentAndChannel(agentID, channelID)
+		if err == nil && policy != nil {
+			templateID = policy.TemplateID
+		}
+	}
+
+	if templateID == 0 {
+		policies, err := s.agentPolicyRepo.FindByAgentID(agentID)
+		if err != nil || len(policies) == 0 {
+			return defaultThreshold
+		}
+		templateID = policies[0].TemplateID
+	}
+
+	// 查询门槛配置
+	if channelID > 0 {
+		threshold, err := s.thresholdRepo.FindByTemplateWalletAndChannel(templateID, walletType, channelID)
+		if err == nil && threshold != nil {
+			return threshold.ThresholdAmount
+		}
+	}
+
+	threshold, err := s.thresholdRepo.FindByTemplateWalletAndChannel(templateID, walletType, 0)
+	if err == nil && threshold != nil {
+		return threshold.ThresholdAmount
+	}
+
+	return defaultThreshold
+}
+
+// WithdrawWithChannelRequest 带通道的提现请求（支持拆分模式）
+type WithdrawWithChannelRequest struct {
+	AgentID   int64  `json:"-"`
+	WalletID  int64  `json:"wallet_id" binding:"required"`
+	ChannelID *int64 `json:"channel_id"` // 拆分模式下必填
+	Amount    int64  `json:"amount" binding:"required,min=100"`
+	CreatedBy int64  `json:"-"`
+}
+
+// WithdrawWithChannel 提现（支持拆分模式）
+func (s *WalletService) WithdrawWithChannel(req *WithdrawWithChannelRequest) error {
+	// 检查钱包
+	wallet, err := s.walletRepo.FindByID(req.WalletID)
+	if err != nil || wallet == nil {
+		return errors.New("钱包不存在")
+	}
+
+	// 验证归属
+	if wallet.AgentID != req.AgentID {
+		return errors.New("无权操作该钱包")
+	}
+
+	// 检查是否按通道拆分
+	splitByChannel := s.isSplitByChannel(req.AgentID)
+
+	// 分润/服务费钱包在拆分模式下必须指定通道
+	if splitByChannel && (wallet.WalletType == models.WalletTypeProfit || wallet.WalletType == models.WalletTypeService) {
+		if req.ChannelID == nil || *req.ChannelID == 0 {
+			return errors.New("拆分模式下请选择提现通道")
+		}
+
+		// 查找指定通道的钱包
+		channelWallet, err := s.walletRepo.FindByAgentAndType(req.AgentID, *req.ChannelID, wallet.WalletType)
+		if err != nil || channelWallet == nil {
+			return errors.New("指定通道的钱包不存在")
+		}
+		wallet = channelWallet
+	}
+
+	// 检查可用余额
+	availableBalance := wallet.Balance - wallet.FrozenAmount
+	if availableBalance < req.Amount {
+		return errors.New("可用余额不足")
+	}
+
+	// 获取提现门槛
+	threshold := s.getWithdrawThreshold(req.AgentID, wallet.WalletType, wallet.ChannelID)
+	if req.Amount < threshold {
+		return fmt.Errorf("提现金额不能低于%d元", threshold/100)
+	}
+
+	// 奖励钱包提现需检查上级充值钱包余额
+	if wallet.WalletType == models.WalletTypeReward {
+		if err := s.checkParentChargingWalletBalance(req.AgentID, req.Amount); err != nil {
+			return err
+		}
+	}
+
+	// 冻结金额
+	if err := s.walletRepo.FreezeBalance(wallet.ID, req.Amount); err != nil {
+		return fmt.Errorf("冻结金额失败: %w", err)
+	}
+
+	// 记录流水
+	walletLog := &repository.WalletLog{
+		WalletID:      wallet.ID,
+		AgentID:       req.AgentID,
+		WalletType:    wallet.WalletType,
+		LogType:       WalletLogTypeWithdrawFreeze,
+		Amount:        -req.Amount,
+		BalanceBefore: wallet.Balance,
+		BalanceAfter:  wallet.Balance,
+		RefType:       "withdraw",
+		Remark:        fmt.Sprintf("提现申请，金额%.2f元", float64(req.Amount)/100),
+	}
+	s.walletLogRepo.Create(walletLog)
+
+	log.Printf("[WalletService] WithdrawWithChannel: agent=%d, wallet=%d, channel=%v, amount=%d",
+		req.AgentID, wallet.ID, req.ChannelID, req.Amount)
 
 	return nil
 }

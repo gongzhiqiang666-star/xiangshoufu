@@ -188,3 +188,77 @@ type SettlementWalletUsage struct {
 func (SettlementWalletUsage) TableName() string {
 	return "settlement_wallet_usages"
 }
+
+// ============================================================
+// 钱包拆分配置
+// ============================================================
+
+// AgentWalletSplitConfig 代理商钱包拆分配置
+// 控制代理商是否按通道拆分显示分润/服务费钱包
+type AgentWalletSplitConfig struct {
+	ID             int64      `json:"id" gorm:"primaryKey"`
+	AgentID        int64      `json:"agent_id" gorm:"uniqueIndex"`    // 被配置的代理商
+	SplitByChannel bool       `json:"split_by_channel" gorm:"default:false"` // 是否按通道拆分
+	ConfiguredBy   *int64     `json:"configured_by"`                  // 配置人（上级代理商ID或管理员ID）
+	ConfiguredAt   *time.Time `json:"configured_at"`                  // 配置时间
+	CreatedAt      time.Time  `json:"created_at" gorm:"default:now()"`
+	UpdatedAt      time.Time  `json:"updated_at" gorm:"default:now()"`
+}
+
+// TableName 表名
+func (AgentWalletSplitConfig) TableName() string {
+	return "agent_wallet_split_configs"
+}
+
+// ============================================================
+// 政策模版提现门槛配置
+// ============================================================
+
+// PolicyWithdrawThreshold 政策模版提现门槛配置
+type PolicyWithdrawThreshold struct {
+	ID              int64     `json:"id" gorm:"primaryKey"`
+	TemplateID      int64     `json:"template_id" gorm:"not null;index"` // 政策模版ID
+	WalletType      int16     `json:"wallet_type" gorm:"not null"`       // 钱包类型: 1分润 2服务费 3奖励
+	ChannelID       int64     `json:"channel_id" gorm:"default:0"`       // 通道ID: 0表示所有通道
+	ThresholdAmount int64     `json:"threshold_amount" gorm:"not null;default:10000"` // 提现门槛金额（分）
+	CreatedAt       time.Time `json:"created_at" gorm:"default:now()"`
+	UpdatedAt       time.Time `json:"updated_at" gorm:"default:now()"`
+}
+
+// TableName 表名
+func (PolicyWithdrawThreshold) TableName() string {
+	return "policy_withdraw_thresholds"
+}
+
+// ============================================================
+// 钱包展示相关DTO
+// ============================================================
+
+// SubWallet 子钱包（按通道拆分时的二级钱包）
+type SubWallet struct {
+	ChannelID         int64  `json:"channel_id"`
+	ChannelName       string `json:"channel_name"`
+	Balance           int64  `json:"balance"`
+	FrozenAmount      int64  `json:"frozen_amount"`
+	WithdrawThreshold int64  `json:"withdraw_threshold"`
+	CanWithdraw       bool   `json:"can_withdraw"`
+}
+
+// WalletDisplay 钱包展示结构
+type WalletDisplay struct {
+	WalletType        int16        `json:"wallet_type"`
+	WalletTypeName    string       `json:"wallet_type_name"`
+	Balance           int64        `json:"balance"`
+	FrozenAmount      int64        `json:"frozen_amount"`
+	TotalIncome       int64        `json:"total_income"`
+	TotalWithdraw     int64        `json:"total_withdraw"`
+	WithdrawThreshold int64        `json:"withdraw_threshold"`
+	CanWithdraw       bool         `json:"can_withdraw"`
+	SubWallets        []SubWallet  `json:"sub_wallets,omitempty"` // 拆分时的二级钱包
+}
+
+// WalletListResponse 钱包列表响应
+type WalletListResponse struct {
+	SplitByChannel bool            `json:"split_by_channel"` // 是否按通道拆分
+	Wallets        []WalletDisplay `json:"wallets"`
+}

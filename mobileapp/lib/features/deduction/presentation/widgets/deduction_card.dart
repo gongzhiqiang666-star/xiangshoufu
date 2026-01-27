@@ -8,17 +8,23 @@ import '../../data/models/deduction_model.dart';
 class DeductionCard extends StatelessWidget {
   final DeductionPlan plan;
   final VoidCallback? onTap;
+  final VoidCallback? onAccept;
+  final VoidCallback? onReject;
   final VoidCallback? onPause;
   final VoidCallback? onResume;
   final VoidCallback? onCancel;
+  final bool showDeductor; // 是否显示扣款方（我接收的代扣时显示）
 
   const DeductionCard({
     super.key,
     required this.plan,
     this.onTap,
+    this.onAccept,
+    this.onReject,
     this.onPause,
     this.onResume,
     this.onCancel,
+    this.showDeductor = false,
   });
 
   @override
@@ -49,7 +55,8 @@ class DeductionCard extends StatelessWidget {
             _buildProgress(),
             const SizedBox(height: AppSpacing.sm),
             _buildFooter(),
-            if (plan.status == 1 || plan.status == 3) ...[
+            // 待接收、进行中、已暂停状态显示操作按钮
+            if (plan.status == 0 || plan.status == 1 || plan.status == 3) ...[
               const SizedBox(height: AppSpacing.sm),
               _buildActions(),
             ],
@@ -136,21 +143,29 @@ class DeductionCard extends StatelessWidget {
     Color textColor;
 
     switch (plan.status) {
-      case 1:
+      case 0: // 待接收
+        bgColor = AppColors.info.withOpacity(0.1);
+        textColor = AppColors.info;
+        break;
+      case 1: // 进行中
         bgColor = AppColors.primary.withOpacity(0.1);
         textColor = AppColors.primary;
         break;
-      case 2:
+      case 2: // 已完成
         bgColor = AppColors.success.withOpacity(0.1);
         textColor = AppColors.success;
         break;
-      case 3:
+      case 3: // 已暂停
         bgColor = AppColors.warning.withOpacity(0.1);
         textColor = AppColors.warning;
         break;
-      case 4:
+      case 4: // 已取消
         bgColor = AppColors.textTertiary.withOpacity(0.1);
         textColor = AppColors.textTertiary;
+        break;
+      case 5: // 已拒绝
+        bgColor = AppColors.danger.withOpacity(0.1);
+        textColor = AppColors.danger;
         break;
       default:
         bgColor = AppColors.textTertiary.withOpacity(0.1);
@@ -327,7 +342,29 @@ class DeductionCard extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        if (plan.status == 1)
+        // 待接收状态：显示接收和拒绝按钮
+        if (plan.status == 0) ...[
+          TextButton(
+            onPressed: onReject,
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.danger,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+            ),
+            child: const Text('拒绝'),
+          ),
+          ElevatedButton(
+            onPressed: onAccept,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.success,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              minimumSize: const Size(0, 32),
+            ),
+            child: const Text('接收确认'),
+          ),
+        ],
+        // 进行中状态：显示暂停和取消按钮
+        if (plan.status == 1) ...[
           TextButton(
             onPressed: onPause,
             style: TextButton.styleFrom(
@@ -336,16 +373,6 @@ class DeductionCard extends StatelessWidget {
             ),
             child: const Text('暂停'),
           ),
-        if (plan.status == 3)
-          TextButton(
-            onPressed: onResume,
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.success,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-            ),
-            child: const Text('恢复'),
-          ),
-        if (plan.status == 1 || plan.status == 3)
           TextButton(
             onPressed: onCancel,
             style: TextButton.styleFrom(
@@ -354,6 +381,26 @@ class DeductionCard extends StatelessWidget {
             ),
             child: const Text('取消'),
           ),
+        ],
+        // 已暂停状态：显示恢复和取消按钮
+        if (plan.status == 3) ...[
+          TextButton(
+            onPressed: onResume,
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.success,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+            ),
+            child: const Text('恢复'),
+          ),
+          TextButton(
+            onPressed: onCancel,
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.danger,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+            ),
+            child: const Text('取消'),
+          ),
+        ],
       ],
     );
   }

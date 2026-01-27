@@ -1,5 +1,5 @@
-// 商户类型
-export type MerchantType = 'loyal' | 'quality' | 'potential' | 'normal' | 'low_active' | 'inactive'
+// 商户类型（5档分类）
+export type MerchantType = 'quality' | 'medium' | 'normal' | 'warning' | 'churned'
 
 // 商户信息
 export interface Merchant {
@@ -46,27 +46,25 @@ export interface MerchantDetail extends Merchant {
   register_remark: string
 }
 
-// 商户统计
+// 商户统计（5档分类）
 export interface MerchantStats {
   total: number
   direct: number
   team: number
-  loyal: number
-  quality: number
-  potential: number
-  normal: number
-  low_active: number
-  inactive: number
+  quality: number   // 优质
+  medium: number    // 中等
+  normal: number    // 普通
+  warning: number   // 预警
+  churned: number   // 流失
 }
 
-// 商户类型配置
+// 商户类型配置（5档分类）
 export const MERCHANT_TYPE_CONFIG: Record<MerchantType, { label: string; color: string }> = {
-  loyal: { label: '忠诚商户', color: '#67c23a' },
-  quality: { label: '优质商户', color: '#409eff' },
-  potential: { label: '潜力商户', color: '#e6a23c' },
-  normal: { label: '一般商户', color: '#909399' },
-  low_active: { label: '低活跃', color: '#f56c6c' },
-  inactive: { label: '30天无交易', color: '#c0c4cc' },
+  quality: { label: '优质商户', color: '#67c23a' },
+  medium: { label: '中等商户', color: '#409eff' },
+  normal: { label: '普通商户', color: '#909399' },
+  warning: { label: '预警商户', color: '#e6a23c' },
+  churned: { label: '流失商户', color: '#f56c6c' },
 }
 
 // 商户查询参数

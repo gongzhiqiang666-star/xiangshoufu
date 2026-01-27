@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../router/app_router.dart';
+import '../data/models/deduction_model.dart';
 import 'providers/deduction_provider.dart';
 import 'widgets/deduction_card.dart';
 
@@ -15,14 +16,35 @@ class DeductionPage extends ConsumerStatefulWidget {
   ConsumerState<DeductionPage> createState() => _DeductionPageState();
 }
 
-class _DeductionPageState extends ConsumerState<DeductionPage> {
+class _DeductionPageState extends ConsumerState<DeductionPage>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(_onTabChanged);
     // 加载数据
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(deductionPlansProvider.notifier).loadPlans(refresh: true);
     });
+  }
+
+  @override
+  void dispose() {
+    _tabController.removeListener(_onTabChanged);
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _onTabChanged() {
+    if (!_tabController.indexIsChanging) {
+      final mode = _tabController.index == 0
+          ? DeductionListMode.received
+          : DeductionListMode.sent;
+      ref.read(deductionPlansProvider.notifier).setListMode(mode);
+    }
   }
 
   @override
@@ -40,6 +62,16 @@ class _DeductionPageState extends ConsumerState<DeductionPage> {
             onPressed: () => _showFilterSheet(context),
           ),
         ],
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: AppColors.primary,
+          unselectedLabelColor: AppColors.textSecondary,
+          indicatorColor: AppColors.primary,
+          tabs: const [
+            Tab(text: '我接收的'),
+            Tab(text: '我发起的'),
+          ],
+        ),
       ),
       body: _buildBody(state),
     );
@@ -86,14 +118,16 @@ class _DeductionPageState extends ConsumerState<DeductionPage> {
             }
 
             final plan = state.list[index];
+            final isReceived = state.listMode == DeductionListMode.received;
             return DeductionCard(
               plan: plan,
+              showDeductor: isReceived,
               onTap: () => _navigateToDetail(plan.id),
-              onPause: plan.status == 1 ? () => _handlePause(plan) : null,
-              onResume: plan.status == 3 ? () => _handleResume(plan) : null,
-              onCancel: (plan.status == 1 || plan.status == 3)
-                  ? () => _handleCancel(plan)
-                  : null,
+              onAccept: plan.statusEnum.canAccept ? () => _handleAccept(plan) : null,
+              onReject: plan.statusEnum.canReject ? () => _handleReject(plan) : null,
+              onPause: plan.statusEnum.canPause ? () => _handlePause(plan) : null,
+              onResume: plan.statusEnum.canResume ? () => _handleResume(plan) : null,
+              onCancel: plan.statusEnum.canCancel ? () => _handleCancel(plan) : null,
             );
           },
         ),
@@ -162,7 +196,101 @@ class _DeductionPageState extends ConsumerState<DeductionPage> {
     context.push(RoutePaths.deductionDetail.replaceFirst(':id', id.toString()));
   }
 
-  Future<void> _handlePause(dynamic plan) async {
+  Future<void> _handleAccept(DeductionPlan plan) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('接收确认'),
+        content: Text('确认接收代扣计划 ${plan.planNo}？\n\n接收后，系统将自动冻结您的相应余额用于扣款。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.success,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('确认接收'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final success =
+          await ref.read(deductionPlansProvider.notifier).acceptPlan(plan.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(success ? '已接收，开始冻结余额' : '操作失败'),
+            backgroundColor: success ? AppColors.success : AppColors.danger,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleReject(DeductionPlan plan) async {
+    final reasonController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('拒绝代扣'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('确定要拒绝代扣计划 ${plan.planNo} 吗？'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                labelText: '拒绝原因（可选）',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('确定拒绝'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final reason = reasonController.text.trim();
+      final success = await ref.read(deductionPlansProvider.notifier).rejectPlan(
+            plan.id,
+            reason: reason.isNotEmpty ? reason : null,
+          );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(success ? '已拒绝' : '操作失败'),
+            backgroundColor: success ? AppColors.success : AppColors.danger,
+          ),
+        );
+      }
+    }
+    reasonController.dispose();
+  }
+
+  Future<void> _handlePause(DeductionPlan plan) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -199,7 +327,7 @@ class _DeductionPageState extends ConsumerState<DeductionPage> {
     }
   }
 
-  Future<void> _handleResume(dynamic plan) async {
+  Future<void> _handleResume(DeductionPlan plan) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -236,7 +364,7 @@ class _DeductionPageState extends ConsumerState<DeductionPage> {
     }
   }
 
-  Future<void> _handleCancel(dynamic plan) async {
+  Future<void> _handleCancel(DeductionPlan plan) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -313,22 +441,12 @@ class _DeductionPageState extends ConsumerState<DeductionPage> {
             Wrap(
               spacing: 8,
               children: [
-                _buildFilterChip('全部', null, state.statusFilter, (v) {
-                  ref.read(deductionPlansProvider.notifier).setStatusFilter(v);
-                  Navigator.of(context).pop();
-                }),
-                _buildFilterChip('进行中', 1, state.statusFilter, (v) {
-                  ref.read(deductionPlansProvider.notifier).setStatusFilter(v);
-                  Navigator.of(context).pop();
-                }),
-                _buildFilterChip('已完成', 2, state.statusFilter, (v) {
-                  ref.read(deductionPlansProvider.notifier).setStatusFilter(v);
-                  Navigator.of(context).pop();
-                }),
-                _buildFilterChip('已暂停', 3, state.statusFilter, (v) {
-                  ref.read(deductionPlansProvider.notifier).setStatusFilter(v);
-                  Navigator.of(context).pop();
-                }),
+                _buildStatusFilterChip('全部', null, state.statusFilter),
+                _buildStatusFilterChip('待接收', '0', state.statusFilter),
+                _buildStatusFilterChip('进行中', '1', state.statusFilter),
+                _buildStatusFilterChip('已完成', '2', state.statusFilter),
+                _buildStatusFilterChip('已暂停', '3', state.statusFilter),
+                _buildStatusFilterChip('已拒绝', '5', state.statusFilter),
               ],
             ),
             const SizedBox(height: AppSpacing.md),
@@ -337,22 +455,10 @@ class _DeductionPageState extends ConsumerState<DeductionPage> {
             Wrap(
               spacing: 8,
               children: [
-                _buildFilterChip('全部', null, state.typeFilter, (v) {
-                  ref.read(deductionPlansProvider.notifier).setTypeFilter(v);
-                  Navigator.of(context).pop();
-                }),
-                _buildFilterChip('货款代扣', 1, state.typeFilter, (v) {
-                  ref.read(deductionPlansProvider.notifier).setTypeFilter(v);
-                  Navigator.of(context).pop();
-                }),
-                _buildFilterChip('伙伴代扣', 2, state.typeFilter, (v) {
-                  ref.read(deductionPlansProvider.notifier).setTypeFilter(v);
-                  Navigator.of(context).pop();
-                }),
-                _buildFilterChip('押金代扣', 3, state.typeFilter, (v) {
-                  ref.read(deductionPlansProvider.notifier).setTypeFilter(v);
-                  Navigator.of(context).pop();
-                }),
+                _buildTypeFilterChip('全部', null, state.typeFilter),
+                _buildTypeFilterChip('货款代扣', 1, state.typeFilter),
+                _buildTypeFilterChip('伙伴代扣', 2, state.typeFilter),
+                _buildTypeFilterChip('押金代扣', 3, state.typeFilter),
               ],
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -362,17 +468,31 @@ class _DeductionPageState extends ConsumerState<DeductionPage> {
     );
   }
 
-  Widget _buildFilterChip(
-    String label,
-    int? value,
-    int? currentValue,
-    Function(int?) onSelected,
-  ) {
+  Widget _buildStatusFilterChip(String label, String? value, String? currentValue) {
     final isSelected = value == currentValue;
     return ChoiceChip(
       label: Text(label),
       selected: isSelected,
-      onSelected: (_) => onSelected(value),
+      onSelected: (_) {
+        ref.read(deductionPlansProvider.notifier).setStatusFilter(value);
+        Navigator.of(context).pop();
+      },
+      selectedColor: AppColors.primary.withOpacity(0.2),
+      labelStyle: TextStyle(
+        color: isSelected ? AppColors.primary : AppColors.textSecondary,
+      ),
+    );
+  }
+
+  Widget _buildTypeFilterChip(String label, int? value, int? currentValue) {
+    final isSelected = value == currentValue;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (_) {
+        ref.read(deductionPlansProvider.notifier).setTypeFilter(value);
+        Navigator.of(context).pop();
+      },
       selectedColor: AppColors.primary.withOpacity(0.2),
       labelStyle: TextStyle(
         color: isSelected ? AppColors.primary : AppColors.textSecondary,

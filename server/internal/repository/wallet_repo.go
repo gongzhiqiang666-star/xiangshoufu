@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"xiangshoufu/internal/models"
+
 	"gorm.io/gorm"
 )
 
@@ -66,6 +68,16 @@ func (r *GormWalletRepository) BatchUpdateBalance(updates map[int64]int64) error
 
 // 确保实现了接口
 var _ WalletRepository = (*GormWalletRepository)(nil)
+
+// UpdateFrozenAmount 更新冻结金额（正数增加，负数减少）
+func (r *GormWalletRepository) UpdateFrozenAmount(id int64, amount int64) error {
+	return r.db.Model(&Wallet{}).
+		Where("id = ?", id).
+		Updates(map[string]interface{}{
+			"frozen_amount": gorm.Expr("frozen_amount + ?", amount),
+			"version":       gorm.Expr("version + 1"),
+		}).Error
+}
 
 // GormWalletLogRepository GORM实现的钱包流水仓库
 type GormWalletLogRepository struct {
@@ -426,4 +438,121 @@ func (r *GormAgentRepository) SearchAgents(keyword string, status *int16, limit,
 	var agents []*AgentFull
 	err := query.Order("created_at DESC").Limit(limit).Offset(offset).Find(&agents).Error
 	return agents, total, err
+}
+
+// ============================================================
+// 钱包拆分配置仓库
+// ============================================================
+
+// GormWalletSplitConfigRepository GORM实现的钱包拆分配置仓库
+type GormWalletSplitConfigRepository struct {
+	db *gorm.DB
+}
+
+// NewGormWalletSplitConfigRepository 创建仓库
+func NewGormWalletSplitConfigRepository(db *gorm.DB) *GormWalletSplitConfigRepository {
+	return &GormWalletSplitConfigRepository{db: db}
+}
+
+// FindByAgentID 根据代理商ID查找拆分配置
+func (r *GormWalletSplitConfigRepository) FindByAgentID(agentID int64) (*models.AgentWalletSplitConfig, error) {
+	var config models.AgentWalletSplitConfig
+	err := r.db.Where("agent_id = ?", agentID).First(&config).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	return &config, err
+}
+
+// Create 创建拆分配置
+func (r *GormWalletSplitConfigRepository) Create(config *models.AgentWalletSplitConfig) error {
+	return r.db.Create(config).Error
+}
+
+// Update 更新拆分配置
+func (r *GormWalletSplitConfigRepository) Update(config *models.AgentWalletSplitConfig) error {
+	return r.db.Save(config).Error
+}
+
+// Upsert 创建或更新拆分配置
+func (r *GormWalletSplitConfigRepository) Upsert(config *models.AgentWalletSplitConfig) error {
+	return r.db.Save(config).Error
+}
+
+// ============================================================
+// 政策提现门槛配置仓库
+// ============================================================
+
+// GormPolicyWithdrawThresholdRepository GORM实现的政策提现门槛仓库
+type GormPolicyWithdrawThresholdRepository struct {
+	db *gorm.DB
+}
+
+// NewGormPolicyWithdrawThresholdRepository 创建仓库
+func NewGormPolicyWithdrawThresholdRepository(db *gorm.DB) *GormPolicyWithdrawThresholdRepository {
+	return &GormPolicyWithdrawThresholdRepository{db: db}
+}
+
+// FindByTemplateID 根据政策模版ID查找所有门槛配置
+func (r *GormPolicyWithdrawThresholdRepository) FindByTemplateID(templateID int64) ([]*models.PolicyWithdrawThreshold, error) {
+	var thresholds []*models.PolicyWithdrawThreshold
+	err := r.db.Where("template_id = ?", templateID).Order("wallet_type, channel_id").Find(&thresholds).Error
+	return thresholds, err
+}
+
+// FindByTemplateAndWalletType 根据政策模版和钱包类型查找门槛配置
+func (r *GormPolicyWithdrawThresholdRepository) FindByTemplateAndWalletType(templateID int64, walletType int16) ([]*models.PolicyWithdrawThreshold, error) {
+	var thresholds []*models.PolicyWithdrawThreshold
+	err := r.db.Where("template_id = ? AND wallet_type = ?", templateID, walletType).Order("channel_id").Find(&thresholds).Error
+	return thresholds, err
+}
+
+// FindByTemplateWalletAndChannel 根据政策模版、钱包类型和通道查找门槛配置
+func (r *GormPolicyWithdrawThresholdRepository) FindByTemplateWalletAndChannel(templateID int64, walletType int16, channelID int64) (*models.PolicyWithdrawThreshold, error) {
+	var threshold models.PolicyWithdrawThreshold
+	err := r.db.Where("template_id = ? AND wallet_type = ? AND channel_id = ?", templateID, walletType, channelID).First(&threshold).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	return &threshold, err
+}
+
+// Create 创建门槛配置
+func (r *GormPolicyWithdrawThresholdRepository) Create(threshold *models.PolicyWithdrawThreshold) error {
+	return r.db.Create(threshold).Error
+}
+
+// Update 更新门槛配置
+func (r *GormPolicyWithdrawThresholdRepository) Update(threshold *models.PolicyWithdrawThreshold) error {
+	return r.db.Save(threshold).Error
+}
+
+// Upsert 创建或更新门槛配置
+func (r *GormPolicyWithdrawThresholdRepository) Upsert(threshold *models.PolicyWithdrawThreshold) error {
+	return r.db.Save(threshold).Error
+}
+
+// BatchUpsert 批量创建或更新门槛配置
+func (r *GormPolicyWithdrawThresholdRepository) BatchUpsert(thresholds []*models.PolicyWithdrawThreshold) error {
+	if len(thresholds) == 0 {
+		return nil
+	}
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		for _, threshold := range thresholds {
+			if err := tx.Save(threshold).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// DeleteByTemplateID 删除政策模版的所有门槛配置
+func (r *GormPolicyWithdrawThresholdRepository) DeleteByTemplateID(templateID int64) error {
+	return r.db.Where("template_id = ?", templateID).Delete(&models.PolicyWithdrawThreshold{}).Error
+}
+
+// DeleteByTemplateAndChannel 删除政策模版指定通道的门槛配置
+func (r *GormPolicyWithdrawThresholdRepository) DeleteByTemplateAndChannel(templateID int64, channelID int64) error {
+	return r.db.Where("template_id = ? AND channel_id = ?", templateID, channelID).Delete(&models.PolicyWithdrawThreshold{}).Error
 }

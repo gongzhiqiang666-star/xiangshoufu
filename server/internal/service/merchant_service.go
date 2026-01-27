@@ -396,34 +396,55 @@ func (s *MerchantService) DeleteMerchant(id int64, agentID int64) error {
 	return s.merchantRepo.Delete(id)
 }
 
-// CalculateMerchantType 计算商户类型（基于月均交易额）
+// CalculateMerchantType 计算商户类型（5档分类）
+// 分类逻辑：
+// 1. 先判断60天无交易 → churned（流失）
+// 2. 再判断30天无交易 → warning（预警）
+// 3. 有交易按金额分档：≥5万→quality，3-5万→medium，<3万→normal
 func (s *MerchantService) CalculateMerchantType(merchantID int64) (string, error) {
-	// 获取最近30天的交易统计
 	endTime := time.Now()
-	startTime := endTime.AddDate(0, 0, -30)
 
-	stats, err := s.merchantRepo.GetMerchantTransStats(merchantID, &startTime, &endTime)
+	// 先检查60天内是否有交易
+	startTime60 := endTime.AddDate(0, 0, -60)
+	stats60, err := s.merchantRepo.GetMerchantTransStats(merchantID, &startTime60, &endTime)
 	if err != nil {
-		return "", fmt.Errorf("获取交易统计失败: %w", err)
+		return "", fmt.Errorf("获取60天交易统计失败: %w", err)
 	}
 
-	// 月均交易额（分转元）
-	monthAmount := float64(stats.TotalAmount) / 100
+	// 60天无交易 → 流失
+	if stats60.TotalCount == 0 {
+		if err := s.merchantRepo.UpdateMerchantType(merchantID, models.MerchantTypeChurned); err != nil {
+			return "", fmt.Errorf("更新商户类型失败: %w", err)
+		}
+		return models.MerchantTypeChurned, nil
+	}
+
+	// 检查30天内是否有交易
+	startTime30 := endTime.AddDate(0, 0, -30)
+	stats30, err := s.merchantRepo.GetMerchantTransStats(merchantID, &startTime30, &endTime)
+	if err != nil {
+		return "", fmt.Errorf("获取30天交易统计失败: %w", err)
+	}
+
+	// 30天无交易 → 预警
+	if stats30.TotalCount == 0 {
+		if err := s.merchantRepo.UpdateMerchantType(merchantID, models.MerchantTypeWarning); err != nil {
+			return "", fmt.Errorf("更新商户类型失败: %w", err)
+		}
+		return models.MerchantTypeWarning, nil
+	}
+
+	// 有交易，按月均交易额分档（分转元）
+	monthAmount := float64(stats30.TotalAmount) / 100
 
 	var merchantType string
 	switch {
-	case stats.TotalCount == 0:
-		merchantType = models.MerchantTypeInactive
 	case monthAmount >= 50000:
-		merchantType = models.MerchantTypeLoyal
+		merchantType = models.MerchantTypeQuality // 优质: ≥5万
 	case monthAmount >= 30000:
-		merchantType = models.MerchantTypeQuality
-	case monthAmount >= 20000:
-		merchantType = models.MerchantTypePotential
-	case monthAmount >= 10000:
-		merchantType = models.MerchantTypeNormal
+		merchantType = models.MerchantTypeMedium // 中等: 3-5万
 	default:
-		merchantType = models.MerchantTypeLowActive
+		merchantType = models.MerchantTypeNormal // 普通: <3万
 	}
 
 	// 更新商户类型
@@ -539,18 +560,16 @@ func getMerchantApproveStatusName(status int16) string {
 
 func getMerchantTypeName(merchantType string) string {
 	switch merchantType {
-	case models.MerchantTypeLoyal:
-		return "忠诚商户"
 	case models.MerchantTypeQuality:
 		return "优质商户"
-	case models.MerchantTypePotential:
-		return "潜力商户"
+	case models.MerchantTypeMedium:
+		return "中等商户"
 	case models.MerchantTypeNormal:
-		return "一般商户"
-	case models.MerchantTypeLowActive:
-		return "低活跃"
-	case models.MerchantTypeInactive:
-		return "30天无交易"
+		return "普通商户"
+	case models.MerchantTypeWarning:
+		return "预警商户"
+	case models.MerchantTypeChurned:
+		return "流失商户"
 	default:
 		return "未知"
 	}
