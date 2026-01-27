@@ -77,6 +77,180 @@ void main() {
     });
   });
 
+  // ==================== 新增：我的结算价状态测试 ====================
+  group('MySettlementPriceListState', () {
+    // ✅ 正常流程
+    test('should have correct initial state', () {
+      final state = MySettlementPriceListState();
+
+      expect(state.list, isEmpty);
+      expect(state.isLoading, false);
+      expect(state.error, isNull);
+      expect(state.page, 1);
+      expect(state.hasMore, true);
+    });
+
+    test('should create state with custom values', () {
+      final mockList = [
+        _createMockSettlementPrice(id: 1),
+        _createMockSettlementPrice(id: 2),
+      ];
+
+      final state = MySettlementPriceListState(
+        list: mockList,
+        isLoading: true,
+        error: 'Test error',
+        page: 2,
+        hasMore: false,
+      );
+
+      expect(state.list.length, 2);
+      expect(state.isLoading, true);
+      expect(state.error, 'Test error');
+      expect(state.page, 2);
+      expect(state.hasMore, false);
+    });
+
+    // ✅ copyWith测试
+    test('should copyWith correctly', () {
+      final state = MySettlementPriceListState();
+      final newState = state.copyWith(
+        isLoading: true,
+        page: 2,
+      );
+
+      expect(newState.isLoading, true);
+      expect(newState.page, 2);
+      expect(newState.list, isEmpty);
+      expect(newState.error, isNull);
+    });
+  });
+
+  // ==================== 新增：下级代理商结算价状态测试 ====================
+  group('AgentSettlementPriceListState', () {
+    // ✅ 正常流程
+    test('should have correct initial state', () {
+      final state = AgentSettlementPriceListState();
+
+      expect(state.list, isEmpty);
+      expect(state.isLoading, false);
+      expect(state.error, isNull);
+      expect(state.page, 1);
+      expect(state.hasMore, true);
+    });
+
+    test('should create state with custom values', () {
+      final mockList = [
+        _createMockSettlementPrice(id: 1),
+      ];
+
+      final state = AgentSettlementPriceListState(
+        list: mockList,
+        isLoading: false,
+        page: 3,
+        hasMore: false,
+      );
+
+      expect(state.list.length, 1);
+      expect(state.page, 3);
+      expect(state.hasMore, false);
+    });
+
+    // ✅ copyWith测试
+    test('should copyWith correctly', () {
+      final state = AgentSettlementPriceListState();
+      final newState = state.copyWith(
+        error: 'Network error',
+        hasMore: false,
+      );
+
+      expect(newState.error, 'Network error');
+      expect(newState.hasMore, false);
+      expect(newState.page, 1);
+    });
+  });
+
+  // ==================== 新增：下级代理商调价记录状态测试 ====================
+  group('AgentPriceChangeLogListState', () {
+    // ✅ 正常流程
+    test('should have correct initial state', () {
+      final state = AgentPriceChangeLogListState();
+
+      expect(state.list, isEmpty);
+      expect(state.isLoading, false);
+      expect(state.error, isNull);
+      expect(state.page, 1);
+      expect(state.hasMore, true);
+    });
+
+    test('should create state with custom values', () {
+      final mockList = [
+        _createMockPriceChangeLog(id: 1),
+        _createMockPriceChangeLog(id: 2),
+      ];
+
+      final state = AgentPriceChangeLogListState(
+        list: mockList,
+        isLoading: false,
+        page: 2,
+        hasMore: true,
+      );
+
+      expect(state.list.length, 2);
+      expect(state.page, 2);
+    });
+
+    // ✅ copyWith测试
+    test('should copyWith correctly', () {
+      final state = AgentPriceChangeLogListState();
+      final newState = state.copyWith(
+        error: '加载失败',
+        isLoading: false,
+      );
+
+      expect(newState.error, '加载失败');
+      expect(newState.isLoading, false);
+      expect(newState.page, 1);
+    });
+  });
+
+  // ==================== 新增：更新参数类测试 ====================
+  group('UpdateRateParams', () {
+    test('should create params correctly', () {
+      final params = UpdateRateParams(id: 1, data: {'credit_rate': '0.55'});
+      expect(params.id, 1);
+      expect(params.data['credit_rate'], '0.55');
+    });
+
+    test('should compare equality by id', () {
+      final params1 = UpdateRateParams(id: 1, data: {'credit_rate': '0.55'});
+      final params2 = UpdateRateParams(id: 1, data: {'credit_rate': '0.60'});
+      expect(params1 == params2, true);
+    });
+
+    test('should have same hashCode for same id', () {
+      final params1 = UpdateRateParams(id: 1, data: {});
+      final params2 = UpdateRateParams(id: 1, data: {'key': 'value'});
+      expect(params1.hashCode, params2.hashCode);
+    });
+  });
+
+  group('UpdateDepositParams', () {
+    test('should create params correctly', () {
+      final params = UpdateDepositParams(id: 2, data: {'deposit_cashbacks': []});
+      expect(params.id, 2);
+      expect(params.data['deposit_cashbacks'], isEmpty);
+    });
+  });
+
+  group('UpdateSimParams', () {
+    test('should create params correctly', () {
+      final params = UpdateSimParams(id: 3, data: {'sim_first_cashback': 5000});
+      expect(params.id, 3);
+      expect(params.data['sim_first_cashback'], 5000);
+    });
+  });
+
   group('PriceChangeLogListState', () {
     // ✅ 正常流程
     test('should have correct initial state', () {
@@ -142,6 +316,39 @@ void main() {
 
     test('priceChangeLogDetailProvider should be a family provider', () {
       final provider = priceChangeLogDetailProvider(1);
+      expect(provider, isNotNull);
+    });
+
+    // ==================== 新增Provider定义测试 ====================
+    test('mySettlementPriceListProvider should be defined', () {
+      expect(mySettlementPriceListProvider, isNotNull);
+    });
+
+    test('agentSettlementPriceListProvider should be a family provider', () {
+      final provider = agentSettlementPriceListProvider(100);
+      expect(provider, isNotNull);
+    });
+
+    test('agentPriceChangeLogListProvider should be a family provider', () {
+      final provider = agentPriceChangeLogListProvider(100);
+      expect(provider, isNotNull);
+    });
+
+    test('updateRateProvider should be a family provider', () {
+      final params = UpdateRateParams(id: 1, data: {});
+      final provider = updateRateProvider(params);
+      expect(provider, isNotNull);
+    });
+
+    test('updateDepositCashbackProvider should be a family provider', () {
+      final params = UpdateDepositParams(id: 1, data: {});
+      final provider = updateDepositCashbackProvider(params);
+      expect(provider, isNotNull);
+    });
+
+    test('updateSimCashbackProvider should be a family provider', () {
+      final params = UpdateSimParams(id: 1, data: {});
+      final provider = updateSimCashbackProvider(params);
       expect(provider, isNotNull);
     });
   });

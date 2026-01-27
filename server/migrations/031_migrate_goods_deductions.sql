@@ -35,12 +35,9 @@ SELECT
     total_amount,
     deducted_amount,
     remaining_amount,
-    total_periods,
-    current_period,
-    CASE
-        WHEN total_periods > 0 THEN total_amount / total_periods
-        ELSE total_amount
-    END, -- period_amount
+    1, -- total_periods: 货款代扣默认1期（一次性扣完）
+    CASE WHEN deducted_amount > 0 THEN 1 ELSE 0 END, -- current_period
+    total_amount, -- period_amount: 等于总金额
     CASE status
         WHEN 1 THEN 0  -- 待接收 -> 待接收
         WHEN 2 THEN 1  -- 进行中 -> 进行中

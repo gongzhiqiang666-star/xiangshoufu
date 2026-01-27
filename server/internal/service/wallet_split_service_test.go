@@ -76,12 +76,18 @@ func (m *MockPolicyWithdrawThresholdRepository) Update(threshold *models.PolicyW
 	return nil
 }
 
-// MockAgentRepositoryForSplit 模拟代理商仓库
-type MockAgentRepositoryForSplit struct {
-	FindAncestorsFunc func(agentID int64) ([]*models.Agent, error)
+// MockAgentForSplit 简化的代理商结构用于测试
+type MockAgentForSplit struct {
+	ID   int64
+	Name string
 }
 
-func (m *MockAgentRepositoryForSplit) FindAncestors(agentID int64) ([]*models.Agent, error) {
+// MockAgentRepositoryForSplit 模拟代理商仓库
+type MockAgentRepositoryForSplit struct {
+	FindAncestorsFunc func(agentID int64) ([]*MockAgentForSplit, error)
+}
+
+func (m *MockAgentRepositoryForSplit) FindAncestors(agentID int64) ([]*MockAgentForSplit, error) {
 	if m.FindAncestorsFunc != nil {
 		return m.FindAncestorsFunc(agentID)
 	}
@@ -474,13 +480,13 @@ func TestBatchSetWithdrawThresholds(t *testing.T) {
 func TestSplitInheritance(t *testing.T) {
 	t.Run("should inherit split from parent", func(t *testing.T) {
 		// 模拟上级链路
-		ancestors := []*models.Agent{
+		ancestors := []*MockAgentForSplit{
 			{ID: 2, Name: "Parent Agent"},
 			{ID: 1, Name: "Root Agent"},
 		}
 
 		mockAgentRepo := &MockAgentRepositoryForSplit{
-			FindAncestorsFunc: func(agentID int64) ([]*models.Agent, error) {
+			FindAncestorsFunc: func(agentID int64) ([]*MockAgentForSplit, error) {
 				return ancestors, nil
 			},
 		}
