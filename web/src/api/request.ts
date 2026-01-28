@@ -104,4 +104,9 @@ export function del<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
   return request.delete(url, config).then((res) => res.data.data)
 }
 
+// 封装PATCH请求
+export function patch<T>(url: string, data?: object, config?: AxiosRequestConfig): Promise<T> {
+  return request.patch(url, data, config).then((res) => res.data.data)
+}
+
 export default request

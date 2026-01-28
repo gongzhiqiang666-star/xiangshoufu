@@ -171,25 +171,73 @@
     </el-dialog>
 
     <!-- 入库弹窗 -->
-    <el-dialog v-model="importDialogVisible" title="终端入库" width="600px">
+    <el-dialog v-model="importDialogVisible" title="终端入库" width="650px">
       <el-form :model="importForm" label-width="100px">
         <el-form-item label="选择通道" required>
-          <ChannelSelect v-model="importForm.channel_id" style="width: 100%" />
+          <ChannelSelect v-model="importForm.channel_id" style="width: 100%" @change="handleChannelChange" />
+        </el-form-item>
+        <el-form-item label="终端类型">
+          <el-select
+            v-model="importForm.terminal_type_id"
+            placeholder="请先选择通道"
+            :disabled="!importForm.channel_id"
+            style="width: 100%"
+            clearable
+            @change="handleTerminalTypeChange"
+          >
+            <el-option
+              v-for="type in terminalTypes"
+              :key="type.id"
+              :label="type.full_name"
+              :value="type.id"
+            />
+          </el-select>
+          <div class="form-tip">选择终端类型后自动填充品牌和型号</div>
         </el-form-item>
         <el-form-item label="品牌编码">
-          <el-input v-model="importForm.brand_code" placeholder="可选，填写品牌编码" />
+          <el-input v-model="importForm.brand_code" placeholder="品牌编码（可手动填写）" />
         </el-form-item>
         <el-form-item label="型号编码">
-          <el-input v-model="importForm.model_code" placeholder="可选，填写型号编码" />
+          <el-input v-model="importForm.model_code" placeholder="型号编码（可手动填写）" />
         </el-form-item>
-        <el-form-item label="终端SN号" required>
-          <el-input
-            v-model="importForm.sn_text"
-            type="textarea"
-            :rows="8"
-            placeholder="请输入终端SN号，每行一个，或使用逗号/分号分隔&#10;最多支持1000个"
-          />
+        <el-form-item label="入库方式">
+          <el-radio-group v-model="importForm.import_mode">
+            <el-radio label="range">号段区间</el-radio>
+            <el-radio label="batch">批量输入</el-radio>
+          </el-radio-group>
         </el-form-item>
+
+        <!-- 号段区间模式 -->
+        <template v-if="importForm.import_mode === 'range'">
+          <el-form-item label="起始SN" required>
+            <el-input v-model="importForm.sn_start" placeholder="如：NL001 或 12345678" @input="calcRangePreview" />
+          </el-form-item>
+          <el-form-item label="结束SN" required>
+            <el-input v-model="importForm.sn_end" placeholder="如：NL005 或 12345682" @input="calcRangePreview" />
+          </el-form-item>
+          <el-form-item label="预计数量">
+            <span class="preview-count" :class="{ error: rangePreview.error }">
+              {{ rangePreview.error || `${rangePreview.count} 台` }}
+            </span>
+          </el-form-item>
+          <el-form-item v-if="rangePreview.count > 0 && rangePreview.count <= 10" label="预览">
+            <div class="sn-preview">
+              <el-tag v-for="sn in rangePreview.samples" :key="sn" size="small">{{ sn }}</el-tag>
+            </div>
+          </el-form-item>
+        </template>
+
+        <!-- 批量输入模式 -->
+        <template v-else>
+          <el-form-item label="终端SN号" required>
+            <el-input
+              v-model="importForm.sn_text"
+              type="textarea"
+              :rows="8"
+              placeholder="请输入终端SN号，每行一个，或使用逗号/分号分隔&#10;最多支持1000个"
+            />
+          </el-form-item>
+        </template>
       </el-form>
 
       <template v-if="importResult && importResult.failed_count > 0">
@@ -271,7 +319,9 @@ import ProTable from '@/components/Common/ProTable.vue'
 import ChannelSelect from '@/components/Common/ChannelSelect.vue'
 import AgentSelect from '@/components/Common/AgentSelect.vue'
 import { getTerminals, getTerminalStats, dispatchTerminals, importTerminals, recallTerminals } from '@/api/terminal'
+import { getTerminalTypesByChannel } from '@/api/terminalType'
 import type { Terminal, TerminalStatus, TerminalStats, TerminalImportResult, TerminalRecallResult } from '@/types'
+import type { TerminalType } from '@/types/terminalType'
 
 const router = useRouter()
 
@@ -388,21 +438,140 @@ const importDialogVisible = ref(false)
 const importForm = reactive({
   channel_id: undefined as number | undefined,
   channel_code: '',
+  terminal_type_id: undefined as number | undefined,
   brand_code: '',
   model_code: '',
+  import_mode: 'range' as 'range' | 'batch',
+  sn_start: '',
+  sn_end: '',
   sn_text: '', // 多行文本输入
 })
 const importLoading = ref(false)
 const importResult = ref<TerminalImportResult | null>(null)
+const terminalTypes = ref<TerminalType[]>([])
+const rangePreview = reactive({
+  count: 0,
+  samples: [] as string[],
+  error: '',
+})
+
+// 通道变更时加载终端类型
+async function handleChannelChange(channelId: number | undefined) {
+  importForm.terminal_type_id = undefined
+  terminalTypes.value = []
+  if (channelId) {
+    try {
+      terminalTypes.value = await getTerminalTypesByChannel(channelId)
+    } catch (error) {
+      console.error('获取终端类型失败:', error)
+    }
+  }
+}
+
+// 终端类型变更时自动填充品牌和型号
+function handleTerminalTypeChange(typeId: number | undefined) {
+  if (typeId) {
+    const type = terminalTypes.value.find(t => t.id === typeId)
+    if (type) {
+      importForm.brand_code = type.brand_code
+      importForm.model_code = type.model_code
+    }
+  }
+}
+
+// 计算号段区间预览
+function calcRangePreview() {
+  rangePreview.count = 0
+  rangePreview.samples = []
+  rangePreview.error = ''
+
+  const start = importForm.sn_start.trim()
+  const end = importForm.sn_end.trim()
+
+  if (!start || !end) {
+    return
+  }
+
+  // 解析号段
+  const result = parseSnRange(start, end)
+  if (result.error) {
+    rangePreview.error = result.error
+    return
+  }
+
+  rangePreview.count = result.count
+  rangePreview.samples = result.samples
+}
+
+// 解析SN号段区间
+function parseSnRange(start: string, end: string): { count: number; samples: string[]; snList: string[]; error: string } {
+  // 找到共同前缀
+  let prefixLen = 0
+  while (prefixLen < start.length && prefixLen < end.length && start[prefixLen] === end[prefixLen]) {
+    prefixLen++
+  }
+
+  // 找到数字部分的起始位置（从后向前找）
+  let numStartIdx = start.length
+  while (numStartIdx > 0 && /\d/.test(start[numStartIdx - 1])) {
+    numStartIdx--
+  }
+
+  const prefix = start.substring(0, numStartIdx)
+  const startNum = start.substring(numStartIdx)
+  const endNum = end.substring(numStartIdx)
+
+  // 验证前缀一致
+  if (!end.startsWith(prefix)) {
+    return { count: 0, samples: [], snList: [], error: '起始和结束SN前缀不一致' }
+  }
+
+  // 验证数字部分
+  if (!/^\d+$/.test(startNum) || !/^\d+$/.test(endNum)) {
+    return { count: 0, samples: [], snList: [], error: 'SN格式错误，尾部应为数字' }
+  }
+
+  const startVal = parseInt(startNum, 10)
+  const endVal = parseInt(endNum, 10)
+
+  if (startVal > endVal) {
+    return { count: 0, samples: [], snList: [], error: '起始SN应小于或等于结束SN' }
+  }
+
+  const count = endVal - startVal + 1
+  if (count > 1000) {
+    return { count: 0, samples: [], snList: [], error: '单次入库不能超过1000台' }
+  }
+
+  // 生成SN列表
+  const numLen = startNum.length
+  const snList: string[] = []
+  for (let i = startVal; i <= endVal; i++) {
+    snList.push(prefix + i.toString().padStart(numLen, '0'))
+  }
+
+  // 只返回前10个作为预览
+  const samples = snList.slice(0, 10)
+
+  return { count, samples, snList, error: '' }
+}
 
 // 入库
 function handleImport() {
   importForm.channel_id = undefined
   importForm.channel_code = ''
+  importForm.terminal_type_id = undefined
   importForm.brand_code = ''
   importForm.model_code = ''
+  importForm.import_mode = 'range'
+  importForm.sn_start = ''
+  importForm.sn_end = ''
   importForm.sn_text = ''
   importResult.value = null
+  terminalTypes.value = []
+  rangePreview.count = 0
+  rangePreview.samples = []
+  rangePreview.error = ''
   importDialogVisible.value = true
 }
 
@@ -413,20 +582,41 @@ async function handleSubmitImport() {
     return
   }
 
-  // 解析SN列表（支持换行、逗号、分号分隔）
-  const snList = importForm.sn_text
-    .split(/[\n,;]+/)
-    .map(sn => sn.trim())
-    .filter(sn => sn.length > 0)
+  let snList: string[] = []
 
-  if (snList.length === 0) {
-    ElMessage.warning('请输入终端SN号')
-    return
-  }
+  if (importForm.import_mode === 'range') {
+    // 号段区间模式
+    const start = importForm.sn_start.trim()
+    const end = importForm.sn_end.trim()
 
-  if (snList.length > 1000) {
-    ElMessage.warning('单次入库不能超过1000台')
-    return
+    if (!start || !end) {
+      ElMessage.warning('请输入起始SN和结束SN')
+      return
+    }
+
+    const result = parseSnRange(start, end)
+    if (result.error) {
+      ElMessage.warning(result.error)
+      return
+    }
+
+    snList = result.snList
+  } else {
+    // 批量输入模式
+    snList = importForm.sn_text
+      .split(/[\n,;]+/)
+      .map(sn => sn.trim())
+      .filter(sn => sn.length > 0)
+
+    if (snList.length === 0) {
+      ElMessage.warning('请输入终端SN号')
+      return
+    }
+
+    if (snList.length > 1000) {
+      ElMessage.warning('单次入库不能超过1000台')
+      return
+    }
   }
 
   importLoading.value = true
@@ -693,5 +883,29 @@ onMounted(() => {
       font-style: italic;
     }
   }
+}
+
+.preview-count {
+  font-size: 16px;
+  font-weight: 600;
+  color: $primary-color;
+
+  &.error {
+    color: $danger-color;
+    font-size: 13px;
+    font-weight: normal;
+  }
+}
+
+.sn-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-xs;
+}
+
+.form-tip {
+  font-size: 12px;
+  color: $text-secondary;
+  margin-top: 4px;
 }
 </style>

@@ -177,6 +177,7 @@ func main() {
 	terminalDistributeRepo := repository.NewGormTerminalDistributeRepository(db)
 	terminalRecallRepo := repository.NewGormTerminalRecallRepository(db)
 	terminalImportRecordRepo := repository.NewGormTerminalImportRecordRepository(db)
+	terminalTypeRepo := repository.NewGormTerminalTypeRepository(db) // 新增：终端类型仓库
 
 	terminalDistributeService := service.NewTerminalDistributeService(
 		terminalRepo,
@@ -194,6 +195,9 @@ func main() {
 		terminalImportRecordRepo,
 		agentRepo,
 	)
+
+	// 9.2 初始化终端类型服务（延迟到channelRepo初始化后）
+	var terminalTypeService *service.TerminalTypeService
 
 	// 10. 初始化流量费返现相关Repository和Service
 	simCashbackPolicyRepo := repository.NewGormSimCashbackPolicyRepository(db)
@@ -284,6 +288,10 @@ func main() {
 	merchantHandler.SetAgentRepo(agentRepo)
 	merchantHandler.SetChannelRepo(channelRepo)
 	merchantHandler.SetTerminalRepo(terminalRepo)
+
+	// 17.2 初始化终端类型服务（channelRepo已初始化）
+	terminalTypeService = service.NewTerminalTypeService(terminalTypeRepo, channelRepo)
+	terminalTypeHandler := handler.NewTerminalTypeHandler(terminalTypeService)
 
 	// 18. 初始化政策管理服务
 	policyService := service.NewPolicyService(
@@ -514,6 +522,7 @@ func main() {
 		rewardHandler,            // 新增：奖励模块Handler
 		settlementPriceHandler, agentRewardSettingHandler, priceChangeLogHandler, // 新增：结算价相关Handler
 		systemHandler, // 新增：系统管理Handler
+		terminalTypeHandler, // 新增：终端类型Handler
 		authService, metricsService, config.SwaggerEnabled,
 	)
 
@@ -776,6 +785,7 @@ func setupRouter(
 	agentRewardSettingHandler *handler.AgentRewardSettingHandler, // 新增：代理商奖励配置Handler
 	priceChangeLogHandler *handler.PriceChangeLogHandler, // 新增：调价记录Handler
 	systemHandler *handler.SystemHandler, // 新增：系统管理Handler
+	terminalTypeHandler *handler.TerminalTypeHandler, // 新增：终端类型Handler
 	authService *service.AuthService,
 	metricsService *service.MetricsService,
 	swaggerEnabled bool,
@@ -888,6 +898,9 @@ func setupRouter(
 			adminGroup.GET("/channels", channelHandler.GetChannelList)
 			adminGroup.GET("/channels/:channelId", channelHandler.GetChannelDetail)
 			adminGroup.GET("/channels/:channelId/rate-types", channelHandler.GetRateTypes)
+
+			// 终端类型路由
+			terminalTypeHandler.RegisterRoutes(adminGroup)
 		}
 
 		// 注册分析统计路由

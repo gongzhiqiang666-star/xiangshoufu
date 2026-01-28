@@ -153,6 +153,15 @@ export const privateRoutes: RouteRecordRaw[] = [
             },
           },
           {
+            path: 'types',
+            name: 'TerminalTypes',
+            component: () => import('@/views/terminals/TerminalTypeListView.vue'),
+            meta: {
+              title: '终端类型',
+              breadcrumb: [{ title: '首页' }, { title: '终端管理' }, { title: '终端类型' }],
+            },
+          },
+          {
             path: ':id',
             name: 'TerminalDetail',
             component: () => import('@/views/terminals/TerminalDetailView.vue'),
