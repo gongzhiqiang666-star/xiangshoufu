@@ -334,8 +334,9 @@ async function fetchRewards() {
 }
 
 // 充值状态类型
-function getDepositStatusType(status: ChargingDepositStatus) {
-  const typeMap: Record<ChargingDepositStatus, string> = {
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger' | ''
+function getDepositStatusType(status: ChargingDepositStatus): TagType {
+  const typeMap: Record<ChargingDepositStatus, TagType> = {
     0: 'warning',
     1: 'success',
     2: 'danger',

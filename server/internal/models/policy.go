@@ -449,3 +449,123 @@ type PolicyLimits struct {
 	// 激活奖励限制（下级奖励不能高于上级）
 	MaxActivationRewards []ActivationRewardConfig `json:"max_activation_rewards"`
 }
+
+// ============================================================
+// 高调费率和P+0加价相关类型定义
+// ============================================================
+
+// HighRateConfigValue 高调费率配置值
+type HighRateConfigValue struct {
+	Rate string `json:"rate"` // 高调费率（百分比）
+}
+
+// HighRateConfigs 高调费率配置集合（按费率类型）
+type HighRateConfigs map[string]HighRateConfigValue
+
+// Scan 实现sql.Scanner接口
+func (h *HighRateConfigs) Scan(value interface{}) error {
+	if value == nil {
+		*h = make(HighRateConfigs)
+		return nil
+	}
+
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return fmt.Errorf("cannot scan type %T into HighRateConfigs", value)
+	}
+
+	if len(bytes) == 0 || string(bytes) == "{}" {
+		*h = make(HighRateConfigs)
+		return nil
+	}
+
+	return json.Unmarshal(bytes, h)
+}
+
+// Value 实现driver.Valuer接口
+func (h HighRateConfigs) Value() (driver.Value, error) {
+	if h == nil {
+		return "{}", nil
+	}
+	return json.Marshal(h)
+}
+
+// D0ExtraConfigValue P+0加价配置值
+type D0ExtraConfigValue struct {
+	ExtraFee int64 `json:"extra_fee"` // 加价金额（分）
+}
+
+// D0ExtraConfigs P+0加价配置集合（按费率类型）
+type D0ExtraConfigs map[string]D0ExtraConfigValue
+
+// Scan 实现sql.Scanner接口
+func (d *D0ExtraConfigs) Scan(value interface{}) error {
+	if value == nil {
+		*d = make(D0ExtraConfigs)
+		return nil
+	}
+
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return fmt.Errorf("cannot scan type %T into D0ExtraConfigs", value)
+	}
+
+	if len(bytes) == 0 || string(bytes) == "{}" {
+		*d = make(D0ExtraConfigs)
+		return nil
+	}
+
+	return json.Unmarshal(bytes, d)
+}
+
+// Value 实现driver.Valuer接口
+func (d D0ExtraConfigs) Value() (driver.Value, error) {
+	if d == nil {
+		return "{}", nil
+	}
+	return json.Marshal(d)
+}
+
+// ============================================================
+// 通道押金档位
+// ============================================================
+
+// ChannelDepositTier 通道押金档位
+type ChannelDepositTier struct {
+	ID            int64     `json:"id" gorm:"primaryKey"`
+	ChannelID     int64     `json:"channel_id" gorm:"not null;index"`      // 通道ID
+	BrandCode     string    `json:"brand_code" gorm:"size:32;default:''"` // 品牌编码（空表示通用）
+	TierCode      string    `json:"tier_code" gorm:"size:32;not null"`    // 档位编码（如TIER_99）
+	DepositAmount int64     `json:"deposit_amount" gorm:"not null"`       // 押金金额（分）
+	TierName      string    `json:"tier_name" gorm:"size:100;not null"`   // 档位名称（如99元档）
+	SortOrder     int       `json:"sort_order" gorm:"default:0"`          // 排序
+	Status        int16     `json:"status" gorm:"default:1"`              // 状态：1启用 0禁用
+	CreatedAt     time.Time `json:"created_at" gorm:"default:now()"`
+	UpdatedAt     time.Time `json:"updated_at" gorm:"default:now()"`
+}
+
+// TableName 表名
+func (ChannelDepositTier) TableName() string {
+	return "channel_deposit_tiers"
+}
+
+// ============================================================
+// 押金返现扩展（支持档位编码）
+// ============================================================
+
+// DepositCashbackWithTier 支持档位编码的押金返现配置
+type DepositCashbackWithTier struct {
+	TierCode       string `json:"tier_code,omitempty"`  // 档位编码（可选）
+	DepositAmount  int64  `json:"deposit_amount"`       // 押金金额（分）
+	CashbackAmount int64  `json:"cashback_amount"`      // 返现金额（分）
+}

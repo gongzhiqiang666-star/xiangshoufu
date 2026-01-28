@@ -19,6 +19,7 @@ type TerminalRepository interface {
 	UpdateStatus(id int64, status int16) error
 	UpdateSimFeeCount(id int64, count int) error
 	FindActivatedAfter(channelID int64, activatedAfter time.Time) ([]*models.Terminal, error)
+	CountByTypeCode(channelID int64, brandCode, modelCode string) (int64, error)
 }
 
 // TerminalDistributeRepository 终端下发仓库接口
@@ -136,6 +137,15 @@ func (r *GormTerminalRepository) UpdateSimFeeCount(id int64, count int) error {
 }
 
 var _ TerminalRepository = (*GormTerminalRepository)(nil)
+
+// CountByTypeCode 统计指定终端类型的终端数量
+func (r *GormTerminalRepository) CountByTypeCode(channelID int64, brandCode, modelCode string) (int64, error) {
+	var count int64
+	err := r.db.Model(&models.Terminal{}).
+		Where("channel_id = ? AND brand_code = ? AND model_code = ?", channelID, brandCode, modelCode).
+		Count(&count).Error
+	return count, err
+}
 
 // FindActivatedAfter 查找指定通道在某时间后激活的终端
 func (r *GormTerminalRepository) FindActivatedAfter(channelID int64, activatedAfter time.Time) ([]*models.Terminal, error) {

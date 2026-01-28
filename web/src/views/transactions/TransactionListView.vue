@@ -162,8 +162,9 @@ const page = ref(1)
 const pageSize = ref(10)
 
 // 类型配置
-function getTypeTag(type: TransactionType) {
-  const colorMap: Record<string, string> = {
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger' | ''
+function getTypeTag(type: TransactionType): TagType {
+  const colorMap: Record<string, TagType> = {
     '#409eff': 'primary',
     '#67c23a': 'success',
     '#07c160': 'success',
@@ -178,8 +179,8 @@ function getTypeLabel(type: TransactionType) {
   return TRANSACTION_TYPE_CONFIG[type]?.label || type
 }
 
-function getStatusTag(status: TransactionStatus) {
-  const map: Record<TransactionStatus, string> = {
+function getStatusTag(status: TransactionStatus): TagType {
+  const map: Record<TransactionStatus, TagType> = {
     success: 'success',
     failed: 'danger',
     pending: 'warning',

@@ -24,6 +24,7 @@ type ProfitService struct {
 	rateStagingService *RateStagingService // 费率阶梯服务
 	goodsDeductionService *GoodsDeductionService // 货款代扣服务（保留兼容）
 	deductionService *DeductionService // 统一代扣服务
+	settlementPriceService *SettlementPriceService // 结算价服务（用于获取高调/P+0配置）
 }
 
 // NewProfitService 创建分润服务
@@ -62,6 +63,11 @@ func (s *ProfitService) SetGoodsDeductionService(gds *GoodsDeductionService) {
 // SetDeductionService 设置统一代扣服务（延迟注入，避免循环依赖）
 func (s *ProfitService) SetDeductionService(ds *DeductionService) {
 	s.deductionService = ds
+}
+
+// SetSettlementPriceService 设置结算价服务（延迟注入，避免循环依赖）
+func (s *ProfitService) SetSettlementPriceService(sps *SettlementPriceService) {
+	s.settlementPriceService = sps
 }
 
 // ProcessMessage 处理分润计算消息
@@ -162,12 +168,35 @@ func (s *ProfitService) CalculateProfit(txID int64) error {
 			WalletStatus:     0, // 待入账
 			CreatedAt:        time.Now(),
 		}
+
+		// 计算高调分润（如果交易有高调）
+		if tx.HighRate != "" && tx.HighRate != "0" {
+			highRateProfit, selfHighRate, lowerHighRate := s.calculateHighRateProfit(tx, currentAgent.ID, agentChain, i)
+			if highRateProfit > 0 {
+				record.HighRateProfit = highRateProfit
+				record.HighRateSelf = selfHighRate
+				record.HighRateLower = lowerHighRate
+				record.ProfitAmount += highRateProfit // 累加到总分润
+			}
+		}
+
+		// 计算P+0分润（如果交易有D0费用）
+		if tx.D0Fee > 0 {
+			d0ExtraProfit, selfD0Extra, lowerD0Extra := s.calculateD0ExtraProfit(tx, currentAgent.ID, agentChain, i)
+			if d0ExtraProfit > 0 {
+				record.D0ExtraProfit = d0ExtraProfit
+				record.D0ExtraSelf = selfD0Extra
+				record.D0ExtraLower = lowerD0Extra
+				record.ProfitAmount += d0ExtraProfit // 累加到总分润
+			}
+		}
+
 		profitRecords = append(profitRecords, record)
 
 		// 获取钱包ID
 		wallet, err := s.walletRepo.FindByAgentAndType(currentAgent.ID, tx.ChannelID, 1)
 		if err == nil && wallet != nil {
-			walletUpdates[wallet.ID] = profitAmount
+			walletUpdates[wallet.ID] = record.ProfitAmount
 		}
 	}
 
@@ -275,6 +304,96 @@ func (s *ProfitService) getMerchantAdjustedRate(merchantID, channelID int64, bas
 	}
 
 	return adjustment.AdjustedRate
+}
+
+// calculateHighRateProfit 计算高调分润
+// 高调分润 = 交易金额 × (下级高调费率 - 自身高调费率) / 100
+func (s *ProfitService) calculateHighRateProfit(tx *repository.Transaction, agentID int64, agentChain []*repository.Agent, idx int) (profit int64, selfRate string, lowerRate string) {
+	if s.settlementPriceService == nil {
+		return 0, "0", "0"
+	}
+
+	// 确定费率类型
+	rateType := s.getRateTypeFromCardType(tx.CardType)
+
+	// 获取自身高调费率
+	selfHighRate, err := s.settlementPriceService.GetAgentHighRate(agentID, tx.ChannelID, "", rateType)
+	if err != nil {
+		selfHighRate = "0"
+	}
+
+	// 获取下级高调费率
+	var lowerHighRate string
+	if idx == 0 {
+		// 直属代理商：下级高调费率 = 交易的实际高调费率
+		lowerHighRate = tx.HighRate
+	} else {
+		// 非直属：下级高调费率 = 下级代理商的配置
+		lowerAgent := agentChain[idx-1]
+		lowerHighRate, _ = s.settlementPriceService.GetAgentHighRate(lowerAgent.ID, tx.ChannelID, "", rateType)
+	}
+
+	// 计算费率差
+	selfRateFloat, _ := strconv.ParseFloat(selfHighRate, 64)
+	lowerRateFloat, _ := strconv.ParseFloat(lowerHighRate, 64)
+
+	rateDiff := lowerRateFloat - selfRateFloat
+	if rateDiff <= 0 {
+		return 0, selfHighRate, lowerHighRate
+	}
+
+	// 计算高调分润金额
+	profit = int64(float64(tx.Amount) * rateDiff / 100)
+	return profit, selfHighRate, lowerHighRate
+}
+
+// calculateD0ExtraProfit 计算P+0分润（差额分配模式）
+// 直属代理商：获得上级给自己配置的全部金额
+// 中间/上级代理商：获得（上级给自己的 - 自己给下级的）
+func (s *ProfitService) calculateD0ExtraProfit(tx *repository.Transaction, agentID int64, agentChain []*repository.Agent, idx int) (profit int64, selfExtra int64, lowerExtra int64) {
+	if s.settlementPriceService == nil {
+		return 0, 0, 0
+	}
+
+	// 确定费率类型
+	rateType := s.getRateTypeFromCardType(tx.CardType)
+
+	// 获取自身P+0加价配置（上级给当前代理商配置的金额）
+	selfD0Extra, err := s.settlementPriceService.GetAgentD0Extra(agentID, tx.ChannelID, "", rateType)
+	if err != nil {
+		selfD0Extra = 0
+	}
+
+	// 获取下级P+0加价配置
+	var lowerD0Extra int64
+	if idx == 0 {
+		// 直属代理商（最底层）：获得全部配置金额
+		lowerD0Extra = 0
+		profit = selfD0Extra
+	} else {
+		// 中间/上级代理商：获得差额
+		lowerAgent := agentChain[idx-1]
+		lowerD0Extra, _ = s.settlementPriceService.GetAgentD0Extra(lowerAgent.ID, tx.ChannelID, "", rateType)
+		profit = selfD0Extra - lowerD0Extra
+	}
+
+	if profit < 0 {
+		profit = 0
+	}
+
+	return profit, selfD0Extra, lowerD0Extra
+}
+
+// getRateTypeFromCardType 根据卡类型获取费率类型编码
+func (s *ProfitService) getRateTypeFromCardType(cardType int16) string {
+	switch cardType {
+	case 1:
+		return "DEBIT" // 借记卡
+	case 2:
+		return "CREDIT" // 贷记卡
+	default:
+		return "CREDIT"
+	}
 }
 
 // sendProfitNotifications 发送分润通知

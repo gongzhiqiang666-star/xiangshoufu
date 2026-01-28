@@ -93,14 +93,161 @@
       </div>
     </el-card>
 
-    <!-- 编辑对话框 -->
-    <el-dialog v-model="editDialogVisible" :title="editForm.id ? '编辑结算价' : '新增结算价'" width="700px">
-      <el-form :model="editForm" label-width="120px">
-        <el-form-item label="代理商ID" required>
-          <el-input v-model.number="editForm.agent_id" :disabled="!!editForm.id" />
+    <!-- 新增对话框：选择代理商+通道+模板 -->
+    <el-dialog v-model="createDialogVisible" title="新增结算价" width="800px" destroy-on-close>
+      <el-form :model="createForm" label-width="100px">
+        <!-- Step 1: 选择代理商 -->
+        <el-form-item label="代理商" required>
+          <el-select
+            v-model="createForm.agent_id"
+            filterable
+            remote
+            reserve-keyword
+            placeholder="请输入代理商名称搜索"
+            :remote-method="handleAgentSearch"
+            :loading="agentSearchLoading"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="agent in agentOptions"
+              :key="agent.id"
+              :label="`${agent.name} (ID: ${agent.id})`"
+              :value="agent.id"
+            />
+          </el-select>
         </el-form-item>
-        <el-form-item label="通道ID" required>
-          <el-input v-model.number="editForm.channel_id" :disabled="!!editForm.id" />
+
+        <!-- Step 2: 选择通道 -->
+        <el-form-item label="通道" required>
+          <el-select
+            v-model="createForm.channel_id"
+            placeholder="请选择通道"
+            style="width: 100%"
+            @change="handleChannelChange"
+          >
+            <el-option
+              v-for="channel in channelList"
+              :key="channel.id"
+              :label="channel.channel_name"
+              :value="channel.id"
+            />
+          </el-select>
+        </el-form-item>
+
+        <!-- Step 3: 选择政策模板（通道选择后显示） -->
+        <el-form-item v-if="createForm.channel_id" label="政策模板" required>
+          <el-select
+            v-model="createForm.template_id"
+            placeholder="请选择政策模板"
+            :loading="templateLoading"
+            style="width: 100%"
+            @change="handleTemplateChange"
+          >
+            <el-option
+              v-for="tpl in templateList"
+              :key="tpl.id"
+              :label="`${tpl.name}${tpl.is_default ? ' (默认)' : ''}`"
+              :value="tpl.id"
+            />
+          </el-select>
+        </el-form-item>
+
+        <!-- Step 4: 模板配置预览（模板选择后显示） -->
+        <template v-if="templateDetail">
+          <el-divider content-position="left">模板配置预览（只读）</el-divider>
+
+          <!-- 费率配置 -->
+          <el-descriptions title="费率配置" :column="3" border size="small">
+            <el-descriptions-item
+              v-for="(config, key) in templateDetail.rate_configs"
+              :key="key"
+              :label="key"
+            >
+              {{ config.rate }}%
+            </el-descriptions-item>
+          </el-descriptions>
+
+          <!-- 押金返现配置 -->
+          <el-descriptions
+            v-if="templateDetail.deposit_cashbacks && templateDetail.deposit_cashbacks.length"
+            title="押金返现"
+            :column="2"
+            border
+            size="small"
+            style="margin-top: 16px"
+          >
+            <el-descriptions-item
+              v-for="(item, idx) in templateDetail.deposit_cashbacks"
+              :key="idx"
+              :label="`¥${(item.deposit_amount/100).toFixed(0)}押金`"
+            >
+              返现 ¥{{ (item.cashback_amount/100).toFixed(0) }}
+            </el-descriptions-item>
+          </el-descriptions>
+
+          <!-- 流量费返现 -->
+          <el-descriptions
+            v-if="templateDetail.sim_cashbacks && templateDetail.sim_cashbacks.length"
+            title="流量费返现"
+            :column="3"
+            border
+            size="small"
+            style="margin-top: 16px"
+          >
+            <el-descriptions-item
+              v-for="(item, idx) in templateDetail.sim_cashbacks"
+              :key="idx"
+              :label="getSimCashbackLabel(item.type)"
+            >
+              ¥{{ (item.cashback_amount/100).toFixed(0) }}
+            </el-descriptions-item>
+          </el-descriptions>
+
+          <!-- 激活奖励 -->
+          <el-descriptions
+            v-if="templateDetail.activation_rewards && templateDetail.activation_rewards.length"
+            title="激活奖励"
+            :column="1"
+            border
+            size="small"
+            style="margin-top: 16px"
+          >
+            <el-descriptions-item
+              v-for="(reward, idx) in templateDetail.activation_rewards"
+              :key="idx"
+              :label="`${reward.start_day}-${reward.end_day}天`"
+            >
+              达标 ¥{{ (reward.target_amount/100).toFixed(0) }} → 奖励 ¥{{ (reward.reward_amount/100).toFixed(0) }}
+            </el-descriptions-item>
+          </el-descriptions>
+
+          <el-alert type="info" :closable="false" style="margin-top: 16px">
+            创建后可在编辑页面调整以上配置
+          </el-alert>
+        </template>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="createDialogVisible = false">取消</el-button>
+        <el-button
+          type="primary"
+          @click="handleConfirmCreate"
+          :loading="creating"
+          :disabled="!createForm.agent_id || !createForm.channel_id || !createForm.template_id"
+        >
+          确认导入
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 编辑对话框 -->
+    <el-dialog v-model="editDialogVisible" title="编辑结算价" width="700px">
+      <el-form :model="editForm" label-width="120px">
+        <el-form-item label="代理商">
+          <el-input :value="`${editForm.agent_name} (ID: ${editForm.agent_id})`" disabled />
+        </el-form-item>
+        <el-form-item label="通道">
+          <el-input :value="`${editForm.channel_name} (ID: ${editForm.channel_id})`" disabled />
         </el-form-item>
         <el-divider content-position="left">费率配置</el-divider>
         <el-form-item label="贷记卡费率">
@@ -183,6 +330,10 @@ import {
   type PriceChangeLog,
   type DepositCashbackItem,
 } from '@/api/settlementPrice'
+import { searchAgentList } from '@/api/agent'
+import { getChannelList } from '@/api/channel'
+import { getPolicyTemplates, getPolicyTemplateDetail } from '@/api/policy'
+import type { PolicyTemplate, PolicyTemplateDetail, Channel, Agent } from '@/types'
 
 // 搜索表单
 const searchForm = reactive({
@@ -203,12 +354,30 @@ const tableData = ref<SettlementPriceItem[]>([])
 const loading = ref(false)
 const saving = ref(false)
 
-// 编辑对话框
+// ============= 新增相关状态 =============
+const createDialogVisible = ref(false)
+const creating = ref(false)
+const channelList = ref<Channel[]>([])
+const agentOptions = ref<Agent[]>([])
+const agentSearchLoading = ref(false)
+const templateList = ref<PolicyTemplate[]>([])
+const templateLoading = ref(false)
+const templateDetail = ref<PolicyTemplateDetail | null>(null)
+
+const createForm = reactive({
+  agent_id: null as number | null,
+  channel_id: null as number | null,
+  template_id: null as number | null,
+})
+
+// ============= 编辑相关状态 =============
 const editDialogVisible = ref(false)
 const editForm = reactive({
   id: 0,
   agent_id: 0,
+  agent_name: '',
   channel_id: 0,
+  channel_name: '',
   credit_rate: '',
   debit_rate: '',
   deposit_cashbacks: [] as DepositCashbackItem[],
@@ -227,6 +396,16 @@ const formatDateTime = (dateStr: string) => {
   if (!dateStr) return ''
   const date = new Date(dateStr)
   return date.toLocaleString('zh-CN')
+}
+
+// 获取流量返现类型标签
+const getSimCashbackLabel = (type: string) => {
+  const labels: Record<string, string> = {
+    'first': '首次',
+    'second': '第2次',
+    'renewal': '第3次+',
+  }
+  return labels[type] || type
 }
 
 // 加载数据
@@ -272,21 +451,104 @@ const handleCurrentChange = () => {
   loadData()
 }
 
-// 新增
-const handleCreate = () => {
-  Object.assign(editForm, {
-    id: 0,
-    agent_id: 0,
-    channel_id: 0,
-    credit_rate: '',
-    debit_rate: '',
-    deposit_cashbacks: [],
-    sim_first_cashback: 0,
-    sim_second_cashback: 0,
-    sim_third_plus_cashback: 0,
-  })
-  editDialogVisible.value = true
+// ============= 新增功能 =============
+
+// 打开新增对话框
+const handleCreate = async () => {
+  // 重置表单
+  createForm.agent_id = null
+  createForm.channel_id = null
+  createForm.template_id = null
+  templateDetail.value = null
+  templateList.value = []
+  agentOptions.value = []
+
+  // 加载通道列表
+  try {
+    channelList.value = await getChannelList()
+  } catch (e) {
+    ElMessage.error('加载通道列表失败')
+    return
+  }
+  createDialogVisible.value = true
 }
+
+// 搜索代理商
+const handleAgentSearch = async (keyword: string) => {
+  if (!keyword || keyword.length < 2) {
+    agentOptions.value = []
+    return
+  }
+  agentSearchLoading.value = true
+  try {
+    const res = await searchAgentList({ keyword, page_size: 20 })
+    agentOptions.value = res.list || []
+  } catch (e) {
+    console.error('搜索代理商失败', e)
+  } finally {
+    agentSearchLoading.value = false
+  }
+}
+
+// 通道变更
+const handleChannelChange = async (channelId: number) => {
+  createForm.template_id = null
+  templateDetail.value = null
+
+  if (!channelId) {
+    templateList.value = []
+    return
+  }
+
+  templateLoading.value = true
+  try {
+    const res = await getPolicyTemplates({ channel_id: channelId })
+    templateList.value = res.list || []
+  } catch (e) {
+    ElMessage.error('获取政策模板列表失败')
+  } finally {
+    templateLoading.value = false
+  }
+}
+
+// 模板变更
+const handleTemplateChange = async (templateId: number) => {
+  if (!templateId) {
+    templateDetail.value = null
+    return
+  }
+  try {
+    templateDetail.value = await getPolicyTemplateDetail(templateId)
+  } catch (e) {
+    ElMessage.error('获取模板详情失败')
+  }
+}
+
+// 确认创建
+const handleConfirmCreate = async () => {
+  if (!createForm.agent_id || !createForm.channel_id || !createForm.template_id) {
+    ElMessage.warning('请完整填写信息')
+    return
+  }
+
+  creating.value = true
+  try {
+    await createSettlementPrice({
+      agent_id: createForm.agent_id,
+      channel_id: createForm.channel_id,
+      template_id: createForm.template_id,
+    })
+    ElMessage.success('创建成功')
+    createDialogVisible.value = false
+    loadData()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '创建失败')
+  } finally {
+    creating.value = false
+  }
+}
+
+// ============= 编辑功能 =============
 
 // 编辑
 const handleEdit = async (row: SettlementPriceItem) => {
@@ -295,7 +557,9 @@ const handleEdit = async (row: SettlementPriceItem) => {
     Object.assign(editForm, {
       id: detail.id,
       agent_id: detail.agent_id,
+      agent_name: row.agent_name || '',
       channel_id: detail.channel_id,
+      channel_name: row.channel_name || '',
       credit_rate: detail.credit_rate || '',
       debit_rate: detail.debit_rate || '',
       deposit_cashbacks: detail.deposit_cashbacks || [],
@@ -313,34 +577,26 @@ const handleEdit = async (row: SettlementPriceItem) => {
 const handleSave = async () => {
   saving.value = true
   try {
-    if (editForm.id) {
-      // 更新费率
-      if (editForm.credit_rate || editForm.debit_rate) {
-        await updateSettlementPriceRate(editForm.id, {
-          credit_rate: editForm.credit_rate || undefined,
-          debit_rate: editForm.debit_rate || undefined,
-        })
-      }
-      // 更新押金返现
-      if (editForm.deposit_cashbacks.length) {
-        await updateSettlementPriceDeposit(editForm.id, {
-          deposit_cashbacks: editForm.deposit_cashbacks,
-        })
-      }
-      // 更新流量费返现
-      await updateSettlementPriceSim(editForm.id, {
-        sim_first_cashback: editForm.sim_first_cashback,
-        sim_second_cashback: editForm.sim_second_cashback,
-        sim_third_plus_cashback: editForm.sim_third_plus_cashback,
+    // 更新费率
+    if (editForm.credit_rate || editForm.debit_rate) {
+      await updateSettlementPriceRate(editForm.id, {
+        credit_rate: editForm.credit_rate || undefined,
+        debit_rate: editForm.debit_rate || undefined,
       })
-      ElMessage.success('更新成功')
-    } else {
-      await createSettlementPrice({
-        agent_id: editForm.agent_id,
-        channel_id: editForm.channel_id,
-      })
-      ElMessage.success('创建成功')
     }
+    // 更新押金返现
+    if (editForm.deposit_cashbacks.length) {
+      await updateSettlementPriceDeposit(editForm.id, {
+        deposit_cashbacks: editForm.deposit_cashbacks,
+      })
+    }
+    // 更新流量费返现
+    await updateSettlementPriceSim(editForm.id, {
+      sim_first_cashback: editForm.sim_first_cashback,
+      sim_second_cashback: editForm.sim_second_cashback,
+      sim_third_plus_cashback: editForm.sim_third_plus_cashback,
+    })
+    ElMessage.success('更新成功')
     editDialogVisible.value = false
     loadData()
   } catch (e) {

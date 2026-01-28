@@ -316,7 +316,7 @@ flutter analyze
 
 | 用户名 | 密码 | 角色 |
 |--------|------|------|
-| admin | admin123 | 管理员 |
+| admin | 123456 | 管理员 |
 
 ## Architecture
 

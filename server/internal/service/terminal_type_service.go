@@ -11,15 +11,17 @@ import (
 
 // TerminalTypeService 终端类型服务
 type TerminalTypeService struct {
-	repo        repository.TerminalTypeRepository
-	channelRepo *repository.GormChannelRepository
+	repo         repository.TerminalTypeRepository
+	channelRepo  *repository.GormChannelRepository
+	terminalRepo *repository.GormTerminalRepository
 }
 
 // NewTerminalTypeService 创建终端类型服务
-func NewTerminalTypeService(repo repository.TerminalTypeRepository, channelRepo *repository.GormChannelRepository) *TerminalTypeService {
+func NewTerminalTypeService(repo repository.TerminalTypeRepository, channelRepo *repository.GormChannelRepository, terminalRepo *repository.GormTerminalRepository) *TerminalTypeService {
 	return &TerminalTypeService{
-		repo:        repo,
-		channelRepo: channelRepo,
+		repo:         repo,
+		channelRepo:  channelRepo,
+		terminalRepo: terminalRepo,
 	}
 }
 
@@ -218,7 +220,14 @@ func (s *TerminalTypeService) Delete(ctx context.Context, id int64) error {
 		return errors.New("终端类型不存在")
 	}
 
-	// TODO: 检查是否有关联的终端，如果有则不允许删除
+	// 检查是否有关联的终端，如果有则不允许删除
+	count, err := s.terminalRepo.CountByTypeCode(terminalType.ChannelID, terminalType.BrandCode, terminalType.ModelCode)
+	if err != nil {
+		return fmt.Errorf("检查关联终端失败: %w", err)
+	}
+	if count > 0 {
+		return fmt.Errorf("该终端类型下存在 %d 台终端，无法删除", count)
+	}
 
 	if err := s.repo.Delete(ctx, id); err != nil {
 		return fmt.Errorf("删除终端类型失败: %w", err)

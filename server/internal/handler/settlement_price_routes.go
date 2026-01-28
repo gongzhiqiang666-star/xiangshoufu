@@ -17,6 +17,8 @@ func RegisterSettlementPriceRoutes(rg *gin.RouterGroup, h *SettlementPriceHandle
 		group.PUT("/:id/rate", h.UpdateRate)
 		group.PUT("/:id/deposit", h.UpdateDeposit)
 		group.PUT("/:id/sim", h.UpdateSim)
+		group.PUT("/:id/high-rate", h.UpdateHighRate)
+		group.PUT("/:id/d0-extra", h.UpdateD0Extra)
 		group.GET("/:id/change-logs", h.GetChangeLogs)
 	}
 }

@@ -245,7 +245,7 @@ const formRules: FormRules = {
 const fetchChannels = async () => {
   try {
     const res = await getChannels()
-    channels.value = res.list || []
+    channels.value = (res as any).list || res || []
   } catch (error) {
     console.error('获取通道列表失败:', error)
   }

@@ -290,7 +290,7 @@ func main() {
 	merchantHandler.SetTerminalRepo(terminalRepo)
 
 	// 17.2 初始化终端类型服务（channelRepo已初始化）
-	terminalTypeService = service.NewTerminalTypeService(terminalTypeRepo, channelRepo)
+	terminalTypeService = service.NewTerminalTypeService(terminalTypeRepo, channelRepo, terminalRepo)
 	terminalTypeHandler := handler.NewTerminalTypeHandler(terminalTypeService)
 
 	// 18. 初始化政策管理服务
@@ -470,6 +470,15 @@ func main() {
 		priceChangeLogRepo,
 		db,
 	)
+
+	// 21.4.1 将结算价服务注入到分润服务（用于高调/P+0分润计算）
+	profitService.SetSettlementPriceService(settlementPriceService)
+
+	// 21.4.2 初始化押金档位相关Repository、Service、Handler
+	depositTierRepo := repository.NewGormChannelDepositTierRepository(db)
+	depositTierService := service.NewDepositTierService(depositTierRepo)
+	depositTierHandler := handler.NewDepositTierHandler(depositTierService)
+
 	agentRewardSettingService := service.NewAgentRewardSettingService(
 		agentRewardSettingRepo,
 		priceChangeLogRepo,
@@ -523,6 +532,7 @@ func main() {
 		settlementPriceHandler, agentRewardSettingHandler, priceChangeLogHandler, // 新增：结算价相关Handler
 		systemHandler, // 新增：系统管理Handler
 		terminalTypeHandler, // 新增：终端类型Handler
+		depositTierHandler, // 新增：押金档位Handler
 		authService, metricsService, config.SwaggerEnabled,
 	)
 
@@ -786,6 +796,7 @@ func setupRouter(
 	priceChangeLogHandler *handler.PriceChangeLogHandler, // 新增：调价记录Handler
 	systemHandler *handler.SystemHandler, // 新增：系统管理Handler
 	terminalTypeHandler *handler.TerminalTypeHandler, // 新增：终端类型Handler
+	depositTierHandler *handler.DepositTierHandler, // 新增：押金档位Handler
 	authService *service.AuthService,
 	metricsService *service.MetricsService,
 	swaggerEnabled bool,
@@ -921,6 +932,9 @@ func setupRouter(
 		handler.RegisterSettlementPriceRoutes(apiV1, settlementPriceHandler, authService)
 		handler.RegisterAgentRewardSettingRoutes(apiV1, agentRewardSettingHandler, authService)
 		handler.RegisterPriceChangeLogRoutes(apiV1, priceChangeLogHandler, authService)
+
+		// 注册押金档位管理路由
+		depositTierHandler.RegisterRoutes(apiV1)
 
 		// 注册系统管理路由
 		handler.RegisterSystemRoutes(apiV1, systemHandler, authService)

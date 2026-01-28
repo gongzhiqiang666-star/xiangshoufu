@@ -338,6 +338,114 @@ func (s *SettlementPriceService) GetAgentSimCashback(agentID, channelID int64, b
 	return price.SimFirstCashback, price.SimSecondCashback, price.SimThirdPlusCashback, nil
 }
 
+// GetAgentHighRate 获取代理商高调费率配置
+func (s *SettlementPriceService) GetAgentHighRate(agentID, channelID int64, brandCode string, rateType string) (string, error) {
+	price, err := s.repo.GetByAgentAndChannel(agentID, channelID, brandCode)
+	if err != nil {
+		return "0", fmt.Errorf("获取结算价失败: %w", err)
+	}
+
+	if price.HighRateConfigs != nil {
+		if config, ok := price.HighRateConfigs[rateType]; ok {
+			return config.Rate, nil
+		}
+	}
+
+	return "0", nil
+}
+
+// GetAgentD0Extra 获取代理商P+0加价配置
+func (s *SettlementPriceService) GetAgentD0Extra(agentID, channelID int64, brandCode string, rateType string) (int64, error) {
+	price, err := s.repo.GetByAgentAndChannel(agentID, channelID, brandCode)
+	if err != nil {
+		return 0, fmt.Errorf("获取结算价失败: %w", err)
+	}
+
+	if price.D0ExtraConfigs != nil {
+		if config, ok := price.D0ExtraConfigs[rateType]; ok {
+			return config.ExtraFee, nil
+		}
+	}
+
+	return 0, nil
+}
+
+// UpdateHighRateRequest 更新高调费率请求
+type UpdateHighRateRequest struct {
+	HighRateConfigs models.HighRateConfigs `json:"high_rate_configs" binding:"required"`
+}
+
+// UpdateD0ExtraRequest 更新P+0加价请求
+type UpdateD0ExtraRequest struct {
+	D0ExtraConfigs models.D0ExtraConfigs `json:"d0_extra_configs" binding:"required"`
+}
+
+// UpdateHighRate 更新高调费率配置
+func (s *SettlementPriceService) UpdateHighRate(
+	id int64,
+	req *UpdateHighRateRequest,
+	operatorID int64,
+	operatorName string,
+	source string,
+	ipAddress string,
+) (*models.SettlementPrice, error) {
+	price, err := s.repo.GetByID(id)
+	if err != nil {
+		return nil, fmt.Errorf("结算价不存在: %w", err)
+	}
+
+	// 保存变更前的快照
+	snapshotBefore := s.createSnapshot(price)
+
+	// 更新高调费率配置
+	price.HighRateConfigs = req.HighRateConfigs
+	price.Version++
+	price.UpdatedBy = &operatorID
+
+	err = s.repo.Update(price)
+	if err != nil {
+		return nil, fmt.Errorf("更新高调费率失败: %w", err)
+	}
+
+	// 记录调价日志
+	s.createChangeLogWithSnapshot(price, snapshotBefore, models.ChangeTypeRate, operatorID, operatorName, source, ipAddress, "高调费率", "高调费率调整")
+
+	return price, nil
+}
+
+// UpdateD0Extra 更新P+0加价配置
+func (s *SettlementPriceService) UpdateD0Extra(
+	id int64,
+	req *UpdateD0ExtraRequest,
+	operatorID int64,
+	operatorName string,
+	source string,
+	ipAddress string,
+) (*models.SettlementPrice, error) {
+	price, err := s.repo.GetByID(id)
+	if err != nil {
+		return nil, fmt.Errorf("结算价不存在: %w", err)
+	}
+
+	// 保存变更前的快照
+	snapshotBefore := s.createSnapshot(price)
+
+	// 更新P+0加价配置
+	price.D0ExtraConfigs = req.D0ExtraConfigs
+	price.Version++
+	price.UpdatedBy = &operatorID
+
+	err = s.repo.Update(price)
+	if err != nil {
+		return nil, fmt.Errorf("更新P+0加价失败: %w", err)
+	}
+
+	// 记录调价日志
+	s.createChangeLogWithSnapshot(price, snapshotBefore, models.ChangeTypeRate, operatorID, operatorName, source, ipAddress, "P+0加价", "P+0加价调整")
+
+	return price, nil
+}
+
 // createSnapshot 创建快照
 func (s *SettlementPriceService) createSnapshot(price *models.SettlementPrice) models.JSONMap {
 	snapshot := models.JSONMap{

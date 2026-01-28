@@ -174,8 +174,9 @@ const detailDialogVisible = ref(false)
 const currentLog = ref<OperationLog | null>(null)
 
 // 获取模块标签类型
-function getModuleTagType(module: LogModule) {
-  const typeMap: Record<string, string> = {
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger' | ''
+function getModuleTagType(module: LogModule): TagType {
+  const typeMap: Record<string, TagType> = {
     '#409eff': 'primary',
     '#67c23a': 'success',
     '#e6a23c': 'warning',
@@ -191,8 +192,8 @@ function getModuleLabel(module: LogModule) {
 }
 
 // 获取请求方式类型
-function getMethodType(method: string) {
-  const methodTypes: Record<string, string> = {
+function getMethodType(method: string): TagType {
+  const methodTypes: Record<string, TagType> = {
     GET: 'success',
     POST: 'primary',
     PUT: 'warning',

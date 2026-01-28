@@ -130,9 +130,10 @@ const page = ref(1)
 const pageSize = ref(10)
 
 // 获取钱包类型标签
-function getWalletTypeTag(type?: WalletType) {
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger' | ''
+function getWalletTypeTag(type?: WalletType): TagType {
   if (!type) return ''
-  const colorMap: Record<string, string> = {
+  const colorMap: Record<string, TagType> = {
     '#409eff': 'primary',
     '#67c23a': 'success',
     '#e6a23c': 'warning',
@@ -150,8 +151,8 @@ function getWalletTypeLabel(type?: WalletType) {
 }
 
 // 获取流水类型标签
-function getLogTypeTag(type: string) {
-  const tagMap: Record<string, string> = {
+function getLogTypeTag(type: string): TagType {
+  const tagMap: Record<string, TagType> = {
     income: 'success',
     expense: 'danger',
     freeze: 'warning',

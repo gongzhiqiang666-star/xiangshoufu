@@ -110,6 +110,16 @@ func (m *MockTerminalRepository) FindActivatedAfter(channelID int64, activatedAf
 	return result, nil
 }
 
+func (m *MockTerminalRepository) CountByTypeCode(channelID int64, brandCode, modelCode string) (int64, error) {
+	var count int64
+	for _, terminal := range m.terminals {
+		if terminal.ChannelID == channelID && terminal.BrandCode == brandCode && terminal.ModelCode == modelCode {
+			count++
+		}
+	}
+	return count, nil
+}
+
 // MockTerminalDistributeRepository 模拟终端下发仓库
 type MockTerminalDistributeRepository struct {
 	distributes map[int64]*models.TerminalDistribute

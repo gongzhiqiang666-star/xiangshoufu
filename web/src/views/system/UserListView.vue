@@ -250,7 +250,7 @@ const resetRules: FormRules = {
   confirmPassword: [
     { required: true, message: '请再次输入密码', trigger: 'blur' },
     {
-      validator: (rule, value, callback) => {
+      validator: (_rule, value, callback) => {
         if (value !== resetForm.password) {
           callback(new Error('两次输入的密码不一致'))
         } else {
@@ -263,14 +263,15 @@ const resetRules: FormRules = {
 }
 
 // 获取角色标签类型
-function getRoleTagType(role: UserRole) {
-  const typeMap: Record<string, string> = {
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
+function getRoleTagType(role: UserRole): TagType | undefined {
+  const typeMap: Record<string, TagType> = {
     '#409eff': 'primary',
     '#67c23a': 'success',
     '#e6a23c': 'warning',
     '#909399': 'info',
   }
-  return typeMap[USER_ROLE_CONFIG[role]?.color] || ''
+  return typeMap[USER_ROLE_CONFIG[role]?.color] || undefined
 }
 
 // 获取角色名称

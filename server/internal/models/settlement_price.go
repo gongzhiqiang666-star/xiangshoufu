@@ -201,6 +201,12 @@ type SettlementPrice struct {
 	SimSecondCashback    int64 `json:"sim_second_cashback" gorm:"default:0"`
 	SimThirdPlusCashback int64 `json:"sim_third_plus_cashback" gorm:"default:0"`
 
+	// 高调费率配置（按费率类型）
+	HighRateConfigs HighRateConfigs `json:"high_rate_configs" gorm:"type:jsonb;default:'{}'"`
+
+	// P+0加价配置（按费率类型）
+	D0ExtraConfigs D0ExtraConfigs `json:"d0_extra_configs" gorm:"type:jsonb;default:'{}'"`
+
 	// 元数据
 	Version     int        `json:"version" gorm:"default:1"`
 	Status      int16      `json:"status" gorm:"default:1"`
@@ -395,6 +401,8 @@ type SettlementPriceItem struct {
 	SimFirstCashback     int64  `json:"sim_first_cashback"`
 	SimSecondCashback    int64  `json:"sim_second_cashback"`
 	SimThirdPlusCashback int64  `json:"sim_third_plus_cashback"`
+	HighRateConfigs HighRateConfigs `json:"high_rate_configs"`
+	D0ExtraConfigs  D0ExtraConfigs  `json:"d0_extra_configs"`
 	Version     int              `json:"version"`
 	Status      int16            `json:"status"`
 	EffectiveAt time.Time        `json:"effective_at"`

@@ -15,6 +15,7 @@ const (
 	ChannelCodeSandpay     = "SANDPAY"     // 杉德支付
 	ChannelCodeFuiou       = "FUIOU"       // 富友支付
 	ChannelCodeHeepay      = "HEEPAY"      // 汇付天下
+	ChannelCodeLiandong    = "LIANDONG"    // 联动
 )
 
 // AdapterFactory 适配器工厂

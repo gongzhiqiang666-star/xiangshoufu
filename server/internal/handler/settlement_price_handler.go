@@ -101,6 +101,20 @@ func (h *SettlementPriceHandler) Create(c *gin.Context) {
 		return
 	}
 
+	// 验证必填字段
+	if req.AgentID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请选择代理商"})
+		return
+	}
+	if req.ChannelID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请选择通道"})
+		return
+	}
+	if req.TemplateID == nil || *req.TemplateID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请选择政策模板"})
+		return
+	}
+
 	// 获取操作者信息
 	operatorID := getOperatorID(c)
 	operatorName := getOperatorName(c)
@@ -111,7 +125,7 @@ func (h *SettlementPriceHandler) Create(c *gin.Context) {
 		req.ChannelID,
 		req.TemplateID,
 		req.BrandCode,
-		nil, // 无模板直接创建
+		nil, // 模板详情由service层查询
 		operatorID,
 		operatorName,
 		source,
@@ -298,4 +312,80 @@ func getSource(c *gin.Context) string {
 		}
 	}
 	return "PC"
+}
+
+// UpdateHighRate 更新高调费率配置
+// @Summary 更新高调费率配置
+// @Tags 结算价管理
+// @Accept json
+// @Produce json
+// @Param id path int64 true "结算价ID"
+// @Param body body service.UpdateHighRateRequest true "更新高调费率请求"
+// @Success 200 {object} models.SettlementPrice
+// @Router /api/v1/settlement-prices/{id}/high-rate [put]
+func (h *SettlementPriceHandler) UpdateHighRate(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
+		return
+	}
+
+	var req service.UpdateHighRateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 获取操作者信息
+	operatorID := getOperatorID(c)
+	operatorName := getOperatorName(c)
+	source := getSource(c)
+	ipAddress := c.ClientIP()
+
+	price, err := h.service.UpdateHighRate(id, &req, operatorID, operatorName, source, ipAddress)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, price)
+}
+
+// UpdateD0Extra 更新P+0加价配置
+// @Summary 更新P+0加价配置
+// @Tags 结算价管理
+// @Accept json
+// @Produce json
+// @Param id path int64 true "结算价ID"
+// @Param body body service.UpdateD0ExtraRequest true "更新P+0加价请求"
+// @Success 200 {object} models.SettlementPrice
+// @Router /api/v1/settlement-prices/{id}/d0-extra [put]
+func (h *SettlementPriceHandler) UpdateD0Extra(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
+		return
+	}
+
+	var req service.UpdateD0ExtraRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 获取操作者信息
+	operatorID := getOperatorID(c)
+	operatorName := getOperatorName(c)
+	source := getSource(c)
+	ipAddress := c.ClientIP()
+
+	price, err := h.service.UpdateD0Extra(id, &req, operatorID, operatorName, source, ipAddress)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, price)
 }

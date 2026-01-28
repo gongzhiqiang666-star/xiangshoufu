@@ -152,6 +152,16 @@ type ProfitRecord struct {
 	RevokedAt        *time.Time `json:"revoked_at"`
 	RevokeReason     string     `json:"revoke_reason"`
 	CreatedAt        time.Time  `json:"created_at" gorm:"default:now()"`
+
+	// 高调分润字段
+	HighRateProfit int64  `json:"high_rate_profit" gorm:"default:0"` // 高调分润金额（分）
+	HighRateSelf   string `json:"high_rate_self"`                    // 自身高调费率
+	HighRateLower  string `json:"high_rate_lower"`                   // 下级高调费率
+
+	// P+0分润字段
+	D0ExtraProfit int64 `json:"d0_extra_profit" gorm:"default:0"` // P+0分润金额（分）
+	D0ExtraSelf   int64 `json:"d0_extra_self" gorm:"default:0"`   // 自身P+0加价配置（分）
+	D0ExtraLower  int64 `json:"d0_extra_lower" gorm:"default:0"`  // 下级P+0加价配置（分）
 }
 
 // WalletRepository 钱包仓库接口
@@ -238,4 +248,15 @@ type MerchantRepository interface {
 	FindByID(id int64) (*models.Merchant, error)
 	FindByMerchantNo(merchantNo string) (*models.Merchant, error)
 	UpdateApproveStatus(id int64, status int16) error
+}
+
+// ChannelDepositTierRepository 通道押金档位仓库接口
+type ChannelDepositTierRepository interface {
+	Create(tier *models.ChannelDepositTier) error
+	Update(tier *models.ChannelDepositTier) error
+	Delete(id int64) error
+	FindByID(id int64) (*models.ChannelDepositTier, error)
+	FindByChannelID(channelID int64) ([]*models.ChannelDepositTier, error)
+	FindByChannelAndBrand(channelID int64, brandCode string) ([]*models.ChannelDepositTier, error)
+	FindByTierCode(channelID int64, brandCode string, tierCode string) (*models.ChannelDepositTier, error)
 }

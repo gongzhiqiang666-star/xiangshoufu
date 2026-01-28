@@ -50,6 +50,8 @@ export interface SettlementPrice {
   sim_first_cashback: number
   sim_second_cashback: number
   sim_third_plus_cashback: number
+  high_rate_configs: HighRateConfigs
+  d0_extra_configs: D0ExtraConfigs
   version: number
   status: number
   effective_at: string
@@ -70,6 +72,8 @@ export interface SettlementPriceItem {
   sim_first_cashback: number
   sim_second_cashback: number
   sim_third_plus_cashback: number
+  high_rate_configs: HighRateConfigs
+  d0_extra_configs: D0ExtraConfigs
   version: number
   status: number
   effective_at: string
@@ -122,6 +126,36 @@ export interface UpdateSimCashbackRequest {
   sim_first_cashback: number
   sim_second_cashback: number
   sim_third_plus_cashback: number
+}
+
+/** 高调费率配置项 */
+export interface HighRateConfig {
+  rate: string  // 高调费率（%）
+}
+
+/** 高调费率配置集合 */
+export interface HighRateConfigs {
+  [rateType: string]: HighRateConfig
+}
+
+/** P+0加价配置项 */
+export interface D0ExtraConfig {
+  extra_fee: number  // 加价金额（分）
+}
+
+/** P+0加价配置集合 */
+export interface D0ExtraConfigs {
+  [rateType: string]: D0ExtraConfig
+}
+
+/** 更新高调费率请求 */
+export interface UpdateHighRateRequest {
+  high_rate_configs: HighRateConfigs
+}
+
+/** 更新P+0加价请求 */
+export interface UpdateD0ExtraRequest {
+  d0_extra_configs: D0ExtraConfigs
 }
 
 // ============================================================
@@ -284,6 +318,26 @@ export function getSettlementPriceChangeLogs(
   params?: { page?: number; page_size?: number }
 ): Promise<PriceChangeLogListResponse> {
   return get<PriceChangeLogListResponse>(`/v1/settlement-prices/${id}/change-logs`, params)
+}
+
+/**
+ * 更新高调费率配置
+ */
+export function updateSettlementPriceHighRate(
+  id: number,
+  data: UpdateHighRateRequest
+): Promise<SettlementPrice> {
+  return put<SettlementPrice>(`/v1/settlement-prices/${id}/high-rate`, data)
+}
+
+/**
+ * 更新P+0加价配置
+ */
+export function updateSettlementPriceD0Extra(
+  id: number,
+  data: UpdateD0ExtraRequest
+): Promise<SettlementPrice> {
+  return put<SettlementPrice>(`/v1/settlement-prices/${id}/d0-extra`, data)
 }
 
 // ============================================================

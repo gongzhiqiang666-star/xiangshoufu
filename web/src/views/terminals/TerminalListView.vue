@@ -312,7 +312,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Upload, Bottom, Top, WarningFilled } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import PageHeader from '@/components/Common/PageHeader.vue'
 import SearchForm from '@/components/Common/SearchForm.vue'
 import ProTable from '@/components/Common/ProTable.vue'
@@ -364,8 +364,9 @@ const dispatchForm = reactive({
 })
 
 // 状态配置
-function getStatusType(status: TerminalStatus) {
-  const map: Record<TerminalStatus, string> = {
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger' | ''
+function getStatusType(status: TerminalStatus): TagType {
+  const map: Record<TerminalStatus, TagType> = {
     stock: 'info',
     distributed: 'warning',
     activated: 'success',

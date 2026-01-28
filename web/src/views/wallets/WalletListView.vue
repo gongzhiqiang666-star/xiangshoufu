@@ -196,8 +196,9 @@ const maxWithdrawAmount = computed(() => {
 })
 
 // 钱包类型配置
-function getWalletTypeTag(type: WalletTypeEnum) {
-  const colorMap: Record<string, string> = {
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger' | ''
+function getWalletTypeTag(type: WalletTypeEnum): TagType {
+  const colorMap: Record<string, TagType> = {
     '#409eff': 'primary',
     '#67c23a': 'success',
     '#e6a23c': 'warning',
