@@ -88,6 +88,24 @@ export const MENU_LIST: MenuItem[] = [
     ],
   },
   {
+    path: '/settlement-prices',
+    title: '结算价管理',
+    icon: 'PriceTag',
+    children: [
+      { path: '/settlement-prices/list', title: '结算价列表', icon: '' },
+      { path: '/settlement-prices/change-logs', title: '调价记录', icon: '' },
+    ],
+  },
+  {
+    path: '/rewards',
+    title: '奖励管理',
+    icon: 'Trophy',
+    children: [
+      { path: '/rewards/templates', title: '奖励模版', icon: '' },
+      { path: '/rewards/overflow-logs', title: '溢出日志', icon: '' },
+    ],
+  },
+  {
     path: '/marketing',
     title: '营销管理',
     icon: 'Picture',

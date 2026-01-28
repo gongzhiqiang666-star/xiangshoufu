@@ -1,11 +1,19 @@
 import { post, get } from './request'
 import type { LoginRequest, LoginResponse, RefreshTokenResponse, UserInfo } from '@/types'
+import { encryptPassword } from '@/utils/crypto'
 
 /**
- * 用户登录
+ * 用户登录（密码加密传输）
  */
-export function login(data: LoginRequest): Promise<LoginResponse> {
-  return post<LoginResponse>('/v1/auth/login', data)
+export async function login(data: LoginRequest): Promise<LoginResponse> {
+  // 加密密码
+  const encryptedPassword = await encryptPassword(data.password)
+
+  return post<LoginResponse>('/v1/auth/login', {
+    username: data.username,
+    password: encryptedPassword,
+    encrypted: true, // 标识密码已加密
+  })
 }
 
 /**

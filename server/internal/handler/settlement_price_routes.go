@@ -42,11 +42,4 @@ func RegisterPriceChangeLogRoutes(rg *gin.RouterGroup, h *PriceChangeLogHandler,
 		group.GET("", h.List)
 		group.GET("/:id", h.GetByID)
 	}
-
-	// 代理商调价记录
-	agentGroup := rg.Group("/agents")
-	agentGroup.Use(middleware.AuthMiddleware(authService))
-	{
-		agentGroup.GET("/:agent_id/price-change-logs", h.ListByAgent)
-	}
 }

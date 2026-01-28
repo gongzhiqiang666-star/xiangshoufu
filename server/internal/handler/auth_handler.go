@@ -5,6 +5,7 @@ import (
 
 	"xiangshoufu/internal/middleware"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/crypto"
 
 	"github.com/gin-gonic/gin"
 )
@@ -35,8 +36,9 @@ func (h *AuthHandler) SetAuditService(auditService *service.AuditService) {
 
 // LoginRequest 登录请求
 type LoginRequest struct {
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
+	Username  string `json:"username" binding:"required"`
+	Password  string `json:"password" binding:"required"`
+	Encrypted bool   `json:"encrypted"` // 密码是否已加密
 }
 
 // Login 登录
@@ -58,9 +60,23 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	// 如果密码已加密，先解密
+	password := req.Password
+	if req.Encrypted {
+		decrypted, err := crypto.DecryptPassword(req.Password)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"code":    400,
+				"message": "密码解密失败，请刷新页面重试",
+			})
+			return
+		}
+		password = decrypted
+	}
+
 	loginReq := &service.LoginRequest{
 		Username:  req.Username,
-		Password:  req.Password,
+		Password:  password,
 		IP:        c.ClientIP(),
 		UserAgent: c.GetHeader("User-Agent"),
 	}
@@ -341,11 +357,38 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	})
 }
 
+// GetPublicKey 获取RSA公钥
+// @Summary 获取RSA公钥
+// @Description 获取用于密码加密的RSA公钥
+// @Tags 认证
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/auth/public-key [get]
+func (h *AuthHandler) GetPublicKey(c *gin.Context) {
+	publicKey, err := crypto.GetPublicKeyPEM()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "获取公钥失败",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"public_key": publicKey,
+		},
+	})
+}
+
 // RegisterAuthRoutes 注册认证路由
 func RegisterAuthRoutes(r *gin.RouterGroup, h *AuthHandler, authService *service.AuthService) {
 	auth := r.Group("/auth")
 	{
 		// 公开接口（无需登录）
+		auth.GET("/public-key", h.GetPublicKey) // RSA公钥获取
 		auth.POST("/login", h.Login)
 		auth.POST("/refresh", h.Refresh)
 		auth.POST("/register", h.Register) // 邀请码注册接口

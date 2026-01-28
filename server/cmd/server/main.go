@@ -419,6 +419,9 @@ func main() {
 	jobHandler := handler.NewJobHandler(jobConfigRepo, jobLogRepo)
 	alertHandler := handler.NewAlertHandler(alertConfigRepo, alertLogRepo, alertService)
 
+	// 20.9 初始化系统管理Handler
+	systemHandler := handler.NewSystemHandler(userRepo, auditLogRepo)
+
 	// 21. 初始化政策Handler
 	policyHandler := handler.NewPolicyHandler(policyTemplateRepo, agentPolicyRepo, policyService)
 
@@ -510,6 +513,7 @@ func main() {
 		rateSyncHandler,          // 新增：费率同步Handler
 		rewardHandler,            // 新增：奖励模块Handler
 		settlementPriceHandler, agentRewardSettingHandler, priceChangeLogHandler, // 新增：结算价相关Handler
+		systemHandler, // 新增：系统管理Handler
 		authService, metricsService, config.SwaggerEnabled,
 	)
 
@@ -771,6 +775,7 @@ func setupRouter(
 	settlementPriceHandler *handler.SettlementPriceHandler, // 新增：结算价Handler
 	agentRewardSettingHandler *handler.AgentRewardSettingHandler, // 新增：代理商奖励配置Handler
 	priceChangeLogHandler *handler.PriceChangeLogHandler, // 新增：调价记录Handler
+	systemHandler *handler.SystemHandler, // 新增：系统管理Handler
 	authService *service.AuthService,
 	metricsService *service.MetricsService,
 	swaggerEnabled bool,
@@ -903,6 +908,9 @@ func setupRouter(
 		handler.RegisterSettlementPriceRoutes(apiV1, settlementPriceHandler, authService)
 		handler.RegisterAgentRewardSettingRoutes(apiV1, agentRewardSettingHandler, authService)
 		handler.RegisterPriceChangeLogRoutes(apiV1, priceChangeLogHandler, authService)
+
+		// 注册系统管理路由
+		handler.RegisterSystemRoutes(apiV1, systemHandler, authService)
 	}
 
 	// Swagger UI (可通过环境变量关闭)

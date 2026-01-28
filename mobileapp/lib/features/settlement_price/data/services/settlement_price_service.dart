@@ -24,31 +24,31 @@ class SettlementPriceService {
     if (channelId != null) params['channel_id'] = channelId;
     if (status != null) params['status'] = status;
 
-    final response = await _apiClient.get('/v1/settlement-prices', queryParameters: params);
+    final response = await _apiClient.get('/api/v1/settlement-prices', queryParameters: params);
     return SettlementPriceListResponse.fromJson(response.data);
   }
 
   /// 获取结算价详情
   Future<SettlementPriceModel> getSettlementPrice(int id) async {
-    final response = await _apiClient.get('/v1/settlement-prices/$id');
+    final response = await _apiClient.get('/api/v1/settlement-prices/$id');
     return SettlementPriceModel.fromJson(response.data);
   }
 
   /// 更新费率
   Future<SettlementPriceModel> updateRate(int id, Map<String, dynamic> data) async {
-    final response = await _apiClient.put('/v1/settlement-prices/$id/rate', data: data);
+    final response = await _apiClient.put('/api/v1/settlement-prices/$id/rate', data: data);
     return SettlementPriceModel.fromJson(response.data);
   }
 
   /// 更新押金返现
   Future<SettlementPriceModel> updateDepositCashback(int id, Map<String, dynamic> data) async {
-    final response = await _apiClient.put('/v1/settlement-prices/$id/deposit', data: data);
+    final response = await _apiClient.put('/api/v1/settlement-prices/$id/deposit', data: data);
     return SettlementPriceModel.fromJson(response.data);
   }
 
   /// 更新流量费返现
   Future<SettlementPriceModel> updateSimCashback(int id, Map<String, dynamic> data) async {
-    final response = await _apiClient.put('/v1/settlement-prices/$id/sim', data: data);
+    final response = await _apiClient.put('/api/v1/settlement-prices/$id/sim', data: data);
     return SettlementPriceModel.fromJson(response.data);
   }
 
@@ -72,13 +72,13 @@ class SettlementPriceService {
     if (startDate != null) params['start_date'] = startDate;
     if (endDate != null) params['end_date'] = endDate;
 
-    final response = await _apiClient.get('/v1/price-change-logs', queryParameters: params);
+    final response = await _apiClient.get('/api/v1/price-change-logs', queryParameters: params);
     return PriceChangeLogListResponse.fromJson(response.data);
   }
 
   /// 获取调价记录详情
   Future<PriceChangeLogModel> getPriceChangeLog(int id) async {
-    final response = await _apiClient.get('/v1/price-change-logs/$id');
+    final response = await _apiClient.get('/api/v1/price-change-logs/$id');
     return PriceChangeLogModel.fromJson(response.data);
   }
 }

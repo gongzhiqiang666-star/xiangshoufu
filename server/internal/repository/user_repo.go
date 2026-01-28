@@ -8,6 +8,15 @@ import (
 	"gorm.io/gorm"
 )
 
+// UserQueryParams 用户查询参数
+type UserQueryParams struct {
+	Username string
+	RoleType *int16
+	Status   *int16
+	Limit    int
+	Offset   int
+}
+
 // UserRepository 用户仓库接口
 type UserRepository interface {
 	Create(user *models.User) error
@@ -15,6 +24,9 @@ type UserRepository interface {
 	FindByID(id int64) (*models.User, error)
 	FindByUsername(username string) (*models.User, error)
 	UpdateLastLogin(id int64, ip string) error
+	FindByParams(params UserQueryParams) ([]*models.User, int64, error)
+	Delete(id int64) error
+	UpdateStatus(id int64, status int16) error
 }
 
 // GormUserRepository GORM实现
@@ -59,6 +71,48 @@ func (r *GormUserRepository) UpdateLastLogin(id int64, ip string) error {
 		"last_login_at": now,
 		"last_login_ip": ip,
 	}).Error
+}
+
+// FindByParams 根据参数查询用户列表
+func (r *GormUserRepository) FindByParams(params UserQueryParams) ([]*models.User, int64, error) {
+	var users []*models.User
+	var total int64
+
+	query := r.db.Model(&models.User{})
+
+	if params.Username != "" {
+		query = query.Where("username LIKE ?", "%"+params.Username+"%")
+	}
+	if params.RoleType != nil {
+		query = query.Where("role_type = ?", *params.RoleType)
+	}
+	if params.Status != nil {
+		query = query.Where("status = ?", *params.Status)
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	if params.Limit <= 0 {
+		params.Limit = 20
+	}
+
+	if err := query.Order("created_at DESC").Limit(params.Limit).Offset(params.Offset).Find(&users).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return users, total, nil
+}
+
+// Delete 删除用户
+func (r *GormUserRepository) Delete(id int64) error {
+	return r.db.Delete(&models.User{}, id).Error
+}
+
+// UpdateStatus 更新用户状态
+func (r *GormUserRepository) UpdateStatus(id int64, status int16) error {
+	return r.db.Model(&models.User{}).Where("id = ?", id).Update("status", status).Error
 }
 
 // RefreshTokenRepository 刷新令牌仓库接口
