@@ -598,3 +598,307 @@ func (r *GormTerminalRepository) UpdatePolicySyncStatus(id int64, isSynced bool,
 	}
 	return r.db.Model(&models.TerminalPolicy{}).Where("id = ?", id).Updates(updates).Error
 }
+
+// TerminalFilterParams 终端列表筛选参数
+type TerminalFilterParams struct {
+	OwnerAgentID int64    // 所属代理商ID（必填）
+	ChannelID    *int64   // 通道ID（可选）
+	BrandCode    string   // 品牌编码（可选）
+	ModelCode    string   // 型号编码（可选）
+	StatusGroup  string   // 状态分组（可选）：all/unstock/stocked/unbound/inactive/active
+	Keyword      string   // 搜索关键词（可选）：终端SN或商户号
+	Limit        int
+	Offset       int
+}
+
+// FindByOwnerWithFilter 带筛选条件查询终端列表
+func (r *GormTerminalRepository) FindByOwnerWithFilter(params TerminalFilterParams) ([]*models.Terminal, int64, error) {
+	var terminals []*models.Terminal
+	var total int64
+
+	query := r.db.Model(&models.Terminal{}).Where("owner_agent_id = ?", params.OwnerAgentID)
+
+	// 通道筛选
+	if params.ChannelID != nil && *params.ChannelID > 0 {
+		query = query.Where("channel_id = ?", *params.ChannelID)
+	}
+
+	// 品牌筛选
+	if params.BrandCode != "" {
+		query = query.Where("brand_code = ?", params.BrandCode)
+	}
+
+	// 型号筛选
+	if params.ModelCode != "" {
+		query = query.Where("model_code = ?", params.ModelCode)
+	}
+
+	// 状态分组筛选
+	switch params.StatusGroup {
+	case "unstock":
+		// 未出库: Status=1
+		query = query.Where("status = ?", models.TerminalStatusPending)
+	case "stocked":
+		// 已出库: Status=2
+		query = query.Where("status = ?", models.TerminalStatusAllocated)
+	case "unbound":
+		// 未绑定: Status=2 且 MerchantID=null
+		query = query.Where("status = ? AND merchant_id IS NULL", models.TerminalStatusAllocated)
+	case "inactive":
+		// 未激活: Status=3 且 ActivatedAt=null
+		query = query.Where("status = ? AND activated_at IS NULL", models.TerminalStatusBound)
+	case "active":
+		// 已激活: Status=4
+		query = query.Where("status = ?", models.TerminalStatusActivated)
+	case "all", "":
+		// 全部，不添加状态筛选
+	}
+
+	// 关键词搜索
+	if params.Keyword != "" {
+		query = query.Where("terminal_sn LIKE ? OR merchant_no LIKE ?", "%"+params.Keyword+"%", "%"+params.Keyword+"%")
+	}
+
+	err := query.Count(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	err = query.Order("created_at DESC").Limit(params.Limit).Offset(params.Offset).Find(&terminals).Error
+	return terminals, total, err
+}
+
+// TerminalTypeInfo 终端类型信息
+type TerminalTypeInfo struct {
+	ChannelID   int64  `json:"channel_id"`
+	ChannelCode string `json:"channel_code"`
+	BrandCode   string `json:"brand_code"`
+	ModelCode   string `json:"model_code"`
+	Count       int64  `json:"count"`
+}
+
+// GetTerminalTypes 获取代理商拥有的终端类型列表
+func (r *GormTerminalRepository) GetTerminalTypes(ownerAgentID int64) ([]TerminalTypeInfo, error) {
+	var types []TerminalTypeInfo
+	err := r.db.Model(&models.Terminal{}).
+		Select("channel_id, channel_code, brand_code, model_code, COUNT(*) as count").
+		Where("owner_agent_id = ?", ownerAgentID).
+		Group("channel_id, channel_code, brand_code, model_code").
+		Order("channel_id, brand_code, model_code").
+		Find(&types).Error
+	return types, err
+}
+
+// StatusGroupCount 状态分组统计
+type StatusGroupCount struct {
+	Key   string `json:"key"`
+	Label string `json:"label"`
+	Count int64  `json:"count"`
+}
+
+// GetStatusGroupCounts 获取状态分组统计
+func (r *GormTerminalRepository) GetStatusGroupCounts(ownerAgentID int64, channelID *int64, brandCode, modelCode string) ([]StatusGroupCount, error) {
+	var counts []StatusGroupCount
+
+	baseQuery := r.db.Model(&models.Terminal{}).Where("owner_agent_id = ?", ownerAgentID)
+	if channelID != nil && *channelID > 0 {
+		baseQuery = baseQuery.Where("channel_id = ?", *channelID)
+	}
+	if brandCode != "" {
+		baseQuery = baseQuery.Where("brand_code = ?", brandCode)
+	}
+	if modelCode != "" {
+		baseQuery = baseQuery.Where("model_code = ?", modelCode)
+	}
+
+	// 全部
+	var totalCount int64
+	baseQuery.Count(&totalCount)
+	counts = append(counts, StatusGroupCount{Key: "all", Label: "全部", Count: totalCount})
+
+	// 未出库
+	var unstockCount int64
+	baseQuery.Where("status = ?", models.TerminalStatusPending).Count(&unstockCount)
+	counts = append(counts, StatusGroupCount{Key: "unstock", Label: "未出库", Count: unstockCount})
+
+	// 已出库
+	var stockedCount int64
+	r.db.Model(&models.Terminal{}).Where("owner_agent_id = ? AND status = ?", ownerAgentID, models.TerminalStatusAllocated).Count(&stockedCount)
+	counts = append(counts, StatusGroupCount{Key: "stocked", Label: "已出库", Count: stockedCount})
+
+	// 未绑定
+	var unboundCount int64
+	r.db.Model(&models.Terminal{}).Where("owner_agent_id = ? AND status = ? AND merchant_id IS NULL", ownerAgentID, models.TerminalStatusAllocated).Count(&unboundCount)
+	counts = append(counts, StatusGroupCount{Key: "unbound", Label: "未绑定", Count: unboundCount})
+
+	// 未激活
+	var inactiveCount int64
+	r.db.Model(&models.Terminal{}).Where("owner_agent_id = ? AND status = ? AND activated_at IS NULL", ownerAgentID, models.TerminalStatusBound).Count(&inactiveCount)
+	counts = append(counts, StatusGroupCount{Key: "inactive", Label: "未激活", Count: inactiveCount})
+
+	// 已激活
+	var activeCount int64
+	r.db.Model(&models.Terminal{}).Where("owner_agent_id = ? AND status = ?", ownerAgentID, models.TerminalStatusActivated).Count(&activeCount)
+	counts = append(counts, StatusGroupCount{Key: "active", Label: "已激活", Count: activeCount})
+
+	return counts, nil
+}
+
+// TerminalFlowLog 终端流动记录
+type TerminalFlowLog struct {
+	ID            int64      `json:"id"`
+	LogType       string     `json:"log_type"`        // distribute/recall/bind/unbind/activate
+	LogTypeName   string     `json:"log_type_name"`   // 下发/回拨/绑定/解绑/激活
+	FromAgentID   *int64     `json:"from_agent_id"`
+	FromAgentName string     `json:"from_agent_name"`
+	ToAgentID     *int64     `json:"to_agent_id"`
+	ToAgentName   string     `json:"to_agent_name"`
+	MerchantNo    string     `json:"merchant_no"`
+	Status        int16      `json:"status"`
+	StatusName    string     `json:"status_name"`
+	Remark        string     `json:"remark"`
+	CreatedAt     time.Time  `json:"created_at"`
+	ConfirmedAt   *time.Time `json:"confirmed_at"`
+}
+
+// GetTerminalFlowLogs 获取终端流动记录
+func (r *GormTerminalRepository) GetTerminalFlowLogs(terminalSN string, logType string, limit, offset int) ([]TerminalFlowLog, int64, error) {
+	var logs []TerminalFlowLog
+	var total int64
+
+	// 构建UNION ALL查询
+	// 1. 下发记录
+	distributeQuery := r.db.Model(&models.TerminalDistribute{}).
+		Select(`id, 'distribute' as log_type, '下发' as log_type_name,
+			from_agent_id, to_agent_id, '' as merchant_no, status, remark,
+			created_at, confirmed_at`).
+		Where("terminal_sn = ?", terminalSN)
+
+	// 2. 回拨记录
+	recallQuery := r.db.Model(&models.TerminalRecall{}).
+		Select(`id, 'recall' as log_type, '回拨' as log_type_name,
+			from_agent_id, to_agent_id, '' as merchant_no, status, remark,
+			created_at, confirmed_at`).
+		Where("terminal_sn = ?", terminalSN)
+
+	// 根据日志类型筛选
+	switch logType {
+	case "distribute":
+		err := distributeQuery.Count(&total).Error
+		if err != nil {
+			return nil, 0, err
+		}
+		err = distributeQuery.Order("created_at DESC").Limit(limit).Offset(offset).Find(&logs).Error
+		return logs, total, err
+	case "recall":
+		err := recallQuery.Count(&total).Error
+		if err != nil {
+			return nil, 0, err
+		}
+		err = recallQuery.Order("created_at DESC").Limit(limit).Offset(offset).Find(&logs).Error
+		return logs, total, err
+	default:
+		// 查询全部类型，使用子查询合并
+		// 先分别查询再合并
+		var distributeLogs []TerminalFlowLog
+		var recallLogs []TerminalFlowLog
+
+		r.db.Model(&models.TerminalDistribute{}).
+			Select(`id, 'distribute' as log_type, from_agent_id, to_agent_id, '' as merchant_no, status, remark, created_at, confirmed_at`).
+			Where("terminal_sn = ?", terminalSN).
+			Find(&distributeLogs)
+
+		r.db.Model(&models.TerminalRecall{}).
+			Select(`id, 'recall' as log_type, from_agent_id, to_agent_id, '' as merchant_no, status, remark, created_at, confirmed_at`).
+			Where("terminal_sn = ?", terminalSN).
+			Find(&recallLogs)
+
+		// 为下发记录设置类型名称和状态名称
+		for i := range distributeLogs {
+			distributeLogs[i].LogType = "distribute"
+			distributeLogs[i].LogTypeName = "下发"
+			distributeLogs[i].StatusName = getDistributeStatusName(distributeLogs[i].Status)
+		}
+
+		// 为回拨记录设置类型名称和状态名称
+		for i := range recallLogs {
+			recallLogs[i].LogType = "recall"
+			recallLogs[i].LogTypeName = "回拨"
+			recallLogs[i].StatusName = getRecallStatusName(recallLogs[i].Status)
+		}
+
+		// 合并并按时间排序
+		logs = append(distributeLogs, recallLogs...)
+		total = int64(len(logs))
+
+		// 简单排序（按创建时间倒序）
+		for i := 0; i < len(logs)-1; i++ {
+			for j := i + 1; j < len(logs); j++ {
+				if logs[i].CreatedAt.Before(logs[j].CreatedAt) {
+					logs[i], logs[j] = logs[j], logs[i]
+				}
+			}
+		}
+
+		// 分页
+		start := offset
+		if start > len(logs) {
+			start = len(logs)
+		}
+		end := start + limit
+		if end > len(logs) {
+			end = len(logs)
+		}
+		logs = logs[start:end]
+
+		return logs, total, nil
+	}
+}
+
+// getDistributeStatusName 获取下发状态名称
+func getDistributeStatusName(status int16) string {
+	switch status {
+	case models.TerminalDistributeStatusPending:
+		return "待确认"
+	case models.TerminalDistributeStatusConfirmed:
+		return "已确认"
+	case models.TerminalDistributeStatusRejected:
+		return "已拒绝"
+	case models.TerminalDistributeStatusCancelled:
+		return "已取消"
+	default:
+		return "未知"
+	}
+}
+
+// getRecallStatusName 获取回拨状态名称
+func getRecallStatusName(status int16) string {
+	switch status {
+	case models.TerminalRecallStatusPending:
+		return "待确认"
+	case models.TerminalRecallStatusConfirmed:
+		return "已确认"
+	case models.TerminalRecallStatusRejected:
+		return "已拒绝"
+	case models.TerminalRecallStatusCancelled:
+		return "已取消"
+	default:
+		return "未知"
+	}
+}
+
+// GetChannelList 获取代理商拥有终端的通道列表
+func (r *GormTerminalRepository) GetChannelList(ownerAgentID int64) ([]struct {
+	ChannelID   int64  `json:"channel_id"`
+	ChannelCode string `json:"channel_code"`
+}, error) {
+	var channels []struct {
+		ChannelID   int64  `json:"channel_id"`
+		ChannelCode string `json:"channel_code"`
+	}
+	err := r.db.Model(&models.Terminal{}).
+		Select("DISTINCT channel_id, channel_code").
+		Where("owner_agent_id = ?", ownerAgentID).
+		Find(&channels).Error
+	return channels, err
+}

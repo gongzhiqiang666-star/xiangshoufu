@@ -358,5 +358,364 @@ void main() {
         );
       });
     });
+
+    // ==================== 新增筛选和流动记录模型测试 ====================
+
+    group('TerminalStatusGroup', () {
+      test('fromValue returns correct status group', () {
+        expect(TerminalStatusGroup.fromValue('all'), TerminalStatusGroup.all);
+        expect(TerminalStatusGroup.fromValue('unstock'), TerminalStatusGroup.unstock);
+        expect(TerminalStatusGroup.fromValue('stocked'), TerminalStatusGroup.stocked);
+        expect(TerminalStatusGroup.fromValue('unbound'), TerminalStatusGroup.unbound);
+        expect(TerminalStatusGroup.fromValue('inactive'), TerminalStatusGroup.inactive);
+        expect(TerminalStatusGroup.fromValue('active'), TerminalStatusGroup.active);
+      });
+
+      test('fromValue returns all for unknown value', () {
+        expect(TerminalStatusGroup.fromValue('unknown'), TerminalStatusGroup.all);
+        expect(TerminalStatusGroup.fromValue(''), TerminalStatusGroup.all);
+      });
+
+      test('has correct value and label', () {
+        expect(TerminalStatusGroup.all.value, 'all');
+        expect(TerminalStatusGroup.all.label, '全部');
+        expect(TerminalStatusGroup.unstock.value, 'unstock');
+        expect(TerminalStatusGroup.unstock.label, '未出库');
+        expect(TerminalStatusGroup.active.value, 'active');
+        expect(TerminalStatusGroup.active.label, '已激活');
+      });
+    });
+
+    group('ChannelOption', () {
+      test('fromJson parses correctly', () {
+        final json = {
+          'channel_id': 1,
+          'channel_code': 'HENGXINTONG',
+        };
+
+        final option = ChannelOption.fromJson(json);
+
+        expect(option.channelId, 1);
+        expect(option.channelCode, 'HENGXINTONG');
+      });
+
+      test('handles missing values', () {
+        final json = <String, dynamic>{};
+        final option = ChannelOption.fromJson(json);
+
+        expect(option.channelId, 0);
+        expect(option.channelCode, '');
+      });
+    });
+
+    group('TerminalTypeOption', () {
+      test('fromJson parses correctly', () {
+        final json = {
+          'channel_id': 1,
+          'channel_code': 'HENGXINTONG',
+          'brand_code': 'NEWLAND',
+          'model_code': 'N910',
+          'count': 50,
+        };
+
+        final option = TerminalTypeOption.fromJson(json);
+
+        expect(option.channelId, 1);
+        expect(option.channelCode, 'HENGXINTONG');
+        expect(option.brandCode, 'NEWLAND');
+        expect(option.modelCode, 'N910');
+        expect(option.count, 50);
+      });
+
+      test('displayName returns correct format', () {
+        final option = TerminalTypeOption(
+          channelId: 1,
+          channelCode: 'HENGXINTONG',
+          brandCode: 'NEWLAND',
+          modelCode: 'N910',
+          count: 50,
+        );
+
+        expect(option.displayName, 'NEWLAND N910');
+      });
+
+      test('handles missing values', () {
+        final json = <String, dynamic>{};
+        final option = TerminalTypeOption.fromJson(json);
+
+        expect(option.channelId, 0);
+        expect(option.brandCode, '');
+        expect(option.modelCode, '');
+        expect(option.count, 0);
+      });
+    });
+
+    group('StatusGroupCount', () {
+      test('fromJson parses correctly', () {
+        final json = {
+          'key': 'active',
+          'label': '已激活',
+          'count': 100,
+        };
+
+        final count = StatusGroupCount.fromJson(json);
+
+        expect(count.key, 'active');
+        expect(count.label, '已激活');
+        expect(count.count, 100);
+      });
+
+      test('handles missing values', () {
+        final json = <String, dynamic>{};
+        final count = StatusGroupCount.fromJson(json);
+
+        expect(count.key, '');
+        expect(count.label, '');
+        expect(count.count, 0);
+      });
+    });
+
+    group('TerminalFilterOptions', () {
+      test('fromJson parses correctly', () {
+        final json = {
+          'channels': [
+            {'channel_id': 1, 'channel_code': 'HENGXINTONG'},
+            {'channel_id': 2, 'channel_code': 'LAKALA'},
+          ],
+          'terminal_types': [
+            {'channel_id': 1, 'channel_code': 'HENGXINTONG', 'brand_code': 'NEWLAND', 'model_code': 'N910', 'count': 50},
+          ],
+          'status_groups': [
+            {'key': 'all', 'label': '全部', 'count': 100},
+            {'key': 'active', 'label': '已激活', 'count': 50},
+          ],
+        };
+
+        final options = TerminalFilterOptions.fromJson(json);
+
+        expect(options.channels.length, 2);
+        expect(options.channels[0].channelCode, 'HENGXINTONG');
+        expect(options.terminalTypes.length, 1);
+        expect(options.terminalTypes[0].brandCode, 'NEWLAND');
+        expect(options.statusGroups.length, 2);
+        expect(options.statusGroups[1].key, 'active');
+      });
+
+      test('handles empty lists', () {
+        final json = <String, dynamic>{};
+        final options = TerminalFilterOptions.fromJson(json);
+
+        expect(options.channels, isEmpty);
+        expect(options.terminalTypes, isEmpty);
+        expect(options.statusGroups, isEmpty);
+      });
+    });
+
+    group('TerminalFlowLog', () {
+      test('fromJson parses correctly', () {
+        final json = {
+          'id': 1,
+          'log_type': 'distribute',
+          'log_type_name': '下发',
+          'from_agent_id': 100,
+          'from_agent_name': '总代理',
+          'to_agent_id': 101,
+          'to_agent_name': '一级代理',
+          'merchant_no': '',
+          'status': 2,
+          'status_name': '已确认',
+          'remark': '测试备注',
+          'created_at': '2024-01-15T10:00:00Z',
+          'confirmed_at': '2024-01-15T11:00:00Z',
+        };
+
+        final log = TerminalFlowLog.fromJson(json);
+
+        expect(log.id, 1);
+        expect(log.logType, 'distribute');
+        expect(log.logTypeName, '下发');
+        expect(log.fromAgentId, 100);
+        expect(log.fromAgentName, '总代理');
+        expect(log.toAgentId, 101);
+        expect(log.toAgentName, '一级代理');
+        expect(log.status, 2);
+        expect(log.statusName, '已确认');
+        expect(log.remark, '测试备注');
+        expect(log.confirmedAt, isNotNull);
+      });
+
+      test('handles missing optional values', () {
+        final json = {
+          'id': 1,
+          'log_type': 'bind',
+          'log_type_name': '绑定',
+          'status': 2,
+          'status_name': '已确认',
+          'created_at': '2024-01-15T10:00:00Z',
+        };
+
+        final log = TerminalFlowLog.fromJson(json);
+
+        expect(log.id, 1);
+        expect(log.logType, 'bind');
+        expect(log.fromAgentId, isNull);
+        expect(log.fromAgentName, '');
+        expect(log.toAgentId, isNull);
+        expect(log.toAgentName, '');
+        expect(log.merchantNo, '');
+        expect(log.remark, '');
+        expect(log.confirmedAt, isNull);
+      });
+
+      test('parses different log types', () {
+        final logTypes = ['distribute', 'recall', 'bind', 'unbind', 'activate'];
+
+        for (final type in logTypes) {
+          final json = {
+            'id': 1,
+            'log_type': type,
+            'log_type_name': type,
+            'status': 2,
+            'status_name': '已确认',
+            'created_at': '2024-01-15T10:00:00Z',
+          };
+
+          final log = TerminalFlowLog.fromJson(json);
+          expect(log.logType, type);
+        }
+      });
+    });
+
+    group('TerminalInfo', () {
+      test('fromJson parses correctly', () {
+        final json = {
+          'terminal_sn': 'SN123456',
+          'channel_id': 1,
+          'channel_code': 'HENGXINTONG',
+          'brand_code': 'NEWLAND',
+          'model_code': 'N910',
+        };
+
+        final info = TerminalInfo.fromJson(json);
+
+        expect(info.terminalSn, 'SN123456');
+        expect(info.channelId, 1);
+        expect(info.channelCode, 'HENGXINTONG');
+        expect(info.brandCode, 'NEWLAND');
+        expect(info.modelCode, 'N910');
+      });
+
+      test('handles missing values', () {
+        final json = <String, dynamic>{};
+        final info = TerminalInfo.fromJson(json);
+
+        expect(info.terminalSn, '');
+        expect(info.channelId, 0);
+        expect(info.channelCode, '');
+        expect(info.brandCode, '');
+        expect(info.modelCode, '');
+      });
+    });
+
+    group('TerminalFlowLogsResponse', () {
+      test('fromJson parses correctly', () {
+        final json = {
+          'terminal': {
+            'terminal_sn': 'SN123456',
+            'channel_id': 1,
+            'channel_code': 'HENGXINTONG',
+            'brand_code': 'NEWLAND',
+            'model_code': 'N910',
+          },
+          'list': [
+            {
+              'id': 1,
+              'log_type': 'distribute',
+              'log_type_name': '下发',
+              'status': 2,
+              'status_name': '已确认',
+              'created_at': '2024-01-15T10:00:00Z',
+            },
+            {
+              'id': 2,
+              'log_type': 'bind',
+              'log_type_name': '绑定',
+              'status': 2,
+              'status_name': '已确认',
+              'created_at': '2024-01-16T10:00:00Z',
+            },
+          ],
+          'total': 2,
+          'page': 1,
+          'page_size': 20,
+        };
+
+        final response = TerminalFlowLogsResponse.fromJson(json);
+
+        expect(response.terminal.terminalSn, 'SN123456');
+        expect(response.list.length, 2);
+        expect(response.list[0].logType, 'distribute');
+        expect(response.list[1].logType, 'bind');
+        expect(response.total, 2);
+        expect(response.page, 1);
+        expect(response.pageSize, 20);
+      });
+
+      test('hasMore returns true when list size equals pageSize', () {
+        final json = {
+          'terminal': {'terminal_sn': 'SN123'},
+          'list': List.generate(20, (i) => {
+            'id': i,
+            'log_type': 'distribute',
+            'log_type_name': '下发',
+            'status': 2,
+            'status_name': '已确认',
+            'created_at': '2024-01-15T10:00:00Z',
+          }),
+          'total': 50,
+          'page': 1,
+          'page_size': 20,
+        };
+
+        final response = TerminalFlowLogsResponse.fromJson(json);
+        expect(response.hasMore, true);
+      });
+
+      test('hasMore returns false when list size is less than pageSize', () {
+        final json = {
+          'terminal': {'terminal_sn': 'SN123'},
+          'list': [
+            {
+              'id': 1,
+              'log_type': 'distribute',
+              'log_type_name': '下发',
+              'status': 2,
+              'status_name': '已确认',
+              'created_at': '2024-01-15T10:00:00Z',
+            },
+          ],
+          'total': 1,
+          'page': 1,
+          'page_size': 20,
+        };
+
+        final response = TerminalFlowLogsResponse.fromJson(json);
+        expect(response.hasMore, false);
+      });
+
+      test('handles empty list', () {
+        final json = {
+          'terminal': {'terminal_sn': 'SN123'},
+          'list': [],
+          'total': 0,
+          'page': 1,
+          'page_size': 20,
+        };
+
+        final response = TerminalFlowLogsResponse.fromJson(json);
+        expect(response.list, isEmpty);
+        expect(response.hasMore, false);
+      });
+    });
   });
 }

@@ -7,9 +7,14 @@ import '../../domain/models/terminal.dart';
 class TerminalService {
   final Dio _dio = ApiClient().dio;
 
-  /// 获取终端列表
+  /// 获取终端列表（支持多条件筛选）
   Future<PaginatedResponse<Terminal>> getTerminals({
     int? status,
+    int? channelId,
+    String? brandCode,
+    String? modelCode,
+    String? statusGroup,
+    String? keyword,
     int page = 1,
     int pageSize = 20,
   }) async {
@@ -18,6 +23,11 @@ class TerminalService {
         '/api/v1/terminals',
         queryParameters: {
           if (status != null) 'status': status,
+          if (channelId != null) 'channel_id': channelId,
+          if (brandCode != null && brandCode.isNotEmpty) 'brand_code': brandCode,
+          if (modelCode != null && modelCode.isNotEmpty) 'model_code': modelCode,
+          if (statusGroup != null && statusGroup.isNotEmpty) 'status_group': statusGroup,
+          if (keyword != null && keyword.isNotEmpty) 'keyword': keyword,
           'page': page,
           'page_size': pageSize,
         },
@@ -32,6 +42,61 @@ class TerminalService {
         apiResponse.data as Map<String, dynamic>,
         (json) => Terminal.fromJson(json),
       );
+    } on DioException catch (e) {
+      throw ApiException(-1, e.message ?? '网络错误');
+    }
+  }
+
+  /// 获取筛选选项
+  Future<TerminalFilterOptions> getFilterOptions({
+    int? channelId,
+    String? brandCode,
+    String? modelCode,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '/api/v1/terminals/filter-options',
+        queryParameters: {
+          if (channelId != null) 'channel_id': channelId,
+          if (brandCode != null && brandCode.isNotEmpty) 'brand_code': brandCode,
+          if (modelCode != null && modelCode.isNotEmpty) 'model_code': modelCode,
+        },
+      );
+
+      final apiResponse = ApiResponse.fromJson(response.data, null);
+      if (!apiResponse.isSuccess) {
+        throw ApiException(apiResponse.code, apiResponse.message);
+      }
+
+      return TerminalFilterOptions.fromJson(apiResponse.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw ApiException(-1, e.message ?? '网络错误');
+    }
+  }
+
+  /// 获取终端流动记录
+  Future<TerminalFlowLogsResponse> getFlowLogs({
+    required String terminalSn,
+    String logType = 'all',
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '/api/v1/terminals/$terminalSn/flow-logs',
+        queryParameters: {
+          'log_type': logType,
+          'page': page,
+          'page_size': pageSize,
+        },
+      );
+
+      final apiResponse = ApiResponse.fromJson(response.data, null);
+      if (!apiResponse.isSuccess) {
+        throw ApiException(apiResponse.code, apiResponse.message);
+      }
+
+      return TerminalFlowLogsResponse.fromJson(apiResponse.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw ApiException(-1, e.message ?? '网络错误');
     }

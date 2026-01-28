@@ -20,6 +20,11 @@ class TerminalListState {
   final bool hasMore;
   final int currentPage;
   final int? statusFilter;
+  final int? channelId;
+  final String? brandCode;
+  final String? modelCode;
+  final String? statusGroup;
+  final String? keyword;
   final String? error;
 
   TerminalListState({
@@ -28,6 +33,11 @@ class TerminalListState {
     this.hasMore = true,
     this.currentPage = 1,
     this.statusFilter,
+    this.channelId,
+    this.brandCode,
+    this.modelCode,
+    this.statusGroup,
+    this.keyword,
     this.error,
   });
 
@@ -37,7 +47,17 @@ class TerminalListState {
     bool? hasMore,
     int? currentPage,
     int? statusFilter,
+    int? channelId,
+    String? brandCode,
+    String? modelCode,
+    String? statusGroup,
+    String? keyword,
     String? error,
+    bool clearChannelId = false,
+    bool clearBrandCode = false,
+    bool clearModelCode = false,
+    bool clearStatusGroup = false,
+    bool clearKeyword = false,
   }) {
     return TerminalListState(
       terminals: terminals ?? this.terminals,
@@ -45,6 +65,11 @@ class TerminalListState {
       hasMore: hasMore ?? this.hasMore,
       currentPage: currentPage ?? this.currentPage,
       statusFilter: statusFilter,
+      channelId: clearChannelId ? null : (channelId ?? this.channelId),
+      brandCode: clearBrandCode ? null : (brandCode ?? this.brandCode),
+      modelCode: clearModelCode ? null : (modelCode ?? this.modelCode),
+      statusGroup: clearStatusGroup ? null : (statusGroup ?? this.statusGroup),
+      keyword: clearKeyword ? null : (keyword ?? this.keyword),
       error: error,
     );
   }
@@ -57,16 +82,33 @@ class TerminalListNotifier extends StateNotifier<TerminalListState> {
   TerminalListNotifier(this._service) : super(TerminalListState());
 
   /// 加载终端列表（首次或刷新）
-  Future<void> loadTerminals({int? status}) async {
+  Future<void> loadTerminals({
+    int? status,
+    int? channelId,
+    String? brandCode,
+    String? modelCode,
+    String? statusGroup,
+    String? keyword,
+  }) async {
     state = state.copyWith(
       isLoading: true,
       error: null,
       statusFilter: status,
+      channelId: channelId,
+      brandCode: brandCode,
+      modelCode: modelCode,
+      statusGroup: statusGroup,
+      keyword: keyword,
     );
 
     try {
       final response = await _service.getTerminals(
         status: status,
+        channelId: channelId,
+        brandCode: brandCode,
+        modelCode: modelCode,
+        statusGroup: statusGroup,
+        keyword: keyword,
         page: 1,
         pageSize: 20,
       );
@@ -95,6 +137,11 @@ class TerminalListNotifier extends StateNotifier<TerminalListState> {
       final nextPage = state.currentPage + 1;
       final response = await _service.getTerminals(
         status: state.statusFilter,
+        channelId: state.channelId,
+        brandCode: state.brandCode,
+        modelCode: state.modelCode,
+        statusGroup: state.statusGroup,
+        keyword: state.keyword,
         page: nextPage,
         pageSize: 20,
       );
@@ -115,12 +162,72 @@ class TerminalListNotifier extends StateNotifier<TerminalListState> {
 
   /// 刷新
   Future<void> refresh() async {
-    await loadTerminals(status: state.statusFilter);
+    await loadTerminals(
+      status: state.statusFilter,
+      channelId: state.channelId,
+      brandCode: state.brandCode,
+      modelCode: state.modelCode,
+      statusGroup: state.statusGroup,
+      keyword: state.keyword,
+    );
   }
 
   /// 设置状态筛选
   Future<void> setStatusFilter(int? status) async {
-    await loadTerminals(status: status);
+    await loadTerminals(
+      status: status,
+      channelId: state.channelId,
+      brandCode: state.brandCode,
+      modelCode: state.modelCode,
+      keyword: state.keyword,
+    );
+  }
+
+  /// 设置状态分组筛选
+  Future<void> setStatusGroup(String? statusGroup) async {
+    await loadTerminals(
+      channelId: state.channelId,
+      brandCode: state.brandCode,
+      modelCode: state.modelCode,
+      statusGroup: statusGroup,
+      keyword: state.keyword,
+    );
+  }
+
+  /// 设置通道筛选
+  Future<void> setChannelFilter(int? channelId) async {
+    await loadTerminals(
+      channelId: channelId,
+      statusGroup: state.statusGroup,
+      keyword: state.keyword,
+    );
+  }
+
+  /// 设置终端类型筛选
+  Future<void> setTerminalTypeFilter(String? brandCode, String? modelCode) async {
+    await loadTerminals(
+      channelId: state.channelId,
+      brandCode: brandCode,
+      modelCode: modelCode,
+      statusGroup: state.statusGroup,
+      keyword: state.keyword,
+    );
+  }
+
+  /// 设置关键词搜索
+  Future<void> setKeyword(String? keyword) async {
+    await loadTerminals(
+      channelId: state.channelId,
+      brandCode: state.brandCode,
+      modelCode: state.modelCode,
+      statusGroup: state.statusGroup,
+      keyword: keyword,
+    );
+  }
+
+  /// 重置所有筛选条件
+  Future<void> resetFilters() async {
+    await loadTerminals();
   }
 }
 
@@ -813,4 +920,130 @@ final batchSetProvider =
     StateNotifierProvider<BatchSetNotifier, BatchSetState>((ref) {
   final service = ref.watch(terminalServiceProvider);
   return BatchSetNotifier(service, ref);
+});
+
+// ==================== 筛选选项 ====================
+
+/// 筛选选项Provider
+final terminalFilterOptionsProvider = FutureProvider<TerminalFilterOptions>((ref) async {
+  final service = ref.watch(terminalServiceProvider);
+  return service.getFilterOptions();
+});
+
+/// 带参数的筛选选项Provider
+final terminalFilterOptionsWithParamsProvider = FutureProvider.family<TerminalFilterOptions, Map<String, dynamic>>((ref, params) async {
+  final service = ref.watch(terminalServiceProvider);
+  return service.getFilterOptions(
+    channelId: params['channel_id'] as int?,
+    brandCode: params['brand_code'] as String?,
+    modelCode: params['model_code'] as String?,
+  );
+});
+
+// ==================== 流动记录 ====================
+
+/// 流动记录列表状态
+class FlowLogListState {
+  final TerminalInfo? terminal;
+  final List<TerminalFlowLog> list;
+  final bool isLoading;
+  final bool isLoadingMore;
+  final bool hasMore;
+  final int currentPage;
+  final String logType;
+  final String? error;
+
+  FlowLogListState({
+    this.terminal,
+    this.list = const [],
+    this.isLoading = false,
+    this.isLoadingMore = false,
+    this.hasMore = true,
+    this.currentPage = 1,
+    this.logType = 'all',
+    this.error,
+  });
+
+  FlowLogListState copyWith({
+    TerminalInfo? terminal,
+    List<TerminalFlowLog>? list,
+    bool? isLoading,
+    bool? isLoadingMore,
+    bool? hasMore,
+    int? currentPage,
+    String? logType,
+    String? error,
+  }) {
+    return FlowLogListState(
+      terminal: terminal ?? this.terminal,
+      list: list ?? this.list,
+      isLoading: isLoading ?? this.isLoading,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      hasMore: hasMore ?? this.hasMore,
+      currentPage: currentPage ?? this.currentPage,
+      logType: logType ?? this.logType,
+      error: error,
+    );
+  }
+}
+
+/// 流动记录列表Notifier
+class FlowLogListNotifier extends StateNotifier<FlowLogListState> {
+  final TerminalService _service;
+  final String _terminalSn;
+
+  FlowLogListNotifier(this._service, this._terminalSn) : super(FlowLogListState());
+
+  /// 加载列表
+  Future<void> loadList({bool refresh = false, String? logType}) async {
+    if (state.isLoading || state.isLoadingMore) return;
+    if (!refresh && !state.hasMore && logType == null) return;
+
+    final isRefresh = refresh || state.list.isEmpty || logType != null;
+    final newLogType = logType ?? state.logType;
+
+    state = state.copyWith(
+      isLoading: isRefresh,
+      isLoadingMore: !isRefresh,
+      error: null,
+      logType: newLogType,
+    );
+
+    try {
+      final page = isRefresh ? 1 : state.currentPage + 1;
+      final response = await _service.getFlowLogs(
+        terminalSn: _terminalSn,
+        logType: newLogType,
+        page: page,
+        pageSize: 20,
+      );
+
+      state = state.copyWith(
+        terminal: response.terminal,
+        list: isRefresh ? response.list : [...state.list, ...response.list],
+        isLoading: false,
+        isLoadingMore: false,
+        hasMore: response.hasMore,
+        currentPage: page,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        isLoadingMore: false,
+        error: e.toString(),
+      );
+    }
+  }
+
+  /// 刷新
+  Future<void> refresh() => loadList(refresh: true);
+
+  /// 设置日志类型筛选
+  Future<void> setLogType(String logType) => loadList(refresh: true, logType: logType);
+}
+
+/// 流动记录列表Provider（按终端SN）
+final flowLogListProvider = StateNotifierProvider.family<FlowLogListNotifier, FlowLogListState, String>((ref, terminalSn) {
+  final service = ref.watch(terminalServiceProvider);
+  return FlowLogListNotifier(service, terminalSn);
 });

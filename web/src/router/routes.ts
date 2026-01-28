@@ -5,7 +5,7 @@ export const publicRoutes: RouteRecordRaw[] = [
   {
     path: '/login',
     name: 'Login',
-    component: () => import('@/views/login/LoginView.vue'),
+    component: () => import('@/views/login/LoginViewV2.vue'),
     meta: {
       title: '登录',
       hidden: true,
@@ -571,6 +571,27 @@ export const privateRoutes: RouteRecordRaw[] = [
             meta: {
               title: '海报分类',
               breadcrumb: [{ title: '首页' }, { title: '营销管理' }, { title: '海报分类' }],
+            },
+          },
+        ],
+      },
+      // 通道管理
+      {
+        path: 'channels',
+        name: 'Channels',
+        redirect: '/channels/deposit-tiers',
+        meta: {
+          title: '通道管理',
+          icon: 'Connection',
+        },
+        children: [
+          {
+            path: 'deposit-tiers',
+            name: 'DepositTiers',
+            component: () => import('@/views/channel/deposit-tiers/index.vue'),
+            meta: {
+              title: '押金档位',
+              breadcrumb: [{ title: '首页' }, { title: '通道管理' }, { title: '押金档位' }],
             },
           },
         ],

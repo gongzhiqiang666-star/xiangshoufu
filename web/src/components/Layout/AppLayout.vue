@@ -9,9 +9,6 @@
 
       <!-- 主内容区 -->
       <el-main class="main-content">
-        <!-- 面包屑 -->
-        <AppBreadcrumb />
-
         <!-- 页面内容 -->
         <div class="page-content">
           <router-view v-slot="{ Component }">
@@ -28,7 +25,6 @@
 <script setup lang="ts">
 import AppSidebar from './AppSidebar.vue'
 import AppHeader from './AppHeader.vue'
-import AppBreadcrumb from './AppBreadcrumb.vue'
 </script>
 
 <style lang="scss" scoped>
@@ -46,13 +42,13 @@ import AppBreadcrumb from './AppBreadcrumb.vue'
 
 .main-content {
   flex: 1;
-  padding: $spacing-md;
+  padding: $spacing-sm $spacing-md;
   background-color: $bg-color;
   overflow-y: auto;
 }
 
 .page-content {
-  min-height: calc(100vh - 140px);
+  min-height: calc(100vh - 100px);
 }
 
 // 页面切换动画

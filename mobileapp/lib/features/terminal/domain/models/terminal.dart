@@ -302,3 +302,235 @@ class TerminalRecall {
     }
   }
 }
+
+/// 终端状态分组
+enum TerminalStatusGroup {
+  all('all', '全部'),
+  unstock('unstock', '未出库'),
+  stocked('stocked', '已出库'),
+  unbound('unbound', '未绑定'),
+  inactive('inactive', '未激活'),
+  active('active', '已激活');
+
+  final String value;
+  final String label;
+  const TerminalStatusGroup(this.value, this.label);
+
+  static TerminalStatusGroup fromValue(String value) {
+    return TerminalStatusGroup.values.firstWhere(
+      (e) => e.value == value,
+      orElse: () => TerminalStatusGroup.all,
+    );
+  }
+}
+
+/// 终端筛选选项
+class TerminalFilterOptions {
+  final List<ChannelOption> channels;
+  final List<TerminalTypeOption> terminalTypes;
+  final List<StatusGroupCount> statusGroups;
+
+  TerminalFilterOptions({
+    required this.channels,
+    required this.terminalTypes,
+    required this.statusGroups,
+  });
+
+  factory TerminalFilterOptions.fromJson(Map<String, dynamic> json) {
+    return TerminalFilterOptions(
+      channels: (json['channels'] as List?)
+              ?.map((e) => ChannelOption.fromJson(e))
+              .toList() ??
+          [],
+      terminalTypes: (json['terminal_types'] as List?)
+              ?.map((e) => TerminalTypeOption.fromJson(e))
+              .toList() ??
+          [],
+      statusGroups: (json['status_groups'] as List?)
+              ?.map((e) => StatusGroupCount.fromJson(e))
+              .toList() ??
+          [],
+    );
+  }
+}
+
+/// 通道选项
+class ChannelOption {
+  final int channelId;
+  final String channelCode;
+
+  ChannelOption({
+    required this.channelId,
+    required this.channelCode,
+  });
+
+  factory ChannelOption.fromJson(Map<String, dynamic> json) {
+    return ChannelOption(
+      channelId: json['channel_id'] ?? 0,
+      channelCode: json['channel_code'] ?? '',
+    );
+  }
+}
+
+/// 终端类型选项
+class TerminalTypeOption {
+  final int channelId;
+  final String channelCode;
+  final String brandCode;
+  final String modelCode;
+  final int count;
+
+  TerminalTypeOption({
+    required this.channelId,
+    required this.channelCode,
+    required this.brandCode,
+    required this.modelCode,
+    required this.count,
+  });
+
+  factory TerminalTypeOption.fromJson(Map<String, dynamic> json) {
+    return TerminalTypeOption(
+      channelId: json['channel_id'] ?? 0,
+      channelCode: json['channel_code'] ?? '',
+      brandCode: json['brand_code'] ?? '',
+      modelCode: json['model_code'] ?? '',
+      count: json['count'] ?? 0,
+    );
+  }
+
+  /// 获取显示名称
+  String get displayName => '$brandCode $modelCode';
+}
+
+/// 状态分组统计
+class StatusGroupCount {
+  final String key;
+  final String label;
+  final int count;
+
+  StatusGroupCount({
+    required this.key,
+    required this.label,
+    required this.count,
+  });
+
+  factory StatusGroupCount.fromJson(Map<String, dynamic> json) {
+    return StatusGroupCount(
+      key: json['key'] ?? '',
+      label: json['label'] ?? '',
+      count: json['count'] ?? 0,
+    );
+  }
+}
+
+/// 终端流动记录
+class TerminalFlowLog {
+  final int id;
+  final String logType;        // distribute/recall/bind/unbind/activate
+  final String logTypeName;    // 下发/回拨/绑定/解绑/激活
+  final int? fromAgentId;
+  final String fromAgentName;
+  final int? toAgentId;
+  final String toAgentName;
+  final String merchantNo;
+  final int status;
+  final String statusName;
+  final String remark;
+  final DateTime createdAt;
+  final DateTime? confirmedAt;
+
+  TerminalFlowLog({
+    required this.id,
+    required this.logType,
+    required this.logTypeName,
+    this.fromAgentId,
+    this.fromAgentName = '',
+    this.toAgentId,
+    this.toAgentName = '',
+    this.merchantNo = '',
+    required this.status,
+    required this.statusName,
+    this.remark = '',
+    required this.createdAt,
+    this.confirmedAt,
+  });
+
+  factory TerminalFlowLog.fromJson(Map<String, dynamic> json) {
+    return TerminalFlowLog(
+      id: json['id'] ?? 0,
+      logType: json['log_type'] ?? '',
+      logTypeName: json['log_type_name'] ?? '',
+      fromAgentId: json['from_agent_id'],
+      fromAgentName: json['from_agent_name'] ?? '',
+      toAgentId: json['to_agent_id'],
+      toAgentName: json['to_agent_name'] ?? '',
+      merchantNo: json['merchant_no'] ?? '',
+      status: json['status'] ?? 0,
+      statusName: json['status_name'] ?? '',
+      remark: json['remark'] ?? '',
+      createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
+      confirmedAt: json['confirmed_at'] != null
+          ? DateTime.tryParse(json['confirmed_at'])
+          : null,
+    );
+  }
+}
+
+/// 终端流动记录响应
+class TerminalFlowLogsResponse {
+  final TerminalInfo terminal;
+  final List<TerminalFlowLog> list;
+  final int total;
+  final int page;
+  final int pageSize;
+
+  TerminalFlowLogsResponse({
+    required this.terminal,
+    required this.list,
+    required this.total,
+    required this.page,
+    required this.pageSize,
+  });
+
+  factory TerminalFlowLogsResponse.fromJson(Map<String, dynamic> json) {
+    return TerminalFlowLogsResponse(
+      terminal: TerminalInfo.fromJson(json['terminal'] ?? {}),
+      list: (json['list'] as List?)
+              ?.map((e) => TerminalFlowLog.fromJson(e))
+              .toList() ??
+          [],
+      total: json['total'] ?? 0,
+      page: json['page'] ?? 1,
+      pageSize: json['page_size'] ?? 20,
+    );
+  }
+
+  bool get hasMore => list.length >= pageSize;
+}
+
+/// 终端基本信息（用于流动记录响应）
+class TerminalInfo {
+  final String terminalSn;
+  final int channelId;
+  final String channelCode;
+  final String brandCode;
+  final String modelCode;
+
+  TerminalInfo({
+    required this.terminalSn,
+    required this.channelId,
+    required this.channelCode,
+    required this.brandCode,
+    required this.modelCode,
+  });
+
+  factory TerminalInfo.fromJson(Map<String, dynamic> json) {
+    return TerminalInfo(
+      terminalSn: json['terminal_sn'] ?? '',
+      channelId: json['channel_id'] ?? 0,
+      channelCode: json['channel_code'] ?? '',
+      brandCode: json['brand_code'] ?? '',
+      modelCode: json['model_code'] ?? '',
+    );
+  }
+}

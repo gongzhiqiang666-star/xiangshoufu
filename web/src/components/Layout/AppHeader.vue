@@ -1,11 +1,20 @@
 <template>
   <el-header class="app-header">
-    <!-- 左侧：折叠按钮 -->
+    <!-- 左侧：折叠按钮 + 面包屑 -->
     <div class="header-left">
       <el-icon class="collapse-btn" @click="toggleSidebar">
         <Fold v-if="!collapsed" />
         <Expand v-else />
       </el-icon>
+      <el-breadcrumb separator="/" class="header-breadcrumb">
+        <el-breadcrumb-item
+          v-for="(item, index) in breadcrumbs"
+          :key="index"
+          :to="item.path"
+        >
+          {{ item.title }}
+        </el-breadcrumb-item>
+      </el-breadcrumb>
     </div>
 
     <!-- 右侧：用户信息等 -->
@@ -68,6 +77,9 @@ const userStore = useUserStore()
 
 // 侧边栏折叠状态
 const collapsed = computed(() => appStore.sidebarCollapsed)
+
+// 面包屑
+const breadcrumbs = computed(() => appStore.breadcrumbs)
 
 // 用户信息
 const realName = computed(() => userStore.realName || userStore.username)
@@ -142,7 +154,7 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 .app-header {
-  height: 60px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -155,10 +167,11 @@ onMounted(() => {
 .header-left {
   display: flex;
   align-items: center;
+  gap: $spacing-md;
 }
 
 .collapse-btn {
-  font-size: 20px;
+  font-size: 18px;
   cursor: pointer;
   color: $text-regular;
   transition: color $transition-fast;
@@ -168,14 +181,23 @@ onMounted(() => {
   }
 }
 
+.header-breadcrumb {
+  font-size: 13px;
+
+  :deep(.el-breadcrumb__item:last-child .el-breadcrumb__inner) {
+    font-weight: 600;
+    color: $text-primary;
+  }
+}
+
 .header-right {
   display: flex;
   align-items: center;
-  gap: $spacing-lg;
+  gap: $spacing-md;
 }
 
 .header-icon {
-  font-size: 18px;
+  font-size: 16px;
   cursor: pointer;
   color: $text-regular;
   transition: color $transition-fast;
@@ -196,7 +218,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   cursor: pointer;
-  padding: $spacing-xs $spacing-sm;
+  padding: 4px 8px;
   border-radius: $border-radius-sm;
   transition: background-color $transition-fast;
 
@@ -212,13 +234,13 @@ onMounted(() => {
 }
 
 .user-name {
-  margin-left: $spacing-sm;
-  font-size: 14px;
+  margin-left: $spacing-xs;
+  font-size: 13px;
   color: $text-primary;
 }
 
 .arrow-icon {
-  margin-left: $spacing-xs;
+  margin-left: 4px;
   font-size: 12px;
   color: $text-secondary;
 }

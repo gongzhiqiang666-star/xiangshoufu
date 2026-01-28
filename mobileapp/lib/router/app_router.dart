@@ -14,6 +14,7 @@ import '../features/terminal/presentation/terminal_recall_list_page.dart';
 import '../features/terminal/presentation/terminal_batch_set_rate_page.dart';
 import '../features/terminal/presentation/terminal_batch_set_sim_page.dart';
 import '../features/terminal/presentation/terminal_batch_set_deposit_page.dart';
+import '../features/terminal/presentation/terminal_flow_log_page.dart';
 import '../features/cargo_deduction/presentation/cargo_deduction_page.dart';
 import '../features/merchant/presentation/merchant_page.dart';
 import '../features/merchant/presentation/merchant_detail_page.dart';
@@ -72,6 +73,7 @@ class RoutePaths {
   static const String terminalBatchSetRate = '/terminal/batch-set-rate';
   static const String terminalBatchSetSim = '/terminal/batch-set-sim';
   static const String terminalBatchSetDeposit = '/terminal/batch-set-deposit';
+  static const String terminalFlowLog = '/terminal/:sn/flow-logs';
 
   // 货款代扣
   static const String cargoDeduction = '/cargo-deduction';
@@ -283,6 +285,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final snList = state.extra as List<String>? ?? [];
           return TerminalBatchSetDepositPage(selectedSNs: snList);
+        },
+      ),
+      GoRoute(
+        path: RoutePaths.terminalFlowLog,
+        name: 'terminalFlowLog',
+        builder: (context, state) {
+          final sn = state.pathParameters['sn'] ?? '';
+          return TerminalFlowLogPage(terminalSn: sn);
         },
       ),
 

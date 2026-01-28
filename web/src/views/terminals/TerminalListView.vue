@@ -1,19 +1,11 @@
 <template>
   <div class="terminal-list-view">
-    <PageHeader title="终端管理" sub-title="终端列表">
-      <template #extra>
-        <el-button :icon="Upload" @click="handleImport">入库</el-button>
-        <el-button :icon="Bottom" @click="handleBatchDispatch">批量下发</el-button>
-        <el-button :icon="Top" @click="handleBatchRecall">批量回拨</el-button>
-      </template>
-    </PageHeader>
-
     <!-- 统计卡片 -->
-    <el-row :gutter="20" class="stats-row">
+    <el-row :gutter="12" class="stats-row">
       <el-col :xs="12" :sm="6" :lg="3">
         <div class="stat-card">
           <div class="stat-value">{{ stats.total }}</div>
-          <div class="stat-label">终端总数</div>
+          <div class="stat-label">总数</div>
         </div>
       </el-col>
       <el-col :xs="12" :sm="6" :lg="3">
@@ -73,6 +65,11 @@
       <el-form-item label="SN号">
         <el-input v-model="searchForm.sn" placeholder="请输入SN号" clearable />
       </el-form-item>
+      <template #extra>
+        <el-button :icon="Upload" @click="handleImport">入库</el-button>
+        <el-button :icon="Bottom" @click="handleBatchDispatch">批量下发</el-button>
+        <el-button :icon="Top" @click="handleBatchRecall">批量回拨</el-button>
+      </template>
     </SearchForm>
 
     <!-- 表格 -->
@@ -313,7 +310,6 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Upload, Bottom, Top, WarningFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import PageHeader from '@/components/Common/PageHeader.vue'
 import SearchForm from '@/components/Common/SearchForm.vue'
 import ProTable from '@/components/Common/ProTable.vue'
 import ChannelSelect from '@/components/Common/ChannelSelect.vue'
@@ -769,30 +765,31 @@ onMounted(() => {
 }
 
 .stats-row {
-  margin-bottom: $spacing-md;
+  margin-bottom: $spacing-sm;
 
   .el-col {
-    margin-bottom: $spacing-md;
+    margin-bottom: $spacing-xs;
   }
 }
 
 .stat-card {
   background: $bg-white;
-  border-radius: $border-radius-md;
-  padding: $spacing-md;
+  border-radius: $border-radius-sm;
+  padding: $spacing-sm;
   text-align: center;
   box-shadow: $shadow-sm;
 
   .stat-value {
-    font-size: 24px;
+    font-size: 20px;
     font-weight: 600;
     color: $text-primary;
+    line-height: 1.2;
   }
 
   .stat-label {
-    font-size: 12px;
+    font-size: 11px;
     color: $text-secondary;
-    margin-top: $spacing-xs;
+    margin-top: 2px;
   }
 
   &.activated .stat-value {

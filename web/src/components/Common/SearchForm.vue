@@ -44,17 +44,26 @@ function handleReset() {
 
 <style lang="scss" scoped>
 .search-form-card {
-  margin-bottom: $spacing-md;
+  margin-bottom: $spacing-sm;
+
+  :deep(.el-card__body) {
+    padding: $spacing-sm $spacing-md;
+  }
 }
 
 .search-form {
   display: flex;
   flex-wrap: wrap;
-  gap: $spacing-sm;
+  align-items: center;
+  gap: $spacing-xs;
 
   :deep(.el-form-item) {
     margin-bottom: 0;
-    margin-right: $spacing-md;
+    margin-right: $spacing-sm;
+  }
+
+  :deep(.el-form-item__label) {
+    padding-right: 6px;
   }
 
   .form-buttons {

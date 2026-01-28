@@ -34,11 +34,16 @@ func NewTerminalHandler(
 
 // GetTerminalList 获取终端列表
 // @Summary 获取终端列表
-// @Description 获取当前代理商的终端列表
+// @Description 获取当前代理商的终端列表，支持多条件筛选
 // @Tags 终端管理
 // @Produce json
 // @Security ApiKeyAuth
-// @Param status query int false "状态"
+// @Param status query int false "状态（兼容旧版）"
+// @Param channel_id query int false "通道ID"
+// @Param brand_code query string false "品牌编码"
+// @Param model_code query string false "型号编码"
+// @Param status_group query string false "状态分组: all/unstock/stocked/unbound/inactive/active"
+// @Param keyword query string false "搜索关键词（终端SN或商户号）"
 // @Param page query int false "页码"
 // @Param page_size query int false "每页数量"
 // @Success 200 {object} map[string]interface{}
@@ -46,7 +51,7 @@ func NewTerminalHandler(
 func (h *TerminalHandler) GetTerminalList(c *gin.Context) {
 	agentID := middleware.GetCurrentAgentID(c)
 
-	// 解析参数
+	// 解析分页参数
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 	if page <= 0 {
@@ -57,14 +62,45 @@ func (h *TerminalHandler) GetTerminalList(c *gin.Context) {
 	}
 	offset := (page - 1) * pageSize
 
-	var statusFilter []int16
-	if s := c.Query("status"); s != "" {
-		if v, err := strconv.ParseInt(s, 10, 16); err == nil {
-			statusFilter = []int16{int16(v)}
+	// 解析筛选参数
+	var channelID *int64
+	if cid := c.Query("channel_id"); cid != "" {
+		if v, err := strconv.ParseInt(cid, 10, 64); err == nil {
+			channelID = &v
 		}
 	}
 
-	terminals, total, err := h.terminalRepo.FindByOwner(agentID, statusFilter, pageSize, offset)
+	statusGroup := c.Query("status_group")
+	// 兼容旧版status参数
+	if statusGroup == "" {
+		if s := c.Query("status"); s != "" {
+			if v, err := strconv.ParseInt(s, 10, 16); err == nil {
+				switch int16(v) {
+				case models.TerminalStatusPending:
+					statusGroup = "unstock"
+				case models.TerminalStatusAllocated:
+					statusGroup = "stocked"
+				case models.TerminalStatusBound:
+					statusGroup = "inactive"
+				case models.TerminalStatusActivated:
+					statusGroup = "active"
+				}
+			}
+		}
+	}
+
+	params := repository.TerminalFilterParams{
+		OwnerAgentID: agentID,
+		ChannelID:    channelID,
+		BrandCode:    c.Query("brand_code"),
+		ModelCode:    c.Query("model_code"),
+		StatusGroup:  statusGroup,
+		Keyword:      c.Query("keyword"),
+		Limit:        pageSize,
+		Offset:       offset,
+	}
+
+	terminals, total, err := h.terminalRepo.FindByOwnerWithFilter(params)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
@@ -76,6 +112,8 @@ func (h *TerminalHandler) GetTerminalList(c *gin.Context) {
 	// 转换为前端友好格式
 	list := make([]gin.H, 0, len(terminals))
 	for _, t := range terminals {
+		// 计算状态分组
+		terminalStatusGroup := getTerminalStatusGroup(t)
 		list = append(list, gin.H{
 			"id":           t.ID,
 			"terminal_sn":  t.TerminalSN,
@@ -83,10 +121,13 @@ func (h *TerminalHandler) GetTerminalList(c *gin.Context) {
 			"channel_code": t.ChannelCode,
 			"brand_code":   t.BrandCode,
 			"model_code":   t.ModelCode,
+			"merchant_id":  t.MerchantID,
 			"merchant_no":  t.MerchantNo,
 			"status":       t.Status,
 			"status_name":  getTerminalStatusName(t.Status),
+			"status_group": terminalStatusGroup,
 			"activated_at": t.ActivatedAt,
+			"bound_at":     t.BoundAt,
 			"created_at":   t.CreatedAt,
 		})
 	}
@@ -101,6 +142,28 @@ func (h *TerminalHandler) GetTerminalList(c *gin.Context) {
 			"page_size": pageSize,
 		},
 	})
+}
+
+// getTerminalStatusGroup 获取终端状态分组
+func getTerminalStatusGroup(t *models.Terminal) string {
+	switch t.Status {
+	case models.TerminalStatusPending:
+		return "unstock"
+	case models.TerminalStatusAllocated:
+		if t.MerchantID == nil {
+			return "unbound"
+		}
+		return "stocked"
+	case models.TerminalStatusBound:
+		if t.ActivatedAt == nil {
+			return "inactive"
+		}
+		return "active"
+	case models.TerminalStatusActivated:
+		return "active"
+	default:
+		return "other"
+	}
 }
 
 // GetTerminalDetail 获取终端详情
@@ -547,7 +610,9 @@ func RegisterTerminalRoutes(r *gin.RouterGroup, h *TerminalHandler, authService 
 	{
 		terminals.GET("", h.GetTerminalList)
 		terminals.GET("/stats", h.GetTerminalStats)
+		terminals.GET("/filter-options", h.GetFilterOptions) // 新增：筛选选项API
 		terminals.GET("/:sn", h.GetTerminalDetail)
+		terminals.GET("/:sn/flow-logs", h.GetTerminalFlowLogs) // 新增：流动记录API
 
 		// 终端入库
 		terminals.POST("/import", h.ImportTerminals)
@@ -784,5 +849,145 @@ func (h *TerminalHandler) BatchSetDeposit(c *gin.Context) {
 		"code":    0,
 		"message": "设置成功",
 		"data":    result,
+	})
+}
+
+// GetFilterOptions 获取筛选选项
+// @Summary 获取筛选选项
+// @Description 获取终端列表的筛选选项（通道、终端类型、状态分组）
+// @Tags 终端管理
+// @Produce json
+// @Security ApiKeyAuth
+// @Param channel_id query int false "通道ID（用于获取该通道下的终端类型）"
+// @Param brand_code query string false "品牌编码（用于获取状态分组统计）"
+// @Param model_code query string false "型号编码（用于获取状态分组统计）"
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/terminals/filter-options [get]
+func (h *TerminalHandler) GetFilterOptions(c *gin.Context) {
+	agentID := middleware.GetCurrentAgentID(c)
+
+	// 解析筛选参数
+	var channelID *int64
+	if cid := c.Query("channel_id"); cid != "" {
+		if v, err := strconv.ParseInt(cid, 10, 64); err == nil {
+			channelID = &v
+		}
+	}
+	brandCode := c.Query("brand_code")
+	modelCode := c.Query("model_code")
+
+	// 获取通道列表
+	channels, err := h.terminalRepo.GetChannelList(agentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "获取通道列表失败: " + err.Error(),
+		})
+		return
+	}
+
+	// 获取终端类型列表
+	terminalTypes, err := h.terminalRepo.GetTerminalTypes(agentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "获取终端类型失败: " + err.Error(),
+		})
+		return
+	}
+
+	// 获取状态分组统计
+	statusGroups, err := h.terminalRepo.GetStatusGroupCounts(agentID, channelID, brandCode, modelCode)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "获取状态统计失败: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"channels":       channels,
+			"terminal_types": terminalTypes,
+			"status_groups":  statusGroups,
+		},
+	})
+}
+
+// GetTerminalFlowLogs 获取终端流动记录
+// @Summary 获取终端流动记录
+// @Description 获取指定终端的流动记录（下发、回拨、绑定、解绑、激活）
+// @Tags 终端管理
+// @Produce json
+// @Security ApiKeyAuth
+// @Param sn path string true "终端SN"
+// @Param log_type query string false "日志类型: all/distribute/recall"
+// @Param page query int false "页码"
+// @Param page_size query int false "每页数量"
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/terminals/{sn}/flow-logs [get]
+func (h *TerminalHandler) GetTerminalFlowLogs(c *gin.Context) {
+	agentID := middleware.GetCurrentAgentID(c)
+	sn := c.Param("sn")
+
+	// 验证终端权限
+	terminal, err := h.terminalRepo.FindBySN(sn)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"code":    404,
+			"message": "终端不存在",
+		})
+		return
+	}
+
+	if terminal.OwnerAgentID != agentID {
+		c.JSON(http.StatusForbidden, gin.H{
+			"code":    403,
+			"message": "无权访问该终端",
+		})
+		return
+	}
+
+	// 解析参数
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 || pageSize > 100 {
+		pageSize = 20
+	}
+	offset := (page - 1) * pageSize
+
+	logType := c.DefaultQuery("log_type", "all")
+
+	logs, total, err := h.terminalRepo.GetTerminalFlowLogs(sn, logType, pageSize, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "获取流动记录失败: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"terminal": gin.H{
+				"terminal_sn":  terminal.TerminalSN,
+				"channel_id":   terminal.ChannelID,
+				"channel_code": terminal.ChannelCode,
+				"brand_code":   terminal.BrandCode,
+				"model_code":   terminal.ModelCode,
+			},
+			"list":      logs,
+			"total":     total,
+			"page":      page,
+			"page_size": pageSize,
+		},
 	})
 }
