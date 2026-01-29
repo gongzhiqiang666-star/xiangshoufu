@@ -60,14 +60,15 @@ export const MENU_LIST: MenuItem[] = [
       { path: '/deductions/list', title: '代扣列表', icon: '' },
     ],
   },
-  {
-    path: '/goods-deductions',
-    title: '货款代扣',
-    icon: 'ShoppingCart',
-    children: [
-      { path: '/goods-deductions/list', title: '货款代扣列表', icon: '' },
-    ],
-  },
+  // 【已停用】货款代扣菜单，统一使用代扣管理模块
+  // {
+  //   path: '/goods-deductions',
+  //   title: '货款代扣',
+  //   icon: 'ShoppingCart',
+  //   children: [
+  //     { path: '/goods-deductions/list', title: '货款代扣列表', icon: '' },
+  //   ],
+  // },
   {
     path: '/wallets',
     title: '钱包管理',
