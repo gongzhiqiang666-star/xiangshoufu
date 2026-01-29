@@ -293,6 +293,9 @@ func main() {
 	terminalTypeService = service.NewTerminalTypeService(terminalTypeRepo, channelRepo, terminalRepo)
 	terminalTypeHandler := handler.NewTerminalTypeHandler(terminalTypeService)
 
+	// 17.3 初始化通道配置仓储（供政策服务使用）
+	channelConfigRepo := repository.NewGormChannelConfigRepository(db)
+
 	// 18. 初始化政策管理服务
 	policyService := service.NewPolicyService(
 		policyTemplateRepo,
@@ -305,6 +308,8 @@ func main() {
 		agentSimPolicyRepo,
 		agentRewardPolicyRepo,
 		agentRepo,
+		channelConfigRepo,
+		db,
 	)
 
 	// 19. 初始化押金返现服务
@@ -397,7 +402,6 @@ func main() {
 	channelHandler := handler.NewChannelHandler(channelService)
 
 	// 20.4.2 初始化通道配置服务（费率范围、押金档位、流量费返现档位）
-	channelConfigRepo := repository.NewGormChannelConfigRepository(db)
 	channelConfigService := service.NewChannelConfigService(channelConfigRepo)
 	channelConfigHandler := handler.NewChannelConfigHandler(channelConfigService)
 
@@ -473,6 +477,8 @@ func main() {
 	settlementPriceService := service.NewSettlementPriceService(
 		settlementPriceRepo,
 		priceChangeLogRepo,
+		agentRepo,
+		channelConfigRepo,
 		db,
 	)
 

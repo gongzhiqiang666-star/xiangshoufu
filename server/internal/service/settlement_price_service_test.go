@@ -102,7 +102,7 @@ func TestSettlementPriceService_CreateFromTemplate(t *testing.T) {
 		mockRepo := new(MockSettlementPriceRepository)
 		mockLogRepo := new(MockPriceChangeLogRepository)
 
-		service := NewSettlementPriceService(mockRepo, mockLogRepo, nil)
+		service := NewSettlementPriceService(mockRepo, mockLogRepo, nil, nil, nil)
 
 		// 模拟不存在的结算价
 		mockRepo.On("GetByAgentAndChannel", int64(1), int64(1), "").Return(nil, assert.AnError)
@@ -123,7 +123,7 @@ func TestSettlementPriceService_CreateFromTemplate(t *testing.T) {
 		mockRepo := new(MockSettlementPriceRepository)
 		mockLogRepo := new(MockPriceChangeLogRepository)
 
-		service := NewSettlementPriceService(mockRepo, mockLogRepo, nil)
+		service := NewSettlementPriceService(mockRepo, mockLogRepo, nil, nil, nil)
 
 		existingPrice := &models.SettlementPrice{ID: 1, AgentID: 1, ChannelID: 1}
 		mockRepo.On("GetByAgentAndChannel", int64(1), int64(1), "").Return(existingPrice, nil)
@@ -140,7 +140,7 @@ func TestSettlementPriceService_UpdateRate(t *testing.T) {
 		mockRepo := new(MockSettlementPriceRepository)
 		mockLogRepo := new(MockPriceChangeLogRepository)
 
-		service := NewSettlementPriceService(mockRepo, mockLogRepo, nil)
+		service := NewSettlementPriceService(mockRepo, mockLogRepo, nil, nil, nil)
 
 		existingPrice := &models.SettlementPrice{
 			ID:        1,
@@ -175,7 +175,7 @@ func TestSettlementPriceService_UpdateRate(t *testing.T) {
 		mockRepo := new(MockSettlementPriceRepository)
 		mockLogRepo := new(MockPriceChangeLogRepository)
 
-		service := NewSettlementPriceService(mockRepo, mockLogRepo, nil)
+		service := NewSettlementPriceService(mockRepo, mockLogRepo, nil, nil, nil)
 
 		mockRepo.On("GetByID", int64(999)).Return(nil, assert.AnError)
 
@@ -237,7 +237,7 @@ func TestSettlementPriceService_GetAgentRate(t *testing.T) {
 			mockRepo := new(MockSettlementPriceRepository)
 			mockLogRepo := new(MockPriceChangeLogRepository)
 
-			service := NewSettlementPriceService(mockRepo, mockLogRepo, nil)
+			service := NewSettlementPriceService(mockRepo, mockLogRepo, nil, nil, nil)
 
 			mockRepo.On("GetByAgentAndChannel", tt.agentID, tt.channelID, "").Return(tt.mockPrice, tt.mockErr)
 
@@ -258,7 +258,7 @@ func TestSettlementPriceService_UpdateDepositCashback(t *testing.T) {
 		mockRepo := new(MockSettlementPriceRepository)
 		mockLogRepo := new(MockPriceChangeLogRepository)
 
-		service := NewSettlementPriceService(mockRepo, mockLogRepo, nil)
+		service := NewSettlementPriceService(mockRepo, mockLogRepo, nil, nil, nil)
 
 		existingPrice := &models.SettlementPrice{
 			ID:        1,
@@ -295,7 +295,7 @@ func TestSettlementPriceService_List(t *testing.T) {
 		mockRepo := new(MockSettlementPriceRepository)
 		mockLogRepo := new(MockPriceChangeLogRepository)
 
-		service := NewSettlementPriceService(mockRepo, mockLogRepo, nil)
+		service := NewSettlementPriceService(mockRepo, mockLogRepo, nil, nil, nil)
 
 		prices := []models.SettlementPrice{
 			{ID: 1, AgentID: 1, ChannelID: 1, Version: 1},
@@ -317,7 +317,7 @@ func TestSettlementPriceService_List(t *testing.T) {
 		mockRepo := new(MockSettlementPriceRepository)
 		mockLogRepo := new(MockPriceChangeLogRepository)
 
-		service := NewSettlementPriceService(mockRepo, mockLogRepo, nil)
+		service := NewSettlementPriceService(mockRepo, mockLogRepo, nil, nil, nil)
 
 		req := &models.SettlementPriceListRequest{Page: 1, PageSize: 20}
 		mockRepo.On("List", req).Return([]models.SettlementPrice{}, int64(0), nil)
@@ -336,7 +336,7 @@ func TestSettlementPriceService_GetAgentDepositCashback(t *testing.T) {
 		mockRepo := new(MockSettlementPriceRepository)
 		mockLogRepo := new(MockPriceChangeLogRepository)
 
-		service := NewSettlementPriceService(mockRepo, mockLogRepo, nil)
+		service := NewSettlementPriceService(mockRepo, mockLogRepo, nil, nil, nil)
 
 		price := &models.SettlementPrice{
 			DepositCashbacks: models.DepositCashbacks{
@@ -357,7 +357,7 @@ func TestSettlementPriceService_GetAgentDepositCashback(t *testing.T) {
 		mockRepo := new(MockSettlementPriceRepository)
 		mockLogRepo := new(MockPriceChangeLogRepository)
 
-		service := NewSettlementPriceService(mockRepo, mockLogRepo, nil)
+		service := NewSettlementPriceService(mockRepo, mockLogRepo, nil, nil, nil)
 
 		price := &models.SettlementPrice{
 			DepositCashbacks: models.DepositCashbacks{
@@ -379,7 +379,7 @@ func TestSettlementPriceService_GetAgentSimCashback(t *testing.T) {
 		mockRepo := new(MockSettlementPriceRepository)
 		mockLogRepo := new(MockPriceChangeLogRepository)
 
-		service := NewSettlementPriceService(mockRepo, mockLogRepo, nil)
+		service := NewSettlementPriceService(mockRepo, mockLogRepo, nil, nil, nil)
 
 		price := &models.SettlementPrice{
 			SimFirstCashback:     5000,

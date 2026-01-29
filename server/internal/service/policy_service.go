@@ -1,11 +1,13 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
 	"time"
 
+	"gorm.io/gorm"
 	"xiangshoufu/internal/models"
 	"xiangshoufu/internal/repository"
 )
@@ -23,6 +25,8 @@ type PolicyService struct {
 	agentSimRepo           *repository.GormAgentSimCashbackPolicyRepository
 	agentRewardRepo        *repository.GormAgentActivationRewardPolicyRepository
 	agentRepo              repository.AgentRepository
+	channelConfigRepo      *repository.GormChannelConfigRepository
+	db                     *gorm.DB
 }
 
 // NewPolicyService 创建政策服务
@@ -37,6 +41,8 @@ func NewPolicyService(
 	agentSimRepo *repository.GormAgentSimCashbackPolicyRepository,
 	agentRewardRepo *repository.GormAgentActivationRewardPolicyRepository,
 	agentRepo repository.AgentRepository,
+	channelConfigRepo *repository.GormChannelConfigRepository,
+	db *gorm.DB,
 ) *PolicyService {
 	return &PolicyService{
 		templateRepo:        templateRepo,
@@ -49,6 +55,8 @@ func NewPolicyService(
 		agentSimRepo:        agentSimRepo,
 		agentRewardRepo:     agentRewardRepo,
 		agentRepo:           agentRepo,
+		channelConfigRepo:   channelConfigRepo,
+		db:                  db,
 	}
 }
 
@@ -172,6 +180,12 @@ func (s *PolicyService) CreatePolicyTemplate(req *CreatePolicyTemplateRequest) (
 		return nil, errors.New("模板名称不能为空")
 	}
 
+	// 校验模板配置是否符合通道约束
+	ctx := context.Background()
+	if err := s.validateTemplateAgainstChannel(ctx, req.ChannelID, req); err != nil {
+		return nil, fmt.Errorf("通道约束校验失败: %w", err)
+	}
+
 	// 创建主模板
 	template := &models.PolicyTemplateComplete{
 		TemplateName: req.TemplateName,
@@ -227,35 +241,158 @@ func (s *PolicyService) UpdatePolicyTemplate(id int64, req *CreatePolicyTemplate
 		return nil, fmt.Errorf("政策模板不存在: %d", id)
 	}
 
-	// 更新主模板
-	template.TemplateName = req.TemplateName
-	template.IsDefault = req.IsDefault
-	template.RateConfigs = req.RateConfigs
-	template.CreditRate = req.CreditRate
-	template.DebitRate = req.DebitRate
-	template.DebitCap = req.DebitCap
-	template.UnionpayRate = req.UnionpayRate
-	template.WechatRate = req.WechatRate
-	template.AlipayRate = req.AlipayRate
-	template.UpdatedAt = time.Now()
-
-	if err := s.templateRepo.Update(template); err != nil {
-		return nil, fmt.Errorf("更新政策模板失败: %w", err)
+	// 校验模板配置是否符合通道约束
+	ctx := context.Background()
+	if err := s.validateTemplateAgainstChannel(ctx, req.ChannelID, req); err != nil {
+		return nil, fmt.Errorf("通道约束校验失败: %w", err)
 	}
 
-	// 删除并重新创建关联政策
-	s.depositPolicyRepo.DeleteByTemplateID(id)
-	s.simPolicyRepo.DeleteByTemplateID(id)
-	s.rewardPolicyRepo.DeleteByTemplateID(id)
-	s.rateStagePolicyRepo.DeleteByTemplateID(id)
+	// 使用事务保护更新操作
+	if s.db != nil {
+		err = s.db.Transaction(func(tx *gorm.DB) error {
+			// 更新主模板
+			template.TemplateName = req.TemplateName
+			template.IsDefault = req.IsDefault
+			template.RateConfigs = req.RateConfigs
+			template.CreditRate = req.CreditRate
+			template.DebitRate = req.DebitRate
+			template.DebitCap = req.DebitCap
+			template.UnionpayRate = req.UnionpayRate
+			template.WechatRate = req.WechatRate
+			template.AlipayRate = req.AlipayRate
+			template.UpdatedAt = time.Now()
 
-	// 重新创建关联政策
-	s.createDepositCashbackPolicies(id, req.ChannelID, req.DepositCashbacks)
-	if req.SimCashback != nil {
-		s.createSimCashbackPolicy(id, req.ChannelID, req.SimCashback)
+			if err := tx.Save(template).Error; err != nil {
+				return fmt.Errorf("更新政策模板失败: %w", err)
+			}
+
+			// 删除旧的关联政策
+			if err := tx.Where("template_id = ?", id).Delete(&models.DepositCashbackPolicy{}).Error; err != nil {
+				return fmt.Errorf("删除押金返现政策失败: %w", err)
+			}
+			if err := tx.Where("template_id = ?", id).Delete(&models.SimCashbackPolicy{}).Error; err != nil {
+				return fmt.Errorf("删除流量费返现政策失败: %w", err)
+			}
+			if err := tx.Where("template_id = ?", id).Delete(&models.ActivationRewardPolicy{}).Error; err != nil {
+				return fmt.Errorf("删除激活奖励政策失败: %w", err)
+			}
+			if err := tx.Where("template_id = ?", id).Delete(&models.RateStagePolicy{}).Error; err != nil {
+				return fmt.Errorf("删除费率阶梯政策失败: %w", err)
+			}
+
+			// 重新创建关联政策
+			for _, input := range req.DepositCashbacks {
+				policy := &models.DepositCashbackPolicy{
+					TemplateID:     id,
+					ChannelID:      req.ChannelID,
+					DepositAmount:  input.DepositAmount,
+					CashbackAmount: input.CashbackAmount,
+					Status:         1,
+					CreatedAt:      time.Now(),
+					UpdatedAt:      time.Now(),
+				}
+				if err := tx.Create(policy).Error; err != nil {
+					return fmt.Errorf("创建押金返现政策失败: %w", err)
+				}
+			}
+
+			if req.SimCashback != nil {
+				policy := &models.SimCashbackPolicy{
+					TemplateID:         id,
+					ChannelID:          req.ChannelID,
+					FirstTimeCashback:  req.SimCashback.FirstTimeCashback,
+					SecondTimeCashback: req.SimCashback.SecondTimeCashback,
+					ThirdPlusCashback:  req.SimCashback.ThirdPlusCashback,
+					SimFeeAmount:       req.SimCashback.SimFeeAmount,
+					Status:             1,
+					CreatedAt:          time.Now(),
+					UpdatedAt:          time.Now(),
+				}
+				// 同时设置新版N档格式
+				policy.SetFromOldFields()
+				if err := tx.Create(policy).Error; err != nil {
+					return fmt.Errorf("创建流量费返现政策失败: %w", err)
+				}
+			}
+
+			for _, input := range req.ActivationRewards {
+				policy := &models.ActivationRewardPolicy{
+					TemplateID:      id,
+					ChannelID:       req.ChannelID,
+					RewardName:      input.RewardName,
+					MinRegisterDays: input.MinRegisterDays,
+					MaxRegisterDays: input.MaxRegisterDays,
+					TargetAmount:    input.TargetAmount,
+					RewardAmount:    input.RewardAmount,
+					Priority:        input.Priority,
+					Status:          1,
+					CreatedAt:       time.Now(),
+					UpdatedAt:       time.Now(),
+				}
+				if err := tx.Create(policy).Error; err != nil {
+					return fmt.Errorf("创建激活奖励政策失败: %w", err)
+				}
+			}
+
+			for _, input := range req.RateStages {
+				policy := &models.RateStagePolicy{
+					TemplateID:        id,
+					ChannelID:         req.ChannelID,
+					StageName:         input.StageName,
+					ApplyTo:           input.ApplyTo,
+					MinDays:           input.MinDays,
+					MaxDays:           input.MaxDays,
+					RateDeltas:        input.RateDeltas,
+					CreditRateDelta:   input.CreditRateDelta,
+					DebitRateDelta:    input.DebitRateDelta,
+					UnionpayRateDelta: input.UnionpayRateDelta,
+					WechatRateDelta:   input.WechatRateDelta,
+					AlipayRateDelta:   input.AlipayRateDelta,
+					Priority:          input.Priority,
+					Status:            1,
+					CreatedAt:         time.Now(),
+					UpdatedAt:         time.Now(),
+				}
+				if err := tx.Create(policy).Error; err != nil {
+					return fmt.Errorf("创建费率阶梯政策失败: %w", err)
+				}
+			}
+
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// 无事务支持时的降级处理（保持原有逻辑）
+		template.TemplateName = req.TemplateName
+		template.IsDefault = req.IsDefault
+		template.RateConfigs = req.RateConfigs
+		template.CreditRate = req.CreditRate
+		template.DebitRate = req.DebitRate
+		template.DebitCap = req.DebitCap
+		template.UnionpayRate = req.UnionpayRate
+		template.WechatRate = req.WechatRate
+		template.AlipayRate = req.AlipayRate
+		template.UpdatedAt = time.Now()
+
+		if err := s.templateRepo.Update(template); err != nil {
+			return nil, fmt.Errorf("更新政策模板失败: %w", err)
+		}
+
+		// 删除并重新创建关联政策
+		s.depositPolicyRepo.DeleteByTemplateID(id)
+		s.simPolicyRepo.DeleteByTemplateID(id)
+		s.rewardPolicyRepo.DeleteByTemplateID(id)
+		s.rateStagePolicyRepo.DeleteByTemplateID(id)
+
+		s.createDepositCashbackPolicies(id, req.ChannelID, req.DepositCashbacks)
+		if req.SimCashback != nil {
+			s.createSimCashbackPolicy(id, req.ChannelID, req.SimCashback)
+		}
+		s.createActivationRewardPolicies(id, req.ChannelID, req.ActivationRewards)
+		s.createRateStagePolicies(id, req.ChannelID, req.RateStages)
 	}
-	s.createActivationRewardPolicies(id, req.ChannelID, req.ActivationRewards)
-	s.createRateStagePolicies(id, req.ChannelID, req.RateStages)
 
 	log.Printf("[PolicyService] Updated policy template: id=%d", id)
 
@@ -785,5 +922,99 @@ func (s *PolicyService) validatePolicyRange(operatorPolicy *models.AgentPolicyCo
 		}
 	}
 
+	return nil
+}
+
+// ============================================================
+// 通道约束校验
+// ============================================================
+
+// validateTemplateAgainstChannel 校验模板配置是否符合通道约束
+func (s *PolicyService) validateTemplateAgainstChannel(ctx context.Context, channelID int64, req *CreatePolicyTemplateRequest) error {
+	if s.channelConfigRepo == nil {
+		// 如果没有注入通道配置仓库，跳过校验
+		return nil
+	}
+
+	// 1. 获取通道完整配置
+	channelConfig, err := s.channelConfigRepo.GetFullConfig(ctx, channelID)
+	if err != nil {
+		log.Printf("[PolicyService] Failed to get channel config: %v", err)
+		return nil // 获取失败时不阻断流程，仅记录日志
+	}
+
+	// 2. 校验费率配置
+	for rateCode, rateConfig := range req.RateConfigs {
+		channelRateConfig := findChannelRateConfig(channelConfig.RateConfigs, rateCode)
+		if channelRateConfig != nil {
+			if err := models.ValidateRateRange(rateConfig.Rate, channelRateConfig.MinRate, channelRateConfig.MaxRate); err != nil {
+				return fmt.Errorf("%s费率校验失败: %w", channelRateConfig.RateName, err)
+			}
+		}
+	}
+
+	// 3. 校验押金返现配置
+	for _, dc := range req.DepositCashbacks {
+		depositTier := findChannelDepositTier(channelConfig.DepositTiers, dc.DepositAmount)
+		if depositTier != nil && depositTier.MaxCashbackAmount > 0 {
+			if dc.CashbackAmount > depositTier.MaxCashbackAmount {
+				return fmt.Errorf("押金%d元的返现%d元超过通道上限%d元",
+					dc.DepositAmount/100, dc.CashbackAmount/100, depositTier.MaxCashbackAmount/100)
+			}
+		}
+	}
+
+	// 4. 校验流量费返现配置
+	if req.SimCashback != nil {
+		// 校验首次返现
+		tier1 := findChannelSimCashbackTier(channelConfig.SimCashbackTiers, 1)
+		if tier1 != nil && req.SimCashback.FirstTimeCashback > tier1.MaxCashbackAmount {
+			return fmt.Errorf("首次流量费返现%d元超过通道上限%d元",
+				req.SimCashback.FirstTimeCashback/100, tier1.MaxCashbackAmount/100)
+		}
+		// 校验第2次返现
+		tier2 := findChannelSimCashbackTier(channelConfig.SimCashbackTiers, 2)
+		if tier2 != nil && req.SimCashback.SecondTimeCashback > tier2.MaxCashbackAmount {
+			return fmt.Errorf("第2次流量费返现%d元超过通道上限%d元",
+				req.SimCashback.SecondTimeCashback/100, tier2.MaxCashbackAmount/100)
+		}
+		// 校验第3次及以后返现
+		tier3 := findChannelSimCashbackTier(channelConfig.SimCashbackTiers, 3)
+		if tier3 != nil && req.SimCashback.ThirdPlusCashback > tier3.MaxCashbackAmount {
+			return fmt.Errorf("第3次及以后流量费返现%d元超过通道上限%d元",
+				req.SimCashback.ThirdPlusCashback/100, tier3.MaxCashbackAmount/100)
+		}
+	}
+
+	return nil
+}
+
+// findChannelRateConfig 查找通道费率配置
+func findChannelRateConfig(configs []models.ChannelRateConfig, rateCode string) *models.ChannelRateConfig {
+	for i := range configs {
+		if configs[i].RateCode == rateCode {
+			return &configs[i]
+		}
+	}
+	return nil
+}
+
+// findChannelDepositTier 查找通道押金档位
+func findChannelDepositTier(tiers []models.ChannelDepositTier, depositAmount int64) *models.ChannelDepositTier {
+	for i := range tiers {
+		if tiers[i].DepositAmount == depositAmount {
+			return &tiers[i]
+		}
+	}
+	return nil
+}
+
+// findChannelSimCashbackTier 查找通道流量费返现档位
+func findChannelSimCashbackTier(tiers []models.ChannelSimCashbackTier, tierOrder int) *models.ChannelSimCashbackTier {
+	for i := range tiers {
+		if tiers[i].TierOrder == tierOrder {
+			return &tiers[i]
+		}
+	}
 	return nil
 }

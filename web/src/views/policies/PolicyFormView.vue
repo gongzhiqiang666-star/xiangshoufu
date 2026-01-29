@@ -88,7 +88,7 @@
             <span>2. 押金返现配置</span>
             <el-tag type="info" size="small">服务费钱包</el-tag>
           </div>
-          <DepositCashbackEditor v-model="form.deposit_cashbacks" />
+          <DepositCashbackEditor v-model="form.deposit_cashbacks" :limits="depositLimits" />
         </div>
 
         <!-- 3. 流量卡返现配置 -->
@@ -97,7 +97,7 @@
             <span>3. 流量卡返现配置</span>
             <el-tag type="info" size="small">服务费钱包</el-tag>
           </div>
-          <SimCashbackEditor v-model="form.sim_cashback" />
+          <SimCashbackEditor v-model="form.sim_cashback" :limits="simCashbackLimits" />
         </div>
 
         <!-- 4. 激活奖励配置 -->
@@ -136,7 +136,8 @@ import {
   RateStageEditor,
 } from '@/components/Policy'
 import { getPolicyTemplateDetail, createPolicyTemplate, updatePolicyTemplate } from '@/api/policy'
-import { getChannelRateTypes } from '@/api/channel'
+import { getChannelRateTypes, getChannelFullConfig } from '@/api/channel'
+import type { ChannelDepositTier, ChannelSimCashbackTier } from '@/api/channel'
 import type { RateTypeDefinition, RateConfigs } from '@/types/policy'
 
 const route = useRoute()
@@ -152,6 +153,36 @@ const submitting = ref(false)
 // 动态费率类型
 const rateTypes = ref<RateTypeDefinition[]>([])
 const rateTypesLoading = ref(false)
+
+// 通道配置限制（押金档位、流量费返现档位）
+const depositTiers = ref<ChannelDepositTier[]>([])
+const simCashbackTiers = ref<ChannelSimCashbackTier[]>([])
+
+// 计算押金返现限制（deposit_amount -> max_cashback_amount，分转元）
+const depositLimits = computed(() => {
+  const limits: Record<number, number> = {}
+  for (const tier of depositTiers.value) {
+    const depositYuan = tier.deposit_amount / 100
+    limits[depositYuan] = tier.max_cashback_amount / 100
+  }
+  return limits
+})
+
+// 计算流量费返现限制（分转元）
+const simCashbackLimits = computed(() => {
+  const limits: { firstCashback?: number; secondCashback?: number; thirdPlusCashback?: number } = {}
+  for (const tier of simCashbackTiers.value) {
+    const maxYuan = tier.max_cashback_amount / 100
+    if (tier.tier_order === 1) {
+      limits.firstCashback = maxYuan
+    } else if (tier.tier_order === 2) {
+      limits.secondCashback = maxYuan
+    } else if (tier.tier_order >= 3 || tier.is_last_tier) {
+      limits.thirdPlusCashback = maxYuan
+    }
+  }
+  return limits
+})
 
 // 表单引用
 const formRef = ref<FormInstance>()
@@ -218,24 +249,35 @@ const rules: FormRules = {
   ],
 }
 
-// 监听通道变化，动态加载费率类型
+// 监听通道变化，动态加载费率类型和完整配置
 watch(() => form.channel_id, async (channelId) => {
   if (channelId) {
     rateTypesLoading.value = true
     try {
-      const result = await getChannelRateTypes(channelId)
-      rateTypes.value = result || []
+      // 同时加载费率类型和完整配置
+      const [rateTypesResult, fullConfig] = await Promise.all([
+        getChannelRateTypes(channelId),
+        getChannelFullConfig(channelId),
+      ])
+      rateTypes.value = rateTypesResult || []
+      // 加载押金档位和流量费返现档位
+      depositTiers.value = fullConfig?.deposit_tiers || []
+      simCashbackTiers.value = fullConfig?.sim_cashback_tiers || []
       // 每次加载完费率类型后都初始化配置
       initRateConfigs()
     } catch (error) {
-      console.error('Failed to load rate types:', error)
+      console.error('Failed to load channel config:', error)
       rateTypes.value = []
+      depositTiers.value = []
+      simCashbackTiers.value = []
       form.rate_configs = {}
     } finally {
       rateTypesLoading.value = false
     }
   } else {
     rateTypes.value = []
+    depositTiers.value = []
+    simCashbackTiers.value = []
     form.rate_configs = {}
   }
 })
@@ -278,11 +320,17 @@ async function fetchDetail() {
       activation_rewards: data.activation_rewards || [],
       rate_stages: data.rate_stages || [],
     })
-    // 加载费率类型后初始化配置
+    // 加载费率类型和完整配置
     if (data.channel_id) {
       rateTypesLoading.value = true
       try {
-        rateTypes.value = await getChannelRateTypes(data.channel_id)
+        const [rateTypesResult, fullConfig] = await Promise.all([
+          getChannelRateTypes(data.channel_id),
+          getChannelFullConfig(data.channel_id),
+        ])
+        rateTypes.value = rateTypesResult || []
+        depositTiers.value = fullConfig?.deposit_tiers || []
+        simCashbackTiers.value = fullConfig?.sim_cashback_tiers || []
         initRateConfigs()
       } finally {
         rateTypesLoading.value = false

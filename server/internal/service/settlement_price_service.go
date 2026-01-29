@@ -12,21 +12,27 @@ import (
 
 // SettlementPriceService 结算价服务
 type SettlementPriceService struct {
-	repo           repository.SettlementPriceRepository
-	changeLogRepo  repository.PriceChangeLogRepository
-	db             *gorm.DB
+	repo              repository.SettlementPriceRepository
+	changeLogRepo     repository.PriceChangeLogRepository
+	agentRepo         repository.AgentRepository
+	channelConfigRepo *repository.GormChannelConfigRepository
+	db                *gorm.DB
 }
 
 // NewSettlementPriceService 创建结算价服务
 func NewSettlementPriceService(
 	repo repository.SettlementPriceRepository,
 	changeLogRepo repository.PriceChangeLogRepository,
+	agentRepo repository.AgentRepository,
+	channelConfigRepo *repository.GormChannelConfigRepository,
 	db *gorm.DB,
 ) *SettlementPriceService {
 	return &SettlementPriceService{
-		repo:          repo,
-		changeLogRepo: changeLogRepo,
-		db:            db,
+		repo:              repo,
+		changeLogRepo:     changeLogRepo,
+		agentRepo:         agentRepo,
+		channelConfigRepo: channelConfigRepo,
+		db:                db,
 	}
 }
 
@@ -535,4 +541,122 @@ func (s *SettlementPriceService) createChangeLogWithSnapshot(
 	}
 
 	s.changeLogRepo.Create(log)
+}
+
+// ============================================================
+// 上下级约束校验
+// ============================================================
+
+// ValidateSettlementPriceConstraints 校验结算价是否符合上下级约束
+func (s *SettlementPriceService) ValidateSettlementPriceConstraints(
+	agentID, channelID int64,
+	brandCode string,
+	rateConfigs models.RateConfigs,
+	depositCashbacks models.DepositCashbacks,
+	simCashbacks models.SimCashbacks,
+) error {
+	if s.agentRepo == nil {
+		return nil // 没有注入代理商仓库时跳过校验
+	}
+
+	// 1. 获取代理商信息
+	agent, err := s.agentRepo.FindByID(agentID)
+	if err != nil || agent == nil {
+		return nil // 代理商不存在时跳过校验
+	}
+
+	// 2. 如果有上级，校验不能超过上级配置
+	if agent.ParentID > 0 {
+		upperPrice, err := s.repo.GetByAgentAndChannel(agent.ParentID, channelID, brandCode)
+		if err == nil && upperPrice != nil {
+			// 校验费率：下级费率 >= 上级费率
+			for rateCode, rateConfig := range rateConfigs {
+				if upperRateConfig, ok := upperPrice.RateConfigs[rateCode]; ok {
+					if err := models.ValidateSettlementRate(rateConfig.Rate, upperRateConfig.Rate, "0", "100"); err != nil {
+						return fmt.Errorf("%s: %w", getRateCodeName(rateCode), err)
+					}
+				}
+			}
+
+			// 校验押金返现：下级返现 <= 上级返现
+			for _, dc := range depositCashbacks {
+				for _, upperDc := range upperPrice.DepositCashbacks {
+					if dc.DepositAmount == upperDc.DepositAmount {
+						if dc.CashbackAmount > upperDc.CashbackAmount {
+							return fmt.Errorf("押金%d元的返现%d元不能超过上级配置%d元",
+								dc.DepositAmount/100, dc.CashbackAmount/100, upperDc.CashbackAmount/100)
+						}
+					}
+				}
+			}
+
+			// 校验流量费返现：下级每档返现 <= 上级对应档返现
+			for _, tier := range simCashbacks {
+				upperAmount := upperPrice.SimCashbacks.GetCashbackAmount(tier.TierOrder)
+				if upperAmount > 0 && tier.CashbackAmount > upperAmount {
+					return fmt.Errorf("流量费第%d次返现%d元不能超过上级配置%d元",
+						tier.TierOrder, tier.CashbackAmount/100, upperAmount/100)
+				}
+			}
+		}
+	}
+
+	// 3. 校验不超过通道上限
+	if s.channelConfigRepo != nil {
+		channelConfig, err := s.channelConfigRepo.GetFullConfig(nil, channelID)
+		if err == nil && channelConfig != nil {
+			// 校验费率不超过通道上限
+			for rateCode, rateConfig := range rateConfigs {
+				for _, channelRate := range channelConfig.RateConfigs {
+					if channelRate.RateCode == rateCode {
+						if err := models.ValidateRateRange(rateConfig.Rate, channelRate.MinRate, channelRate.MaxRate); err != nil {
+							return fmt.Errorf("%s费率校验失败: %w", channelRate.RateName, err)
+						}
+					}
+				}
+			}
+
+			// 校验押金返现不超过通道上限
+			for _, dc := range depositCashbacks {
+				for _, tier := range channelConfig.DepositTiers {
+					if tier.DepositAmount == dc.DepositAmount && tier.MaxCashbackAmount > 0 {
+						if dc.CashbackAmount > tier.MaxCashbackAmount {
+							return fmt.Errorf("押金%d元的返现%d元超过通道上限%d元",
+								dc.DepositAmount/100, dc.CashbackAmount/100, tier.MaxCashbackAmount/100)
+						}
+					}
+				}
+			}
+
+			// 校验流量费返现不超过通道上限
+			for _, sc := range simCashbacks {
+				for _, tier := range channelConfig.SimCashbackTiers {
+					if tier.TierOrder == sc.TierOrder {
+						if sc.CashbackAmount > tier.MaxCashbackAmount {
+							return fmt.Errorf("流量费第%d次返现%d元超过通道上限%d元",
+								sc.TierOrder, sc.CashbackAmount/100, tier.MaxCashbackAmount/100)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// getRateCodeName 获取费率编码的中文名称
+func getRateCodeName(code string) string {
+	names := map[string]string{
+		"CREDIT":    "贷记卡",
+		"DEBIT":     "借记卡",
+		"WECHAT":    "微信",
+		"ALIPAY":    "支付宝",
+		"UNIONPAY":  "云闪付",
+		"CLOUD_PAY": "云闪付",
+	}
+	if name, ok := names[code]; ok {
+		return name
+	}
+	return code
 }

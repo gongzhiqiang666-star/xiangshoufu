@@ -5,12 +5,14 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../channel/channel.dart';
 import '../data/models/settlement_price_model.dart';
 import 'providers/settlement_price_provider.dart';
 
 /// 结算价编辑页面
 /// 入口：下级结算价列表 → 点击编辑
 /// 支持编辑费率、押金返现、流量费返现
+/// 添加通道配置校验：费率范围、返现上限
 class AgentSettlementPriceEditPage extends ConsumerStatefulWidget {
   final int agentId;
   final int priceId;
@@ -52,6 +54,9 @@ class _AgentSettlementPriceEditPageState extends ConsumerState<AgentSettlementPr
 
   // 当前结算价数据
   SettlementPriceModel? _currentPrice;
+
+  // 通道配置（用于校验）
+  ChannelFullConfig? _channelConfig;
 
   @override
   void initState() {
@@ -144,13 +149,35 @@ class _AgentSettlementPriceEditPageState extends ConsumerState<AgentSettlementPr
         ),
         data: (price) {
           _initFormData(price);
-          return TabBarView(
-            controller: _tabController,
-            children: [
-              _buildRateTab(price),
-              _buildDepositTab(price),
-              _buildSimTab(price),
-            ],
+
+          // 加载通道配置
+          final configAsync = ref.watch(channelFullConfigProvider(price.channelId));
+
+          return configAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, s) {
+              // 通道配置加载失败时，仍允许编辑但不显示限制提示
+              _channelConfig = null;
+              return TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildRateTab(price),
+                  _buildDepositTab(price),
+                  _buildSimTab(price),
+                ],
+              );
+            },
+            data: (config) {
+              _channelConfig = config;
+              return TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildRateTab(price),
+                  _buildDepositTab(price),
+                  _buildSimTab(price),
+                ],
+              );
+            },
           );
         },
       ),
@@ -173,6 +200,7 @@ class _AgentSettlementPriceEditPageState extends ConsumerState<AgentSettlementPr
                 controller: _creditRateController,
                 suffix: '%',
                 hint: '例如: 0.55',
+                rateCode: 'CREDIT',
               ),
               const SizedBox(height: AppSpacing.md),
               _buildRateField(
@@ -180,6 +208,7 @@ class _AgentSettlementPriceEditPageState extends ConsumerState<AgentSettlementPr
                 controller: _debitRateController,
                 suffix: '%',
                 hint: '例如: 0.50',
+                rateCode: 'DEBIT',
               ),
               const SizedBox(height: AppSpacing.md),
               _buildRateField(
@@ -187,6 +216,7 @@ class _AgentSettlementPriceEditPageState extends ConsumerState<AgentSettlementPr
                 controller: _debitCapController,
                 suffix: '元',
                 hint: '例如: 20',
+                rateCode: 'DEBIT_CAP',
               ),
               const SizedBox(height: AppSpacing.md),
               _buildRateField(
@@ -194,6 +224,7 @@ class _AgentSettlementPriceEditPageState extends ConsumerState<AgentSettlementPr
                 controller: _unionpayRateController,
                 suffix: '%',
                 hint: '例如: 0.38',
+                rateCode: 'UNIONPAY',
               ),
               const SizedBox(height: AppSpacing.md),
               _buildRateField(
@@ -201,6 +232,7 @@ class _AgentSettlementPriceEditPageState extends ConsumerState<AgentSettlementPr
                 controller: _wechatRateController,
                 suffix: '%',
                 hint: '例如: 0.38',
+                rateCode: 'WECHAT',
               ),
               const SizedBox(height: AppSpacing.md),
               _buildRateField(
@@ -208,6 +240,7 @@ class _AgentSettlementPriceEditPageState extends ConsumerState<AgentSettlementPr
                 controller: _alipayRateController,
                 suffix: '%',
                 hint: '例如: 0.38',
+                rateCode: 'ALIPAY',
               ),
             ],
           ),
@@ -274,28 +307,22 @@ class _AgentSettlementPriceEditPageState extends ConsumerState<AgentSettlementPr
             title: '流量费返现配置',
             subtitle: '设置流量费返现金额（单位：元）',
             children: [
-              _buildRateField(
+              _buildSimCashbackField(
                 label: '首次返现',
                 controller: _simFirstController,
-                suffix: '元',
-                hint: '例如: 49',
-                keyboardType: TextInputType.number,
+                tierOrder: 1,
               ),
               const SizedBox(height: AppSpacing.md),
-              _buildRateField(
+              _buildSimCashbackField(
                 label: '第2次返现',
                 controller: _simSecondController,
-                suffix: '元',
-                hint: '例如: 39',
-                keyboardType: TextInputType.number,
+                tierOrder: 2,
               ),
               const SizedBox(height: AppSpacing.md),
-              _buildRateField(
+              _buildSimCashbackField(
                 label: '第3次及以后返现',
                 controller: _simThirdPlusController,
-                suffix: '元',
-                hint: '例如: 29',
-                keyboardType: TextInputType.number,
+                tierOrder: 3,
               ),
             ],
           ),
@@ -369,14 +396,21 @@ class _AgentSettlementPriceEditPageState extends ConsumerState<AgentSettlementPr
     );
   }
 
-  /// 构建费率输入字段
+  /// 构建费率输入字段（带通道配置范围提示）
   Widget _buildRateField({
     required String label,
     required TextEditingController controller,
     required String suffix,
     String? hint,
+    String? rateCode,
     TextInputType keyboardType = const TextInputType.numberWithOptions(decimal: true),
   }) {
+    // 获取通道费率配置
+    ChannelRateConfig? rateConfig;
+    if (_channelConfig != null && rateCode != null) {
+      rateConfig = _channelConfig!.getRateConfigByCode(rateCode);
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -411,12 +445,90 @@ class _AgentSettlementPriceEditPageState extends ConsumerState<AgentSettlementPr
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           ),
         ),
+        // 显示费率范围提示
+        if (rateConfig != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            '范围: ${rateConfig.minRate}% ~ ${rateConfig.maxRate}%',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// 构建流量费返现输入字段（带通道配置上限提示）
+  Widget _buildSimCashbackField({
+    required String label,
+    required TextEditingController controller,
+    required int tierOrder,
+  }) {
+    // 获取通道流量费返现档位
+    ChannelSimCashbackTier? tier;
+    if (_channelConfig != null) {
+      tier = _channelConfig!.getSimCashbackTierByOrder(tierOrder);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+          ],
+          decoration: InputDecoration(
+            hintText: '例如: 49',
+            suffixText: '元',
+            filled: true,
+            fillColor: AppColors.background,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: AppColors.primary),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+        ),
+        // 显示返现上限提示
+        if (tier != null && tier.maxCashbackAmount > 0) ...[
+          const SizedBox(height: 4),
+          Text(
+            '最高 ${tier.maxCashbackAmountYuan.toStringAsFixed(0)} 元',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+            ),
+          ),
+        ],
       ],
     );
   }
 
   /// 构建押金返现项卡片
   Widget _buildDepositItemCard(int index, DepositCashbackItem item) {
+    // 获取通道押金档位上限
+    ChannelDepositTier? tier;
+    if (_channelConfig != null) {
+      tier = _channelConfig!.getDepositTierByAmount(item.depositAmount);
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -446,6 +558,17 @@ class _AgentSettlementPriceEditPageState extends ConsumerState<AgentSettlementPr
                     color: AppColors.textPrimary,
                   ),
                 ),
+                // 显示返现上限提示
+                if (tier != null && tier.maxCashbackAmount > 0) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    '最高可返 ${tier.maxCashbackAmountYuan.toStringAsFixed(0)} 元',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey[500],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -488,6 +611,13 @@ class _AgentSettlementPriceEditPageState extends ConsumerState<AgentSettlementPr
       text: item?.cashbackAmountYuan.toStringAsFixed(0) ?? '',
     );
 
+    // 获取通道押金档位上限（用于对话框提示）
+    int? maxCashback;
+    if (_channelConfig != null && item != null) {
+      final tier = _channelConfig!.getDepositTierByAmount(item.depositAmount);
+      maxCashback = tier?.maxCashbackAmount;
+    }
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -502,14 +632,25 @@ class _AgentSettlementPriceEditPageState extends ConsumerState<AgentSettlementPr
                 labelText: '押金金额（元）',
                 hintText: '例如: 99',
               ),
+              onChanged: (value) {
+                // 当押金金额变化时，更新返现上限提示
+                final deposit = int.tryParse(value) ?? 0;
+                if (_channelConfig != null && deposit > 0) {
+                  final tier = _channelConfig!.getDepositTierByAmount(deposit * 100);
+                  maxCashback = tier?.maxCashbackAmount;
+                }
+              },
             ),
             const SizedBox(height: 16),
             TextField(
               controller: cashbackController,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: '返现金额（元）',
                 hintText: '例如: 69',
+                helperText: maxCashback != null && maxCashback! > 0
+                    ? '最高 ${(maxCashback! / 100).toStringAsFixed(0)} 元'
+                    : null,
               ),
             ),
           ],
@@ -529,6 +670,20 @@ class _AgentSettlementPriceEditPageState extends ConsumerState<AgentSettlementPr
                   const SnackBar(content: Text('请输入有效的金额')),
                 );
                 return;
+              }
+
+              // 验证返现金额是否超过通道上限
+              if (_channelConfig != null) {
+                final tier = _channelConfig!.getDepositTierByAmount(deposit * 100);
+                if (tier != null && cashback * 100 > tier.maxCashbackAmount) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('返现金额不能超过${tier.maxCashbackAmountYuan.toStringAsFixed(0)}元'),
+                      backgroundColor: AppColors.danger,
+                    ),
+                  );
+                  return;
+                }
               }
 
               final newItem = DepositCashbackItem(
@@ -553,8 +708,104 @@ class _AgentSettlementPriceEditPageState extends ConsumerState<AgentSettlementPr
     );
   }
 
+  /// 显示错误提示
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: AppColors.danger),
+    );
+  }
+
+  /// 验证费率是否在通道允许范围内
+  bool _validateRates() {
+    if (_channelConfig == null) return true;
+
+    // 费率编码与控制器的映射
+    final rateFields = {
+      'CREDIT': (_creditRateController, '贷记卡费率'),
+      'DEBIT': (_debitRateController, '借记卡费率'),
+      'UNIONPAY': (_unionpayRateController, '云闪付费率'),
+      'WECHAT': (_wechatRateController, '微信费率'),
+      'ALIPAY': (_alipayRateController, '支付宝费率'),
+    };
+
+    for (final entry in rateFields.entries) {
+      final rateCode = entry.key;
+      final controller = entry.value.$1;
+      final label = entry.value.$2;
+
+      if (controller.text.isEmpty) continue;
+
+      final rateConfig = _channelConfig!.getRateConfigByCode(rateCode);
+      if (rateConfig == null) continue;
+
+      final rate = double.tryParse(controller.text) ?? 0;
+      final minRate = rateConfig.minRateValue;
+      final maxRate = rateConfig.maxRateValue;
+
+      if (rate < minRate || rate > maxRate) {
+        _showError('$label必须在 $minRate% ~ $maxRate% 范围内');
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// 验证押金返现是否在通道允许范围内
+  bool _validateDepositCashbacks() {
+    if (_channelConfig == null) return true;
+
+    for (final item in _depositCashbacks) {
+      final tier = _channelConfig!.getDepositTierByAmount(item.depositAmount);
+      if (tier != null && item.cashbackAmount > tier.maxCashbackAmount) {
+        _showError('押金${item.depositAmountYuan.toStringAsFixed(0)}元的返现不能超过${tier.maxCashbackAmountYuan.toStringAsFixed(0)}元');
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// 验证流量费返现是否在通道允许范围内
+  bool _validateSimCashbacks() {
+    if (_channelConfig == null) return true;
+
+    final simFields = [
+      (1, _simFirstController, '首次返现'),
+      (2, _simSecondController, '第2次返现'),
+      (3, _simThirdPlusController, '第3次及以后返现'),
+    ];
+
+    for (final field in simFields) {
+      final tierOrder = field.$1;
+      final controller = field.$2;
+      final label = field.$3;
+
+      if (controller.text.isEmpty) continue;
+
+      final tier = _channelConfig!.getSimCashbackTierByOrder(tierOrder);
+      if (tier == null) continue;
+
+      final cashback = int.tryParse(controller.text) ?? 0;
+      final maxCashback = tier.maxCashbackAmount;
+
+      if (cashback * 100 > maxCashback) {
+        _showError('$label不能超过${tier.maxCashbackAmountYuan.toStringAsFixed(0)}元');
+        return false;
+      }
+    }
+    return true;
+  }
+
   /// 保存所有修改
   Future<void> _saveAll() async {
+    // 1. 验证费率范围
+    if (!_validateRates()) return;
+
+    // 2. 验证押金返现上限
+    if (!_validateDepositCashbacks()) return;
+
+    // 3. 验证流量费返现上限
+    if (!_validateSimCashbacks()) return;
+
     setState(() => _isLoading = true);
 
     try {

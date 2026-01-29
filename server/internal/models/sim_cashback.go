@@ -4,19 +4,51 @@ import (
 	"time"
 )
 
-// SimCashbackPolicy 流量费返现政策（三档：首次/2次/2+N次）
+// SimCashbackPolicy 流量费返现政策（支持N档动态配置）
 type SimCashbackPolicy struct {
-	ID                 int64     `json:"id" gorm:"primaryKey"`
-	TemplateID         int64     `json:"template_id" gorm:"not null;index"`    // 政策模板ID
-	ChannelID          int64     `json:"channel_id" gorm:"not null;index"`     // 通道ID
-	BrandCode          string    `json:"brand_code" gorm:"size:32"`            // 品牌编码
-	FirstTimeCashback  int64     `json:"first_time_cashback" gorm:"not null"`  // 首次返现金额（分）
-	SecondTimeCashback int64     `json:"second_time_cashback" gorm:"not null"` // 第2次返现金额（分）
-	ThirdPlusCashback  int64     `json:"third_plus_cashback" gorm:"not null"`  // 第3次及以后返现金额（分）
-	SimFeeAmount       int64     `json:"sim_fee_amount" gorm:"not null"`       // 流量费金额（分）
-	Status             int16     `json:"status" gorm:"default:1"`              // 1:启用 0:禁用
-	CreatedAt          time.Time `json:"created_at" gorm:"default:now()"`
-	UpdatedAt          time.Time `json:"updated_at" gorm:"default:now()"`
+	ID           int64        `json:"id" gorm:"primaryKey"`
+	TemplateID   int64        `json:"template_id" gorm:"not null;index"`         // 政策模板ID
+	ChannelID    int64        `json:"channel_id" gorm:"not null;index"`          // 通道ID
+	BrandCode    string       `json:"brand_code" gorm:"size:32"`                 // 品牌编码
+	SimFeeAmount int64        `json:"sim_fee_amount" gorm:"not null"`            // 流量费金额（分）
+	CashbackTiers SimCashbacks `json:"cashback_tiers" gorm:"type:jsonb;default:'[]'"` // N档返现配置
+
+	// 旧字段，保留兼容（后续版本可删除）
+	FirstTimeCashback  int64 `json:"first_time_cashback" gorm:"column:first_time_cashback"`
+	SecondTimeCashback int64 `json:"second_time_cashback" gorm:"column:second_time_cashback"`
+	ThirdPlusCashback  int64 `json:"third_plus_cashback" gorm:"column:third_plus_cashback"`
+
+	Status    int16     `json:"status" gorm:"default:1"` // 1:启用 0:禁用
+	CreatedAt time.Time `json:"created_at" gorm:"default:now()"`
+	UpdatedAt time.Time `json:"updated_at" gorm:"default:now()"`
+}
+
+// GetCashbackAmount 获取指定档位的返现金额（兼容新旧两种格式）
+func (s *SimCashbackPolicy) GetCashbackAmount(tierOrder int) int64 {
+	// 优先使用新版N档配置
+	if len(s.CashbackTiers) > 0 {
+		return s.CashbackTiers.GetCashbackAmount(tierOrder)
+	}
+	// 降级使用旧版3档字段
+	switch tierOrder {
+	case 1:
+		return s.FirstTimeCashback
+	case 2:
+		return s.SecondTimeCashback
+	default:
+		return s.ThirdPlusCashback
+	}
+}
+
+// SetFromOldFields 从旧字段迁移数据到新格式
+func (s *SimCashbackPolicy) SetFromOldFields() {
+	if len(s.CashbackTiers) == 0 && (s.FirstTimeCashback > 0 || s.SecondTimeCashback > 0 || s.ThirdPlusCashback > 0) {
+		s.CashbackTiers = SimCashbacks{
+			{TierOrder: 1, CashbackAmount: s.FirstTimeCashback},
+			{TierOrder: 2, CashbackAmount: s.SecondTimeCashback},
+			{TierOrder: 3, CashbackAmount: s.ThirdPlusCashback},
+		}
+	}
 }
 
 func (SimCashbackPolicy) TableName() string {
