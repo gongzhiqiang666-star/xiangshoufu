@@ -1,37 +1,31 @@
 <template>
-  <div class="channel-config-container">
-    <!-- 通道选择 -->
-    <el-card class="channel-selector" shadow="never">
-      <template #header>
-        <span>通道配置管理</span>
-      </template>
-      <el-select
-        v-model="selectedChannelId"
-        placeholder="请选择通道"
-        style="width: 300px"
-        @change="handleChannelChange"
-      >
-        <el-option
-          v-for="channel in channelList"
-          :key="channel.id"
-          :label="channel.channel_name"
-          :value="channel.id"
+  <div class="channel-config-view">
+    <!-- 搜索区域 -->
+    <SearchForm v-model="searchForm" :show-buttons="false">
+      <el-form-item label="选择通道">
+        <ChannelSelect
+          v-model="selectedChannelId"
+          style="width: 200px"
+          @change="handleChannelChange"
         />
-      </el-select>
-    </el-card>
+      </el-form-item>
+    </SearchForm>
 
     <!-- 配置内容 -->
-    <el-card v-if="selectedChannelId" class="config-content" shadow="never">
+    <div v-if="selectedChannelId" class="config-content">
       <el-tabs v-model="activeTab">
         <!-- 费率配置 Tab -->
         <el-tab-pane label="费率配置" name="rate">
-          <div class="tab-header">
-            <el-button type="primary" @click="showAddRateDialog">
-              <el-icon><Plus /></el-icon>
+          <div class="tab-toolbar">
+            <el-button type="primary" :icon="Plus" @click="showAddRateDialog">
               新增费率类型
             </el-button>
           </div>
-          <el-table :data="rateConfigs" border stripe>
+          <ProTable
+            :data="rateConfigs"
+            :loading="loadingRates"
+            :show-pagination="false"
+          >
             <el-table-column prop="rate_code" label="费率编码" width="120" />
             <el-table-column prop="rate_name" label="费率名称" width="120" />
             <el-table-column label="成本范围" width="180">
@@ -52,22 +46,24 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="150" fixed="right">
-              <template #default="{ row }">
-                <el-button type="primary" link @click="editRateConfig(row)">编辑</el-button>
-                <el-popconfirm title="确定删除吗？" @confirm="deleteRateConfig(row)">
-                  <template #reference>
-                    <el-button type="danger" link>删除</el-button>
-                  </template>
-                </el-popconfirm>
-              </template>
-            </el-table-column>
-          </el-table>
+            <template #action="{ row }">
+              <el-button type="primary" link @click="editRateConfig(row)">编辑</el-button>
+              <el-popconfirm title="确定删除吗？" @confirm="deleteRateConfig(row)">
+                <template #reference>
+                  <el-button type="danger" link>删除</el-button>
+                </template>
+              </el-popconfirm>
+            </template>
+          </ProTable>
         </el-tab-pane>
 
         <!-- 押金档位 Tab -->
         <el-tab-pane label="押金档位" name="deposit">
-          <el-table :data="depositTiers" border stripe>
+          <ProTable
+            :data="depositTiers"
+            :loading="loadingDeposits"
+            :show-pagination="false"
+          >
             <el-table-column prop="tier_code" label="档位编码" width="120" />
             <el-table-column prop="tier_name" label="档位名称" width="120" />
             <el-table-column label="押金金额" width="120">
@@ -92,26 +88,27 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="100" fixed="right">
-              <template #default="{ row }">
-                <el-button type="primary" link @click="editDepositTier(row)">编辑</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
+            <template #action="{ row }">
+              <el-button type="primary" link @click="editDepositTier(row)">编辑</el-button>
+            </template>
+          </ProTable>
         </el-tab-pane>
 
         <!-- 流量费返现 Tab -->
         <el-tab-pane label="流量费返现" name="sim">
-          <div class="tab-header">
-            <el-button type="primary" @click="addSimTier">
-              <el-icon><Plus /></el-icon>
+          <div class="tab-toolbar">
+            <el-button type="primary" :icon="Plus" @click="addSimTier">
               添加档位
             </el-button>
             <el-button type="success" @click="saveSimTiers" :loading="savingSimTiers">
               保存配置
             </el-button>
           </div>
-          <el-table :data="simCashbackTiers" border stripe>
+          <ProTable
+            :data="simCashbackTiers"
+            :loading="loadingSim"
+            :show-pagination="false"
+          >
             <el-table-column prop="tier_order" label="档位序号" width="100" />
             <el-table-column label="档位名称" width="150">
               <template #default="{ row }">
@@ -157,19 +154,20 @@
                 <el-switch v-model="row.is_last_tier" />
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="80" fixed="right">
-              <template #default="{ $index }">
-                <el-button type="danger" link @click="removeSimTier($index)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
+            <template #action="{ $index }">
+              <el-button type="danger" link @click="removeSimTier($index)">删除</el-button>
+            </template>
+          </ProTable>
           <div class="tip-text">
             <el-icon><InfoFilled /></el-icon>
             提示：标记为"最后档"的档位将应用于该序号及以后的所有缴费次数
           </div>
         </el-tab-pane>
       </el-tabs>
-    </el-card>
+    </div>
+
+    <!-- 未选择通道提示 -->
+    <el-empty v-else description="请先选择通道" />
 
     <!-- 费率配置对话框 -->
     <el-dialog
@@ -248,8 +246,10 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus, InfoFilled } from '@element-plus/icons-vue'
+import SearchForm from '@/components/Common/SearchForm.vue'
+import ProTable from '@/components/Common/ProTable.vue'
+import ChannelSelect from '@/components/Common/ChannelSelect.vue'
 import {
-  getChannelList,
   getChannelRateConfigs,
   createChannelRateConfig,
   updateChannelRateConfig,
@@ -264,10 +264,17 @@ import {
 } from '@/api/channel'
 import type { Channel } from '@/types'
 
-// 通道列表
-const channelList = ref<Channel[]>([])
-const selectedChannelId = ref<number | null>(null)
+// 搜索表单（SearchForm需要）
+const searchForm = ref({})
+
+// 通道选择
+const selectedChannelId = ref<number | undefined>(undefined)
 const activeTab = ref('rate')
+
+// 加载状态
+const loadingRates = ref(false)
+const loadingDeposits = ref(false)
+const loadingSim = ref(false)
 
 // 费率配置
 const rateConfigs = ref<ChannelRateConfig[]>([])
@@ -311,52 +318,54 @@ const formatMoney = (amount: number) => {
   return (amount / 100).toFixed(2)
 }
 
-// 加载通道列表
-const loadChannelList = async () => {
-  try {
-    channelList.value = await getChannelList()
-    if (channelList.value.length > 0) {
-      selectedChannelId.value = channelList.value[0].id
-      await handleChannelChange(selectedChannelId.value)
-    }
-  } catch (error) {
-    ElMessage.error('加载通道列表失败')
-  }
-}
-
 // 切换通道
-const handleChannelChange = async (channelId: number) => {
+const handleChannelChange = async (channel: Channel | undefined) => {
+  if (!channel) {
+    rateConfigs.value = []
+    depositTiers.value = []
+    simCashbackTiers.value = []
+    return
+  }
   await Promise.all([
-    loadRateConfigs(channelId),
-    loadDepositTiers(channelId),
-    loadSimCashbackTiers(channelId),
+    loadRateConfigs(channel.id),
+    loadDepositTiers(channel.id),
+    loadSimCashbackTiers(channel.id),
   ])
 }
 
 // 加载费率配置
 const loadRateConfigs = async (channelId: number) => {
   try {
+    loadingRates.value = true
     rateConfigs.value = await getChannelRateConfigs(channelId)
   } catch (error) {
     ElMessage.error('加载费率配置失败')
+  } finally {
+    loadingRates.value = false
   }
 }
 
 // 加载押金档位
 const loadDepositTiers = async (channelId: number) => {
   try {
+    loadingDeposits.value = true
     depositTiers.value = await getChannelDepositTiers(channelId)
   } catch (error) {
     ElMessage.error('加载押金档位失败')
+  } finally {
+    loadingDeposits.value = false
   }
 }
 
 // 加载流量费返现档位
 const loadSimCashbackTiers = async (channelId: number) => {
   try {
+    loadingSim.value = true
     simCashbackTiers.value = await getChannelSimCashbackTiers(channelId)
   } catch (error) {
     ElMessage.error('加载流量费返现档位失败')
+  } finally {
+    loadingSim.value = false
   }
 }
 
@@ -518,24 +527,20 @@ const saveSimTiers = async () => {
 }
 
 onMounted(() => {
-  loadChannelList()
+  // ChannelSelect 会自动加载通道列表
 })
 </script>
 
 <style scoped>
-.channel-config-container {
-  padding: 20px;
-}
-
-.channel-selector {
-  margin-bottom: 20px;
+.channel-config-view {
+  padding: 0;
 }
 
 .config-content {
-  min-height: 500px;
+  margin-top: 16px;
 }
 
-.tab-header {
+.tab-toolbar {
   margin-bottom: 16px;
   display: flex;
   gap: 10px;

@@ -227,6 +227,13 @@ xiangshoufu/
 
 ## Common Commands
 
+### 一键重启所有服务
+
+```bash
+# 杀掉所有服务并重新启动（后端+APP+PC端），自动打开浏览器
+./scripts/restart_all.sh
+```
+
 ### 后端 (server/)
 
 ```bash
