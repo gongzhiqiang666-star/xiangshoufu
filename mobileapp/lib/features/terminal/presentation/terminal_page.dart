@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,8 +7,12 @@ import '../../../router/app_router.dart';
 import '../../agent/presentation/providers/agent_provider.dart';
 import '../domain/models/terminal.dart';
 import 'providers/terminal_provider.dart';
+import 'widgets/segment_tabs.dart';
+import 'widgets/terminal_filter_sheet.dart';
+import 'widgets/filter_chip_bar.dart';
 
 /// 终端管理页面
+/// 采用分段控制器 + 筛选标签模式
 class TerminalPage extends ConsumerStatefulWidget {
   const TerminalPage({super.key});
 
@@ -15,98 +20,185 @@ class TerminalPage extends ConsumerStatefulWidget {
   ConsumerState<TerminalPage> createState() => _TerminalPageState();
 }
 
-class _TerminalPageState extends ConsumerState<TerminalPage>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _TerminalPageState extends ConsumerState<TerminalPage> {
   final TextEditingController _searchController = TextEditingController();
+  Timer? _debounceTimer;
 
-  // 状态分组Tab配置
-  final List<Map<String, String>> _statusTabs = [
-    {'key': 'all', 'label': '全部'},
-    {'key': 'unstock', 'label': '未出库'},
-    {'key': 'stocked', 'label': '已出库'},
-    {'key': 'unbound', 'label': '未绑定'},
-    {'key': 'inactive', 'label': '未激活'},
-    {'key': 'active', 'label': '已激活'},
-  ];
+  // 当前选中的分段索引（0:全部, 1:已激活, 2:未激活, 3:未绑定）
+  int _selectedSegmentIndex = 0;
+
+  // 分段配置
+  List<TerminalSegment> _segments = TerminalSegmentTabs.defaultSegments;
 
   // 当前筛选条件
-  int? _selectedChannelId;
-  String? _selectedBrandCode;
-  String? _selectedModelCode;
+  TerminalFilterCondition _filterCondition = TerminalFilterCondition.empty;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: _statusTabs.length, vsync: this);
-    _tabController.addListener(_onTabChanged);
-
     // 初始化加载数据
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(terminalListProvider.notifier).loadTerminals();
+      _updateSegmentCounts();
     });
-  }
-
-  void _onTabChanged() {
-    if (!_tabController.indexIsChanging) {
-      final statusGroup = _statusTabs[_tabController.index]['key']!;
-      ref.read(terminalListProvider.notifier).setStatusGroup(
-        statusGroup == 'all' ? null : statusGroup,
-      );
-    }
   }
 
   @override
   void dispose() {
-    _tabController.removeListener(_onTabChanged);
-    _tabController.dispose();
     _searchController.dispose();
+    _debounceTimer?.cancel();
     super.dispose();
+  }
+
+  /// 更新分段数量统计
+  void _updateSegmentCounts() {
+    final statsAsync = ref.read(terminalStatsProvider);
+    statsAsync.whenData((stats) {
+      setState(() {
+        _segments = [
+          TerminalSegment(key: 'all', label: '全部', count: stats.total),
+          TerminalSegment(
+              key: 'active', label: '已激活', count: stats.activatedCount),
+          TerminalSegment(
+              key: 'inactive', label: '未激活', count: stats.inactiveCount),
+          TerminalSegment(
+              key: 'unbound', label: '未绑定', count: stats.stockCount),
+        ];
+      });
+    });
+  }
+
+  /// 处理分段切换
+  void _onSegmentChanged(int index) {
+    setState(() {
+      _selectedSegmentIndex = index;
+    });
+
+    final segmentKey = _segments[index].key;
+    final statusGroup = segmentKey == 'all' ? null : segmentKey;
+
+    ref.read(terminalListProvider.notifier).loadTerminals(
+          statusGroup: statusGroup,
+          channelId: _filterCondition.channelId,
+          brandCode: _filterCondition.brandCode,
+          modelCode: _filterCondition.modelCode,
+          keyword:
+              _searchController.text.isNotEmpty ? _searchController.text : null,
+        );
+  }
+
+  /// 处理搜索输入（防抖300ms）
+  void _onSearchChanged(String value) {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+      _applyFilters();
+    });
+  }
+
+  /// 应用筛选条件
+  void _applyFilters() {
+    final segmentKey = _segments[_selectedSegmentIndex].key;
+    String? statusGroup = segmentKey == 'all' ? null : segmentKey;
+
+    // 如果有更多状态筛选，使用它覆盖分段状态
+    if (_filterCondition.extraStatus != null) {
+      statusGroup = _filterCondition.extraStatus;
+    }
+
+    ref.read(terminalListProvider.notifier).loadTerminals(
+          statusGroup: statusGroup,
+          channelId: _filterCondition.channelId,
+          brandCode: _filterCondition.brandCode,
+          modelCode: _filterCondition.modelCode,
+          keyword:
+              _searchController.text.isNotEmpty ? _searchController.text : null,
+        );
+  }
+
+  /// 显示筛选Sheet
+  void _showFilterSheet() {
+    final filterOptionsAsync = ref.read(terminalFilterOptionsProvider);
+    filterOptionsAsync.whenData((options) {
+      TerminalFilterSheet.show(
+        context: context,
+        options: options,
+        initialCondition: _filterCondition,
+        onApply: (condition) {
+          setState(() {
+            _filterCondition = condition;
+          });
+          _applyFilters();
+        },
+      );
+    });
+  }
+
+  /// 移除筛选标签
+  void _onRemoveFilterTag(FilterTag tag) {
+    setState(() {
+      switch (tag.type) {
+        case FilterTagType.channel:
+          _filterCondition = _filterCondition.copyWith(clearChannel: true);
+          break;
+        case FilterTagType.terminalType:
+          _filterCondition = _filterCondition.copyWith(clearTerminalType: true);
+          break;
+        case FilterTagType.extraStatus:
+          _filterCondition = _filterCondition.copyWith(clearExtraStatus: true);
+          break;
+      }
+    });
+    _applyFilters();
+  }
+
+  /// 清空所有筛选
+  void _clearAllFilters() {
+    setState(() {
+      _filterCondition = TerminalFilterCondition.empty;
+      _searchController.clear();
+      _selectedSegmentIndex = 0;
+    });
+    ref.read(terminalListProvider.notifier).resetFilters();
   }
 
   @override
   Widget build(BuildContext context) {
+    // 监听统计数据变化，更新分段数量
+    ref.listen(terminalStatsProvider, (previous, next) {
+      next.whenData((stats) {
+        setState(() {
+          _segments = [
+            TerminalSegment(key: 'all', label: '全部', count: stats.total),
+            TerminalSegment(
+                key: 'active', label: '已激活', count: stats.activatedCount),
+            TerminalSegment(
+                key: 'inactive', label: '未激活', count: stats.inactiveCount),
+            TerminalSegment(
+                key: 'unbound', label: '未绑定', count: stats.stockCount),
+          ];
+        });
+      });
+    });
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('终端管理'),
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: (value) => _handleMenuAction(value),
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'distribute_list',
-                child: Row(
-                  children: [
-                    Icon(Icons.send, size: 20, color: AppColors.textSecondary),
-                    SizedBox(width: 8),
-                    Text('划拨记录'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'recall_list',
-                child: Row(
-                  children: [
-                    Icon(Icons.undo, size: 20, color: AppColors.textSecondary),
-                    SizedBox(width: 8),
-                    Text('回拨记录'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+      appBar: _buildAppBar(),
       body: Column(
         children: [
-          // 筛选栏
-          _buildFilterBar(),
-          // 状态Tab栏
-          _buildStatusTabBar(),
-          // 统计卡片
-          _buildStatistics(),
+          // 搜索框（常驻）
+          _buildSearchBar(),
+          // 分段控制器
+          TerminalSegmentTabs(
+            segments: _segments,
+            selectedIndex: _selectedSegmentIndex,
+            onChanged: _onSegmentChanged,
+          ),
+          // 筛选标签条（有筛选时显示）
+          FilterChipBar(
+            tags: _filterCondition.filterTags,
+            onRemove: _onRemoveFilterTag,
+            onClearAll: _clearAllFilters,
+          ),
           // 快捷入口
           _buildQuickActions(),
           // 终端列表
@@ -117,298 +209,81 @@ class _TerminalPageState extends ConsumerState<TerminalPage>
     );
   }
 
-  /// 构建筛选栏
-  Widget _buildFilterBar() {
-    final filterOptionsAsync = ref.watch(terminalFilterOptionsProvider);
+  /// 构建AppBar
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      title: const Text('终端管理'),
+      actions: [
+        // 漏斗筛选按钮
+        Stack(
+          children: [
+            IconButton(
+              onPressed: _showFilterSheet,
+              icon: const Icon(Icons.filter_list),
+              tooltip: '筛选',
+            ),
+            // 有筛选时显示小红点
+            if (_filterCondition.hasFilters)
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: AppColors.danger,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
 
+  /// 构建搜索框
+  Widget _buildSearchBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: Colors.white,
-      child: filterOptionsAsync.when(
-        data: (options) => Row(
-          children: [
-            // 通道筛选下拉
-            Expanded(
-              child: _buildDropdown<int?>(
-                value: _selectedChannelId,
-                hint: '全部通道',
-                items: [
-                  const DropdownMenuItem<int?>(
-                    value: null,
-                    child: Text('全部通道'),
+      child: TextField(
+        controller: _searchController,
+        onChanged: _onSearchChanged,
+        decoration: InputDecoration(
+          hintText: '搜索终端SN或商户号...',
+          hintStyle: const TextStyle(
+            fontSize: 14,
+            color: AppColors.textTertiary,
+          ),
+          prefixIcon: const Icon(
+            Icons.search,
+            color: AppColors.textTertiary,
+            size: 20,
+          ),
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+                  onPressed: () {
+                    _searchController.clear();
+                    _applyFilters();
+                  },
+                  icon: const Icon(
+                    Icons.close,
+                    color: AppColors.textTertiary,
+                    size: 18,
                   ),
-                  ...options.channels.map((channel) => DropdownMenuItem<int?>(
-                    value: channel.channelId,
-                    child: Text(channel.channelCode),
-                  )),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    _selectedChannelId = value;
-                    _selectedBrandCode = null;
-                    _selectedModelCode = null;
-                  });
-                  _applyFilters();
-                },
-              ),
-            ),
-            const SizedBox(width: 8),
-            // 终端类型筛选下拉
-            Expanded(
-              child: _buildTerminalTypeDropdown(options),
-            ),
-            const SizedBox(width: 8),
-            // 搜索按钮
-            SizedBox(
-              width: 40,
-              height: 40,
-              child: IconButton(
-                onPressed: _showSearchDialog,
-                icon: const Icon(Icons.search, color: AppColors.primary),
-                style: IconButton.styleFrom(
-                  backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        loading: () => Row(
-          children: [
-            Expanded(
-              child: Container(
-                height: 40,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Container(
-                height: 40,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            const SizedBox(width: 40, height: 40),
-          ],
-        ),
-        error: (_, __) => const SizedBox.shrink(),
-      ),
-    );
-  }
-
-  /// 构建下拉选择器
-  Widget _buildDropdown<T>({
-    required T value,
-    required String hint,
-    required List<DropdownMenuItem<T>> items,
-    required ValueChanged<T?> onChanged,
-  }) {
-    return Container(
-      height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<T>(
-          value: value,
-          hint: Text(hint, style: const TextStyle(fontSize: 14)),
-          isExpanded: true,
-          icon: const Icon(Icons.arrow_drop_down, size: 20),
-          style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
-          items: items,
-          onChanged: onChanged,
-        ),
-      ),
-    );
-  }
-
-  /// 构建终端类型下拉
-  Widget _buildTerminalTypeDropdown(TerminalFilterOptions options) {
-    // 根据选中的通道过滤终端类型
-    final filteredTypes = _selectedChannelId == null
-        ? options.terminalTypes
-        : options.terminalTypes.where((t) => t.channelId == _selectedChannelId).toList();
-
-    // 构建唯一的终端类型列表
-    final uniqueTypes = <String, TerminalTypeOption>{};
-    for (final type in filteredTypes) {
-      final key = '${type.brandCode}-${type.modelCode}';
-      if (!uniqueTypes.containsKey(key)) {
-        uniqueTypes[key] = type;
-      }
-    }
-
-    return Container(
-      height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String?>(
-          value: _selectedBrandCode != null && _selectedModelCode != null
-              ? '$_selectedBrandCode-$_selectedModelCode'
+                )
               : null,
-          hint: const Text('全部类型', style: TextStyle(fontSize: 14)),
-          isExpanded: true,
-          icon: const Icon(Icons.arrow_drop_down, size: 20),
-          style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
-          items: [
-            const DropdownMenuItem<String?>(
-              value: null,
-              child: Text('全部类型'),
-            ),
-            ...uniqueTypes.entries.map((entry) => DropdownMenuItem<String?>(
-              value: entry.key,
-              child: Text(entry.value.displayName, overflow: TextOverflow.ellipsis),
-            )),
-          ],
-          onChanged: (value) {
-            if (value == null) {
-              setState(() {
-                _selectedBrandCode = null;
-                _selectedModelCode = null;
-              });
-            } else {
-              final parts = value.split('-');
-              setState(() {
-                _selectedBrandCode = parts[0];
-                _selectedModelCode = parts.length > 1 ? parts[1] : null;
-              });
-            }
-            _applyFilters();
-          },
-        ),
-      ),
-    );
-  }
-
-  /// 应用筛选条件
-  void _applyFilters() {
-    final statusGroup = _statusTabs[_tabController.index]['key']!;
-    ref.read(terminalListProvider.notifier).loadTerminals(
-      channelId: _selectedChannelId,
-      brandCode: _selectedBrandCode,
-      modelCode: _selectedModelCode,
-      statusGroup: statusGroup == 'all' ? null : statusGroup,
-      keyword: _searchController.text.isNotEmpty ? _searchController.text : null,
-    );
-  }
-
-  /// 显示搜索对话框
-  void _showSearchDialog() {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('搜索终端'),
-        content: TextField(
-          controller: _searchController,
-          decoration: const InputDecoration(
-            hintText: '输入SN号或商户号搜索',
-            prefixIcon: Icon(Icons.search),
+          filled: true,
+          fillColor: Colors.grey.shade100,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide.none,
           ),
-          autofocus: true,
-          onSubmitted: (_) {
-            Navigator.pop(dialogContext);
-            _applyFilters();
-          },
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              _searchController.clear();
-              Navigator.pop(dialogContext);
-              _applyFilters();
-            },
-            child: const Text('清空'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              _applyFilters();
-            },
-            child: const Text('搜索'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 构建状态Tab栏
-  Widget _buildStatusTabBar() {
-    return Container(
-      color: Colors.white,
-      child: TabBar(
-        controller: _tabController,
-        isScrollable: true,
-        tabAlignment: TabAlignment.start,
-        tabs: _statusTabs.map((tab) => Tab(text: tab['label'])).toList(),
-        labelColor: AppColors.primary,
-        unselectedLabelColor: AppColors.textSecondary,
-        indicatorColor: AppColors.primary,
-        indicatorSize: TabBarIndicatorSize.label,
-      ),
-    );
-  }
-
-  Widget _buildStatistics() {
-    final statsAsync = ref.watch(terminalStatsProvider);
-
-    return statsAsync.when(
-      data: (stats) => Container(
-        margin: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            _buildStatCard('终端总数', stats.total.toString(), AppColors.primary),
-            const SizedBox(width: 12),
-            _buildStatCard(
-                '已激活', stats.activatedCount.toString(), AppColors.success),
-            const SizedBox(width: 12),
-            _buildStatCard(
-                '未激活', stats.inactiveCount.toString(), AppColors.warning),
-            const SizedBox(width: 12),
-            _buildStatCard('今日激活', stats.todayActivated.toString(),
-                AppColors.profitReward),
-          ],
-        ),
-      ),
-      loading: () => Container(
-        margin: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            _buildStatCard('终端总数', '-', AppColors.primary),
-            const SizedBox(width: 12),
-            _buildStatCard('已激活', '-', AppColors.success),
-            const SizedBox(width: 12),
-            _buildStatCard('未激活', '-', AppColors.warning),
-            const SizedBox(width: 12),
-            _buildStatCard('今日激活', '-', AppColors.profitReward),
-          ],
-        ),
-      ),
-      error: (error, stack) => Container(
-        margin: const EdgeInsets.all(16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.red.shade50,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text('加载统计失败: $error',
-            style: TextStyle(color: Colors.red.shade700)),
+        style: const TextStyle(fontSize: 14),
       ),
     );
   }
@@ -416,7 +291,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage>
   /// 快捷入口：划拨记录、回拨记录
   Widget _buildQuickActions() {
     return Container(
-      margin: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
+      margin: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 8),
       child: Row(
         children: [
           Expanded(
@@ -494,30 +369,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage>
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: color.withValues(alpha: 0.5), size: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatCard(String title, String value, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          children: [
-            Text(value,
-                style: TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.bold, color: color)),
-            const SizedBox(height: 4),
-            Text(title,
-                style: const TextStyle(
-                    fontSize: 12, color: AppColors.textSecondary)),
+            Icon(Icons.chevron_right,
+                color: color.withValues(alpha: 0.5), size: 20),
           ],
         ),
       ),
@@ -529,9 +382,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage>
     final selectedTerminals = ref.watch(selectedTerminalsProvider);
 
     // 显示当前筛选条件
-    final hasFilters = _selectedChannelId != null ||
-        _selectedBrandCode != null ||
-        _searchController.text.isNotEmpty;
+    final hasFilters = _filterCondition.hasFilters ||
+        _searchController.text.isNotEmpty ||
+        _selectedSegmentIndex != 0;
 
     if (listState.error != null && listState.terminals.isEmpty) {
       return Center(
@@ -575,7 +428,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage>
             if (hasFilters) ...[
               const SizedBox(height: 12),
               TextButton(
-                onPressed: _clearFilters,
+                onPressed: _clearAllFilters,
                 child: const Text('清空筛选条件'),
               ),
             ],
@@ -585,7 +438,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage>
     }
 
     return RefreshIndicator(
-      onRefresh: () => ref.read(terminalListProvider.notifier).refresh(),
+      onRefresh: () async {
+        await ref.read(terminalListProvider.notifier).refresh();
+        ref.invalidate(terminalStatsProvider);
+      },
       child: NotificationListener<ScrollNotification>(
         onNotification: (notification) {
           if (notification is ScrollEndNotification &&
@@ -616,18 +472,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage>
         ),
       ),
     );
-  }
-
-  /// 清空筛选条件
-  void _clearFilters() {
-    setState(() {
-      _selectedChannelId = null;
-      _selectedBrandCode = null;
-      _selectedModelCode = null;
-      _searchController.clear();
-    });
-    _tabController.animateTo(0);
-    ref.read(terminalListProvider.notifier).resetFilters();
   }
 
   Widget _buildTerminalCard(Terminal terminal, bool isSelected) {
@@ -691,7 +535,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage>
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(4),
@@ -704,7 +549,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage>
                     ),
                   ),
                 ),
-                if (terminal.brandCode != null && terminal.brandCode!.isNotEmpty) ...[
+                if (terminal.brandCode != null &&
+                    terminal.brandCode!.isNotEmpty) ...[
                   const SizedBox(width: 6),
                   Text(
                     '${terminal.brandCode ?? ""} ${terminal.modelCode ?? ""}',
@@ -943,10 +789,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage>
         }
 
         // 执行回拨
-        final success = await ref.read(terminalRecallProvider.notifier).batchRecall(
-          toAgentId: agentDetail.parentId!,
-          terminalSns: terminals.map((t) => t.terminalSn).toList(),
-        );
+        final success =
+            await ref.read(terminalRecallProvider.notifier).batchRecall(
+                  toAgentId: agentDetail.parentId!,
+                  terminalSns: terminals.map((t) => t.terminalSn).toList(),
+                );
 
         if (mounted) {
           final recallState = ref.read(terminalRecallProvider);
@@ -962,7 +809,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage>
           } else if (recallState.failedCount > 0) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('部分回拨失败: 成功${recallState.successCount}台, 失败${recallState.failedCount}台'),
+                content: Text(
+                    '部分回拨失败: 成功${recallState.successCount}台, 失败${recallState.failedCount}台'),
                 backgroundColor: Colors.orange,
               ),
             );
@@ -990,18 +838,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage>
         );
       },
     );
-  }
-
-  /// 处理菜单操作
-  void _handleMenuAction(String action) {
-    switch (action) {
-      case 'distribute_list':
-        context.push(RoutePaths.terminalDistributeList);
-        break;
-      case 'recall_list':
-        context.push(RoutePaths.terminalRecallList);
-        break;
-    }
   }
 
   /// 显示批量设置菜单
@@ -1060,7 +896,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage>
               onTap: terminals.length == 1
                   ? () {
                       Navigator.pop(context);
-                      context.push('/terminal/${terminals.first.terminalSn}/flow-logs');
+                      context.push(
+                          '/terminal/${terminals.first.terminalSn}/flow-logs');
                     }
                   : null,
             ),
