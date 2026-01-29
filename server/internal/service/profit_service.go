@@ -231,25 +231,27 @@ func (s *ProfitService) CalculateProfit(txID int64) error {
 				log.Printf("[ProfitService] Deduction freeze triggered: agent=%d, frozen=%d", record.AgentID, frozen)
 			}
 		}
-	} else if s.goodsDeductionService != nil && len(profitRecords) > 0 {
-		// 兼容旧的货款代扣服务
-		for _, record := range profitRecords {
-			deducted, err := s.goodsDeductionService.TriggerRealtimeDeduction(
-				record.AgentID,
-				record.ChannelID,
-				int16(record.WalletType),
-				record.ProfitAmount,
-				"profit_income",
-				&tx.ID,
-				&record.ID,
-			)
-			if err != nil {
-				log.Printf("[ProfitService] Trigger goods deduction failed for agent %d: %v", record.AgentID, err)
-			} else if deducted > 0 {
-				log.Printf("[ProfitService] Goods deduction triggered: agent=%d, deducted=%d", record.AgentID, deducted)
-			}
-		}
 	}
+	// 【已停用】货款代扣实时扣款逻辑，统一使用代扣管理模块
+	// } else if s.goodsDeductionService != nil && len(profitRecords) > 0 {
+	// 	// 兼容旧的货款代扣服务
+	// 	for _, record := range profitRecords {
+	// 		deducted, err := s.goodsDeductionService.TriggerRealtimeDeduction(
+	// 			record.AgentID,
+	// 			record.ChannelID,
+	// 			int16(record.WalletType),
+	// 			record.ProfitAmount,
+	// 			"profit_income",
+	// 			&tx.ID,
+	// 			&record.ID,
+	// 		)
+	// 		if err != nil {
+	// 			log.Printf("[ProfitService] Trigger goods deduction failed for agent %d: %v", record.AgentID, err)
+	// 		} else if deducted > 0 {
+	// 			log.Printf("[ProfitService] Goods deduction triggered: agent=%d, deducted=%d", record.AgentID, deducted)
+	// 		}
+	// 	}
+	// }
 
 	// 8. 更新交易分润状态
 	if err := s.transactionRepo.UpdateProfitStatus(tx.ID, 1); err != nil {

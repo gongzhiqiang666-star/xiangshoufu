@@ -276,37 +276,37 @@ export const privateRoutes: RouteRecordRaw[] = [
           },
         ],
       },
-      // 货款代扣
-      {
-        path: 'goods-deductions',
-        name: 'GoodsDeductions',
-        redirect: '/goods-deductions/list',
-        meta: {
-          title: '货款代扣',
-          icon: 'ShoppingCart',
-        },
-        children: [
-          {
-            path: 'list',
-            name: 'GoodsDeductionList',
-            component: () => import('@/views/goods-deductions/GoodsDeductionListView.vue'),
-            meta: {
-              title: '货款代扣列表',
-              breadcrumb: [{ title: '首页' }, { title: '货款代扣' }, { title: '货款代扣列表' }],
-            },
-          },
-          {
-            path: ':id',
-            name: 'GoodsDeductionDetail',
-            component: () => import('@/views/goods-deductions/GoodsDeductionDetailView.vue'),
-            meta: {
-              title: '货款代扣详情',
-              hidden: true,
-              breadcrumb: [{ title: '首页' }, { title: '货款代扣' }, { title: '货款代扣详情' }],
-            },
-          },
-        ],
-      },
+      // 【已停用】货款代扣路由，统一使用代扣管理模块
+      // {
+      //   path: 'goods-deductions',
+      //   name: 'GoodsDeductions',
+      //   redirect: '/goods-deductions/list',
+      //   meta: {
+      //     title: '货款代扣',
+      //     icon: 'ShoppingCart',
+      //   },
+      //   children: [
+      //     {
+      //       path: 'list',
+      //       name: 'GoodsDeductionList',
+      //       component: () => import('@/views/goods-deductions/GoodsDeductionListView.vue'),
+      //       meta: {
+      //         title: '货款代扣列表',
+      //         breadcrumb: [{ title: '首页' }, { title: '货款代扣' }, { title: '货款代扣列表' }],
+      //       },
+      //     },
+      //     {
+      //       path: ':id',
+      //       name: 'GoodsDeductionDetail',
+      //       component: () => import('@/views/goods-deductions/GoodsDeductionDetailView.vue'),
+      //       meta: {
+      //         title: '货款代扣详情',
+      //         hidden: true,
+      //         breadcrumb: [{ title: '首页' }, { title: '货款代扣' }, { title: '货款代扣详情' }],
+      //       },
+      //     },
+      //   ],
+      // },
       // 钱包管理
       {
         path: 'wallets',
