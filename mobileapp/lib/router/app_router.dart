@@ -185,16 +185,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          // 终端
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: RoutePaths.terminal,
-                name: 'terminal',
-                builder: (context, state) => const TerminalPage(),
-              ),
-            ],
-          ),
           // 数据
           StatefulShellBranch(
             routes: [
@@ -229,6 +219,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
 
       // ==================== 终端管理 ====================
+      // 注意：具体路由必须在通配路由 /terminal/:id 之前定义！
+      GoRoute(
+        path: RoutePaths.terminal,
+        name: 'terminal',
+        builder: (context, state) => const TerminalPage(),
+      ),
       GoRoute(
         path: RoutePaths.terminalTransfer,
         name: 'terminalTransfer',
@@ -245,14 +241,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           return TerminalRecallPage(selectedSNs: snList);
         },
       ),
-      GoRoute(
-        path: RoutePaths.terminalDetail,
-        name: 'terminalDetail',
-        builder: (context, state) {
-          final id = state.pathParameters['id'] ?? '';
-          return TerminalDetailPage(terminalId: id);
-        },
-      ),
+      // 具体路由放在 /terminal/:id 之前
       GoRoute(
         path: RoutePaths.terminalDistributeList,
         name: 'terminalDistributeList',
@@ -293,6 +282,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final sn = state.pathParameters['sn'] ?? '';
           return TerminalFlowLogPage(terminalSn: sn);
+        },
+      ),
+      // 通配路由放在最后
+      GoRoute(
+        path: RoutePaths.terminalDetail,
+        name: 'terminalDetail',
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return TerminalDetailPage(terminalId: id);
         },
       ),
 
