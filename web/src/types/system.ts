@@ -1,5 +1,10 @@
 // 系统管理相关类型定义
 
+import type { UserRole } from './user'
+
+// 重新导出 UserRole 供外部使用
+export type { UserRole } from './user'
+
 // 系统用户
 export interface SystemUser {
   id: number
@@ -15,9 +20,6 @@ export interface SystemUser {
   created_at: string
   updated_at: string
 }
-
-// 用户角色
-export type UserRole = 'admin' | 'finance' | 'operation' | 'readonly'
 
 // 用户角色配置
 export const USER_ROLE_CONFIG: Record<UserRole, { label: string; color: string }> = {
@@ -52,7 +54,7 @@ export interface OperationLog {
   user_id: number
   username: string
   nickname: string
-  module: string
+  module: LogModule
   action: string
   method: string
   path: string

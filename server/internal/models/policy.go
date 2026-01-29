@@ -542,16 +542,18 @@ func (d D0ExtraConfigs) Value() (driver.Value, error) {
 
 // ChannelDepositTier 通道押金档位
 type ChannelDepositTier struct {
-	ID            int64     `json:"id" gorm:"primaryKey"`
-	ChannelID     int64     `json:"channel_id" gorm:"not null;index"`      // 通道ID
-	BrandCode     string    `json:"brand_code" gorm:"size:32;default:''"` // 品牌编码（空表示通用）
-	TierCode      string    `json:"tier_code" gorm:"size:32;not null"`    // 档位编码（如TIER_99）
-	DepositAmount int64     `json:"deposit_amount" gorm:"not null"`       // 押金金额（分）
-	TierName      string    `json:"tier_name" gorm:"size:100;not null"`   // 档位名称（如99元档）
-	SortOrder     int       `json:"sort_order" gorm:"default:0"`          // 排序
-	Status        int16     `json:"status" gorm:"default:1"`              // 状态：1启用 0禁用
-	CreatedAt     time.Time `json:"created_at" gorm:"default:now()"`
-	UpdatedAt     time.Time `json:"updated_at" gorm:"default:now()"`
+	ID                int64     `json:"id" gorm:"primaryKey"`
+	ChannelID         int64     `json:"channel_id" gorm:"not null;index"`      // 通道ID
+	BrandCode         string    `json:"brand_code" gorm:"size:32;default:''"` // 品牌编码（空表示通用）
+	TierCode          string    `json:"tier_code" gorm:"size:32;not null"`    // 档位编码（如TIER_99）
+	DepositAmount     int64     `json:"deposit_amount" gorm:"not null"`       // 押金金额（分）
+	TierName          string    `json:"tier_name" gorm:"size:100;not null"`   // 档位名称（如99元档）
+	MaxCashbackAmount int64     `json:"max_cashback_amount" gorm:"default:0"` // 返现上限（分）
+	DefaultCashback   int64     `json:"default_cashback" gorm:"default:0"`    // 默认返现（分）
+	SortOrder         int       `json:"sort_order" gorm:"default:0"`          // 排序
+	Status            int16     `json:"status" gorm:"default:1"`              // 状态：1启用 0禁用
+	CreatedAt         time.Time `json:"created_at" gorm:"default:now()"`
+	UpdatedAt         time.Time `json:"updated_at" gorm:"default:now()"`
 }
 
 // TableName 表名

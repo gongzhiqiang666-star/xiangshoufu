@@ -1,4 +1,4 @@
-import request from './request'
+import { get } from './request'
 
 // 费率同步日志
 export interface RateSyncLog {
@@ -27,17 +27,20 @@ export interface RateSyncLogQuery {
   page_size?: number
 }
 
+// 费率同步日志列表响应
+export interface RateSyncLogListResponse {
+  items: RateSyncLog[]
+  total: number
+  page: number
+  page_size: number
+}
+
 // 获取费率同步日志列表
-export function getRateSyncLogs(params: RateSyncLogQuery) {
-  return request.get<{
-    items: RateSyncLog[]
-    total: number
-    page: number
-    page_size: number
-  }>('/v1/rate-sync/logs', { params })
+export function getRateSyncLogs(params: RateSyncLogQuery): Promise<RateSyncLogListResponse> {
+  return get<RateSyncLogListResponse>('/v1/rate-sync/logs', params)
 }
 
 // 获取费率同步日志详情
-export function getRateSyncLogDetail(id: number) {
-  return request.get<RateSyncLog>(`/v1/rate-sync/logs/${id}`)
+export function getRateSyncLogDetail(id: number): Promise<RateSyncLog> {
+  return get<RateSyncLog>(`/v1/rate-sync/logs/${id}`)
 }

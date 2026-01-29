@@ -8,6 +8,7 @@ export const useUserStore = defineStore('user', () => {
   // 状态
   const token = ref<string | null>(getToken())
   const userInfo = ref<UserInfo | null>(getUser<UserInfo>())
+  const agentInfo = ref<{ agent_name: string; agent_id: number } | null>(null)
   const loading = ref(false)
 
   // 计算属性
@@ -107,6 +108,7 @@ export const useUserStore = defineStore('user', () => {
     // 状态
     token,
     userInfo,
+    agentInfo,
     loading,
     // 计算属性
     isLoggedIn,

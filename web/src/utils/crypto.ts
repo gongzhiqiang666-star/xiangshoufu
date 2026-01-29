@@ -19,7 +19,7 @@ export async function getPublicKey(): Promise<string> {
 
   if (data.code === 0 && data.data?.public_key) {
     cachedPublicKey = data.data.public_key
-    return cachedPublicKey
+    return cachedPublicKey!
   }
 
   throw new Error('获取公钥失败')
@@ -37,7 +37,7 @@ export function clearPublicKeyCache(): void {
  */
 function str2ab(str: string): ArrayBuffer {
   const encoder = new TextEncoder()
-  return encoder.encode(str)
+  return encoder.encode(str).buffer as ArrayBuffer
 }
 
 /**

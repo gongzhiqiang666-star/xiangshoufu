@@ -2,7 +2,7 @@
  * 测试工具函数集合
  */
 
-import { mount, VueWrapper } from '@vue/test-utils'
+import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import type { Component } from 'vue'
 
@@ -14,9 +14,11 @@ import type { Component } from 'vue'
 export function mountWithPinia<T extends Component>(
   component: T,
   options: Record<string, unknown> = {}
-): VueWrapper {
+) {
   const pinia = createPinia()
   setActivePinia(pinia)
+
+  const globalOptions = options.global as Record<string, unknown> | undefined
 
   return mount(component, {
     global: {
@@ -26,7 +28,7 @@ export function mountWithPinia<T extends Component>(
         'CaretTop': true,
         'CaretBottom': true,
       },
-      ...options.global,
+      ...globalOptions,
     },
     ...options,
   })

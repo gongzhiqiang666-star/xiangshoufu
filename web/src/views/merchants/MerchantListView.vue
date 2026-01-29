@@ -1,76 +1,40 @@
 <template>
   <div class="merchant-list-view">
-    <PageHeader title="商户管理" sub-title="商户列表">
-      <template #extra>
-        <el-button :icon="Download" :loading="exporting" @click="handleExport">导出Excel</el-button>
-      </template>
-    </PageHeader>
-
     <!-- 统计卡片 -->
-    <div class="stats-cards">
-      <el-row :gutter="16">
-        <el-col :span="6">
-          <el-card shadow="hover" class="stat-card">
-            <div class="stat-content">
-              <div class="stat-icon total">
-                <el-icon size="24"><Shop /></el-icon>
-              </div>
-              <div class="stat-info">
-                <div class="stat-value">{{ stats.total_count }}</div>
-                <div class="stat-label">商户总数</div>
-              </div>
-            </div>
-          </el-card>
-        </el-col>
-        <el-col :span="6">
-          <el-card shadow="hover" class="stat-card">
-            <div class="stat-content">
-              <div class="stat-icon direct">
-                <el-icon size="24"><User /></el-icon>
-              </div>
-              <div class="stat-info">
-                <div class="stat-value">{{ stats.direct_count }}</div>
-                <div class="stat-label">直营商户</div>
-              </div>
-            </div>
-          </el-card>
-        </el-col>
-        <el-col :span="6">
-          <el-card shadow="hover" class="stat-card">
-            <div class="stat-content">
-              <div class="stat-icon team">
-                <el-icon size="24"><UserFilled /></el-icon>
-              </div>
-              <div class="stat-info">
-                <div class="stat-value">{{ stats.team_count }}</div>
-                <div class="stat-label">团队商户</div>
-              </div>
-            </div>
-          </el-card>
-        </el-col>
-        <el-col :span="6">
-          <el-card shadow="hover" class="stat-card">
-            <div class="stat-content">
-              <div class="stat-icon today">
-                <el-icon size="24"><Plus /></el-icon>
-              </div>
-              <div class="stat-info">
-                <div class="stat-value">{{ stats.today_new_count }}</div>
-                <div class="stat-label">今日新增</div>
-              </div>
-            </div>
-          </el-card>
-        </el-col>
-      </el-row>
-    </div>
+    <el-row :gutter="12" class="stats-row">
+      <el-col :xs="12" :sm="6" :lg="3">
+        <div class="stat-card">
+          <div class="stat-value">{{ stats.total_count }}</div>
+          <div class="stat-label">总数</div>
+        </div>
+      </el-col>
+      <el-col :xs="12" :sm="6" :lg="3">
+        <div class="stat-card direct">
+          <div class="stat-value">{{ stats.direct_count }}</div>
+          <div class="stat-label">直营</div>
+        </div>
+      </el-col>
+      <el-col :xs="12" :sm="6" :lg="3">
+        <div class="stat-card team">
+          <div class="stat-value">{{ stats.team_count }}</div>
+          <div class="stat-label">团队</div>
+        </div>
+      </el-col>
+      <el-col :xs="12" :sm="6" :lg="3">
+        <div class="stat-card today">
+          <div class="stat-value">{{ stats.today_new_count }}</div>
+          <div class="stat-label">今日新增</div>
+        </div>
+      </el-col>
+    </el-row>
 
     <!-- 搜索表单 -->
     <SearchForm v-model="searchForm" @search="handleSearch" @reset="handleReset">
       <el-form-item label="通道">
-        <ChannelSelect v-model="searchForm.channel_id" />
+        <ChannelSelect v-model="searchForm.channel_id" style="width: 150px" />
       </el-form-item>
       <el-form-item label="商户类型">
-        <el-select v-model="searchForm.merchant_type" placeholder="请选择类型" clearable>
+        <el-select v-model="searchForm.merchant_type" placeholder="请选择类型" clearable style="width: 130px">
           <el-option label="忠诚商户" value="loyal" />
           <el-option label="优质商户" value="quality" />
           <el-option label="潜力商户" value="potential" />
@@ -79,11 +43,11 @@
           <el-option label="30天无交易" value="inactive" />
         </el-select>
       </el-form-item>
-      <el-form-item label="归属类型">
-        <el-radio-group v-model="searchForm.owner_type">
-          <el-radio-button value="all">全部</el-radio-button>
-          <el-radio-button value="direct">直营</el-radio-button>
-          <el-radio-button value="team">团队</el-radio-button>
+      <el-form-item label="归属">
+        <el-radio-group v-model="searchForm.owner_type" size="small">
+          <el-radio-button label="all">全部</el-radio-button>
+          <el-radio-button label="direct">直营</el-radio-button>
+          <el-radio-button label="team">团队</el-radio-button>
         </el-radio-group>
       </el-form-item>
       <el-form-item label="关键词">
@@ -91,8 +55,12 @@
           v-model="searchForm.keyword"
           placeholder="商户名称/编号/机具号"
           clearable
+          style="width: 180px"
         />
       </el-form-item>
+      <template #extra>
+        <el-button :icon="Download" :loading="exporting" @click="handleExport">导出</el-button>
+      </template>
     </SearchForm>
 
     <!-- 表格 -->
@@ -102,9 +70,7 @@
       :total="total"
       v-model:page="page"
       v-model:page-size="pageSize"
-      :show-export="true"
       @refresh="fetchData"
-      @export="handleExport"
     >
       <el-table-column prop="merchant_code" label="商户编号" width="120" />
       <el-table-column prop="name" label="商户姓名" width="100" />
@@ -117,7 +83,7 @@
         </template>
       </el-table-column>
       <el-table-column prop="agent_name" label="所属代理" width="100" />
-      <el-table-column prop="merchant_type" label="商户类型" width="100" align="center">
+      <el-table-column prop="merchant_type" label="商户类型" width="110" align="center">
         <template #default="{ row }">
           <el-tag :type="getMerchantTypeTag(row.merchant_type)" size="small">
             {{ getMerchantTypeLabel(row.merchant_type) }}
@@ -172,9 +138,8 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Download, Shop, User, UserFilled, Plus } from '@element-plus/icons-vue'
+import { Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import PageHeader from '@/components/Common/PageHeader.vue'
 import SearchForm from '@/components/Common/SearchForm.vue'
 import ProTable from '@/components/Common/ProTable.vue'
 import ChannelSelect from '@/components/Common/ChannelSelect.vue'
@@ -204,8 +169,11 @@ const stats = ref<ExtendedMerchantStats>({
   today_new_count: 0,
   loyal_count: 0,
   quality_count: 0,
-  potential_count: 0,
+  medium_count: 0,
   normal_count: 0,
+  warning_count: 0,
+  churned_count: 0,
+  potential_count: 0,
   low_active_count: 0,
   inactive_count: 0,
 })
@@ -227,11 +195,11 @@ const registerForm = reactive({
 })
 
 // 获取商户类型标签颜色
-function getMerchantTypeTag(type: MerchantType) {
+function getMerchantTypeTag(type: MerchantType): 'primary' | 'success' | 'warning' | 'info' | 'danger' {
   const config = MERCHANT_TYPE_CONFIG[type]
-  if (!config) return ''
+  if (!config) return 'info'
 
-  const colorMap: Record<string, string> = {
+  const colorMap: Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'> = {
     '#67c23a': 'success',
     '#409eff': 'primary',
     '#e6a23c': 'warning',
@@ -239,7 +207,7 @@ function getMerchantTypeTag(type: MerchantType) {
     '#909399': 'info',
     '#c0c4cc': 'info',
   }
-  return colorMap[config.color] || ''
+  return colorMap[config.color] || 'info'
 }
 
 // 获取商户类型标签文本
@@ -361,62 +329,44 @@ onMounted(() => {
   padding: 0;
 }
 
-.stats-cards {
-  margin-bottom: 16px;
+.stats-row {
+  margin-bottom: $spacing-sm;
 
-  .stat-card {
-    :deep(.el-card__body) {
-      padding: 16px;
-    }
+  .el-col {
+    margin-bottom: $spacing-xs;
   }
+}
 
-  .stat-content {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-
-  .stat-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #fff;
-
-    &.total {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    }
-
-    &.direct {
-      background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-    }
-
-    &.team {
-      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    }
-
-    &.today {
-      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    }
-  }
-
-  .stat-info {
-    flex: 1;
-  }
+.stat-card {
+  background: $bg-white;
+  border-radius: $border-radius-sm;
+  padding: $spacing-sm;
+  text-align: center;
+  box-shadow: $shadow-sm;
 
   .stat-value {
-    font-size: 24px;
+    font-size: 20px;
     font-weight: 600;
-    color: #303133;
+    color: $text-primary;
     line-height: 1.2;
   }
 
   .stat-label {
-    font-size: 13px;
-    color: #909399;
-    margin-top: 4px;
+    font-size: 11px;
+    color: $text-secondary;
+    margin-top: 2px;
+  }
+
+  &.direct .stat-value {
+    color: $success-color;
+  }
+
+  &.team .stat-value {
+    color: $primary-color;
+  }
+
+  &.today .stat-value {
+    color: $warning-color;
   }
 }
 </style>

@@ -1,18 +1,12 @@
 <template>
   <div class="agent-list-view">
-    <PageHeader title="代理商管理" sub-title="代理商列表">
-      <template #extra>
-        <el-button type="primary" :icon="Plus" @click="handleCreate">新增代理商</el-button>
-      </template>
-    </PageHeader>
-
     <!-- 搜索表单 -->
     <SearchForm v-model="searchForm" @search="handleSearch" @reset="handleReset">
       <el-form-item label="通道">
-        <ChannelSelect v-model="searchForm.channel_id" />
+        <ChannelSelect v-model="searchForm.channel_id" style="width: 150px" />
       </el-form-item>
       <el-form-item label="状态">
-        <el-select v-model="searchForm.status" placeholder="请选择状态" clearable>
+        <el-select v-model="searchForm.status" placeholder="请选择状态" clearable style="width: 100px">
           <el-option label="正常" :value="1" />
           <el-option label="禁用" :value="0" />
         </el-select>
@@ -22,8 +16,12 @@
           v-model="searchForm.keyword"
           placeholder="代理商名称/手机号/编号"
           clearable
+          style="width: 180px"
         />
       </el-form-item>
+      <template #extra>
+        <el-button type="primary" :icon="Plus" @click="handleCreate">新增代理商</el-button>
+      </template>
     </SearchForm>
 
     <!-- 表格 -->
@@ -35,24 +33,24 @@
       v-model:page-size="pageSize"
       @refresh="fetchData"
     >
-      <el-table-column prop="agent_code" label="代理商编号" width="120" />
-      <el-table-column prop="name" label="姓名" width="100" />
-      <el-table-column prop="phone" label="手机号" width="130" />
-      <el-table-column prop="parent_name" label="上级代理" width="100" />
+      <el-table-column prop="agent_no" label="代理商编号" width="140" />
+      <el-table-column prop="agent_name" label="代理商名称" min-width="120" />
+      <el-table-column prop="contact_phone" label="手机号" width="130" />
       <el-table-column prop="level" label="层级" width="80" align="center">
         <template #default="{ row }">
           <el-tag size="small">{{ row.level }}级</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="channel_name" label="通道" width="100" />
+      <el-table-column prop="direct_agent_count" label="直属代理" width="90" align="center" />
+      <el-table-column prop="direct_merchant_count" label="直属商户" width="90" align="center" />
       <el-table-column prop="status" label="状态" width="80" align="center">
         <template #default="{ row }">
           <el-tag :type="row.status === 1 ? 'success' : 'danger'" size="small">
-            {{ row.status === 1 ? '正常' : '禁用' }}
+            {{ row.status_name || (row.status === 1 ? '正常' : '禁用') }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="created_at" label="注册时间" width="170" />
+      <el-table-column prop="register_time" label="注册时间" width="170" />
 
       <template #action="{ row }">
         <el-button type="primary" link @click="handleView(row)">详情</el-button>
@@ -74,7 +72,6 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import PageHeader from '@/components/Common/PageHeader.vue'
 import SearchForm from '@/components/Common/SearchForm.vue'
 import ProTable from '@/components/Common/ProTable.vue'
 import ChannelSelect from '@/components/Common/ChannelSelect.vue'

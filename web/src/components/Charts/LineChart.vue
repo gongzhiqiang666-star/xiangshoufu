@@ -43,7 +43,7 @@ function updateChart() {
 
   const series = props.data.map((item) => ({
     name: item.name,
-    type: 'line',
+    type: 'line' as const,
     smooth: true,
     symbol: 'circle',
     symbolSize: 6,

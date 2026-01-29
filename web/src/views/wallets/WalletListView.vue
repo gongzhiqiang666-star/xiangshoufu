@@ -1,71 +1,47 @@
 <template>
   <div class="wallet-list-view">
-    <PageHeader title="钱包管理" sub-title="钱包总览" />
-
     <!-- 钱包汇总 -->
-    <el-row :gutter="20" class="wallet-summary">
-      <el-col :xs="24" :sm="12" :lg="6">
-        <div class="wallet-card profit">
-          <div class="wallet-icon">
-            <el-icon><Wallet /></el-icon>
-          </div>
-          <div class="wallet-info">
-            <div class="wallet-name">分润钱包</div>
-            <div class="wallet-balance">¥{{ formatAmount(summary.profit_balance) }}</div>
-            <div class="wallet-desc">交易分润收入</div>
-          </div>
+    <el-row :gutter="12" class="stats-row">
+      <el-col :xs="12" :sm="6" :lg="6">
+        <div class="stat-card">
+          <span class="label">分润钱包:</span>
+          <span class="value primary">¥{{ formatAmount(summary.profit_balance) }}</span>
         </div>
       </el-col>
-      <el-col :xs="24" :sm="12" :lg="6">
-        <div class="wallet-card service">
-          <div class="wallet-icon">
-            <el-icon><CreditCard /></el-icon>
-          </div>
-          <div class="wallet-info">
-            <div class="wallet-name">服务费钱包</div>
-            <div class="wallet-balance">¥{{ formatAmount(summary.service_balance) }}</div>
-            <div class="wallet-desc">流量费+押金返现</div>
-          </div>
+      <el-col :xs="12" :sm="6" :lg="6">
+        <div class="stat-card">
+          <span class="label">服务费钱包:</span>
+          <span class="value success">¥{{ formatAmount(summary.service_balance) }}</span>
         </div>
       </el-col>
-      <el-col :xs="24" :sm="12" :lg="6">
-        <div class="wallet-card reward">
-          <div class="wallet-icon">
-            <el-icon><Present /></el-icon>
-          </div>
-          <div class="wallet-info">
-            <div class="wallet-name">奖励钱包</div>
-            <div class="wallet-balance">¥{{ formatAmount(summary.reward_balance) }}</div>
-            <div class="wallet-desc">激活奖励收入</div>
-          </div>
+      <el-col :xs="12" :sm="6" :lg="6">
+        <div class="stat-card">
+          <span class="label">奖励钱包:</span>
+          <span class="value warning">¥{{ formatAmount(summary.reward_balance) }}</span>
         </div>
       </el-col>
-      <el-col :xs="24" :sm="12" :lg="6">
-        <div class="wallet-card total">
-          <div class="wallet-icon">
-            <el-icon><Money /></el-icon>
-          </div>
-          <div class="wallet-info">
-            <div class="wallet-name">可用余额</div>
-            <div class="wallet-balance">¥{{ formatAmount(summary.total_available) }}</div>
-            <div class="wallet-desc">总余额: ¥{{ formatAmount(summary.total_balance) }}</div>
-          </div>
+      <el-col :xs="12" :sm="6" :lg="6">
+        <div class="stat-card">
+          <span class="label">可用余额:</span>
+          <span class="value danger">¥{{ formatAmount(summary.total_available) }}</span>
         </div>
       </el-col>
     </el-row>
 
     <!-- 钱包列表 -->
-    <el-card class="wallet-list-card">
-      <template #header>
-        <div class="card-header">
-          <span>钱包明细</span>
-          <el-button type="primary" :icon="Download" @click="handleWithdraw">
-            申请提现
-          </el-button>
-        </div>
-      </template>
+    <div class="wallet-list-header">
+      <span class="title">钱包明细</span>
+      <el-button type="primary" :icon="Download" @click="handleWithdraw">
+        申请提现
+      </el-button>
+    </div>
 
-      <el-table :data="wallets" v-loading="loading" border stripe>
+    <ProTable
+      :data="wallets"
+      :loading="loading"
+      :total="wallets.length"
+      :show-pagination="false"
+    >
         <el-table-column prop="channel_name" label="通道" width="120" />
         <el-table-column prop="wallet_type" label="钱包类型" width="120">
           <template #default="{ row }">
@@ -99,21 +75,19 @@
             ¥{{ formatAmount(row.total_withdraw) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right" align="center">
-          <template #default="{ row }">
-            <el-button type="primary" link @click="handleViewLogs(row)">流水</el-button>
-            <el-button
-              type="success"
-              link
-              :disabled="row.available <= 0"
-              @click="handleWithdrawSingle(row)"
-            >
-              提现
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+
+      <template #action="{ row }">
+        <el-button type="primary" link @click="handleViewLogs(row)">流水</el-button>
+        <el-button
+          type="success"
+          link
+          :disabled="row.available <= 0"
+          @click="handleWithdrawSingle(row)"
+        >
+          提现
+        </el-button>
+      </template>
+    </ProTable>
 
     <!-- 提现弹窗 -->
     <el-dialog v-model="withdrawDialogVisible" title="申请提现" width="500px">
@@ -153,9 +127,9 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Wallet, CreditCard, Present, Money, Download } from '@element-plus/icons-vue'
+import { Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import PageHeader from '@/components/Common/PageHeader.vue'
+import ProTable from '@/components/Common/ProTable.vue'
 import { getWallets, getWalletSummary, applyWithdraw } from '@/api/wallet'
 import { formatAmount } from '@/utils/format'
 import type { Wallet as WalletType, WalletSummary, WalletType as WalletTypeEnum } from '@/types'
@@ -196,7 +170,7 @@ const maxWithdrawAmount = computed(() => {
 })
 
 // 钱包类型配置
-type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger' | ''
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
 function getWalletTypeTag(type: WalletTypeEnum): TagType {
   const colorMap: Record<string, TagType> = {
     '#409eff': 'primary',
@@ -206,7 +180,7 @@ function getWalletTypeTag(type: WalletTypeEnum): TagType {
     '#909399': 'info',
   }
   const config = WALLET_TYPE_CONFIG[type]
-  return colorMap[config?.color] || ''
+  return colorMap[config?.color] || 'info'
 }
 
 function getWalletTypeLabel(type: WalletTypeEnum) {
@@ -284,100 +258,71 @@ onMounted(() => {
   padding: 0;
 }
 
-.wallet-summary {
-  margin-bottom: $spacing-lg;
-
-  .el-col {
-    margin-bottom: $spacing-md;
-  }
+.stats-row {
+  margin-bottom: 16px;
 }
 
-.wallet-card {
+.stat-card {
   display: flex;
   align-items: center;
-  gap: $spacing-md;
-  padding: $spacing-lg;
-  background: $bg-white;
-  border-radius: $border-radius-md;
-  box-shadow: $shadow-sm;
-  transition: all $transition-normal;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #fff;
+  border-radius: 4px;
+  border: 1px solid #ebeef5;
 
-  &:hover {
-    box-shadow: $shadow-md;
-    transform: translateY(-2px);
+  .label {
+    color: #909399;
   }
 
-  .wallet-icon {
-    width: 60px;
-    height: 60px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    font-size: 28px;
-    color: #ffffff;
-  }
+  .value {
+    font-size: 18px;
+    font-weight: 600;
 
-  &.profit .wallet-icon {
-    background: linear-gradient(135deg, #409eff, #66b1ff);
-  }
-
-  &.service .wallet-icon {
-    background: linear-gradient(135deg, #67c23a, #85ce61);
-  }
-
-  &.reward .wallet-icon {
-    background: linear-gradient(135deg, #e6a23c, #ebb563);
-  }
-
-  &.total .wallet-icon {
-    background: linear-gradient(135deg, #f56c6c, #f78989);
-  }
-
-  .wallet-info {
-    flex: 1;
-
-    .wallet-name {
-      font-size: 14px;
-      color: $text-secondary;
-      margin-bottom: $spacing-xs;
+    &.primary {
+      color: #409eff;
     }
 
-    .wallet-balance {
-      font-size: 24px;
-      font-weight: 600;
-      color: $text-primary;
-      margin-bottom: $spacing-xs;
+    &.success {
+      color: #67c23a;
     }
 
-    .wallet-desc {
-      font-size: 12px;
-      color: $text-placeholder;
+    &.warning {
+      color: #e6a23c;
+    }
+
+    &.danger {
+      color: #f56c6c;
     }
   }
 }
 
-.wallet-list-card {
-  .card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+.wallet-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+
+  .title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #303133;
   }
 }
 
 .available-amount {
-  color: $success-color;
+  color: #67c23a;
   font-weight: 600;
 }
 
 .form-tip {
-  margin-left: $spacing-sm;
-  color: $text-secondary;
+  margin-left: 8px;
+  color: #909399;
 }
 
 .max-amount {
   font-size: 18px;
   font-weight: 600;
-  color: $primary-color;
+  color: #409eff;
 }
 </style>

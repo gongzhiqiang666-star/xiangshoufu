@@ -1,75 +1,60 @@
 <template>
   <div class="alert-config-view">
-    <el-card class="page-header">
-      <div class="header-content">
-        <div>
-          <h2>告警配置</h2>
-          <p class="description">配置任务告警通道，支持钉钉、企业微信、邮件通知</p>
-        </div>
-        <el-button type="primary" @click="showCreateDialog">
-          <el-icon><Plus /></el-icon>
-          新增配置
-        </el-button>
-      </div>
-    </el-card>
+    <!-- 搜索表单 -->
+    <SearchForm v-model="searchForm" @search="loadConfigs" @reset="loadConfigs">
+      <template #extra>
+        <el-button type="primary" :icon="Plus" @click="showCreateDialog">新增配置</el-button>
+      </template>
+    </SearchForm>
 
-    <el-card class="main-content">
-      <el-table
-        v-loading="loading"
-        :data="configList"
-        stripe
-        border
-        style="width: 100%"
-      >
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="name" label="配置名称" width="180" />
-        <el-table-column prop="channel_type" label="通道类型" width="120" align="center">
-          <template #default="{ row }">
-            <el-tag v-if="row.channel_type === 1" type="primary">钉钉</el-tag>
-            <el-tag v-else-if="row.channel_type === 2" type="success">企业微信</el-tag>
-            <el-tag v-else-if="row.channel_type === 3" type="warning">邮件</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="webhook_url" label="Webhook地址" min-width="200">
-          <template #default="{ row }">
-            <span v-if="row.channel_type !== 3">{{ row.webhook_url || '-' }}</span>
-            <span v-else>-</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="email_addresses" label="邮箱地址" min-width="200">
-          <template #default="{ row }">
-            <span v-if="row.channel_type === 3">{{ row.email_addresses || '-' }}</span>
-            <span v-else>-</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="is_enabled" label="状态" width="100" align="center">
-          <template #default="{ row }">
-            <el-switch
-              v-model="row.is_enabled"
-              @change="handleEnableChange(row)"
-            />
-          </template>
-        </el-table-column>
-        <el-table-column prop="created_at" label="创建时间" width="180">
-          <template #default="{ row }">
-            {{ formatDateTime(row.created_at) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
-          <template #default="{ row }">
-            <el-button type="primary" link size="small" @click="handleTest(row)">
-              测试
-            </el-button>
-            <el-button type="primary" link size="small" @click="showEditDialog(row)">
-              编辑
-            </el-button>
-            <el-button type="danger" link size="small" @click="handleDelete(row)">
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+    <!-- 数据表格 -->
+    <ProTable
+      :data="configList"
+      :loading="loading"
+      :total="configList.length"
+      :show-pagination="false"
+    >
+      <el-table-column prop="id" label="ID" width="80" />
+      <el-table-column prop="name" label="配置名称" width="180" />
+      <el-table-column prop="channel_type" label="通道类型" width="120" align="center">
+        <template #default="{ row }">
+          <el-tag v-if="row.channel_type === 1" type="primary">钉钉</el-tag>
+          <el-tag v-else-if="row.channel_type === 2" type="success">企业微信</el-tag>
+          <el-tag v-else-if="row.channel_type === 3" type="warning">邮件</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column prop="webhook_url" label="Webhook地址" min-width="200">
+        <template #default="{ row }">
+          <span v-if="row.channel_type !== 3">{{ row.webhook_url || '-' }}</span>
+          <span v-else>-</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="email_addresses" label="邮箱地址" min-width="200">
+        <template #default="{ row }">
+          <span v-if="row.channel_type === 3">{{ row.email_addresses || '-' }}</span>
+          <span v-else>-</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="is_enabled" label="状态" width="100" align="center">
+        <template #default="{ row }">
+          <el-switch
+            v-model="row.is_enabled"
+            @change="handleEnableChange(row)"
+          />
+        </template>
+      </el-table-column>
+      <el-table-column prop="created_at" label="创建时间" width="180">
+        <template #default="{ row }">
+          {{ formatDateTime(row.created_at) }}
+        </template>
+      </el-table-column>
+
+      <template #action="{ row }">
+        <el-button type="primary" link @click="handleTest(row)">测试</el-button>
+        <el-button type="primary" link @click="showEditDialog(row)">编辑</el-button>
+        <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
+      </template>
+    </ProTable>
 
     <!-- 新增/编辑对话框 -->
     <el-dialog
@@ -157,6 +142,8 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
+import SearchForm from '@/components/Common/SearchForm.vue'
+import ProTable from '@/components/Common/ProTable.vue'
 import {
   getAlertConfigs,
   createAlertConfig,
@@ -167,6 +154,7 @@ import {
 } from '@/api/job'
 import type { AlertConfig, CreateAlertConfigRequest } from '@/types/job'
 
+const searchForm = reactive({})
 const loading = ref(false)
 const saving = ref(false)
 const configList = ref<AlertConfig[]>([])
@@ -372,32 +360,7 @@ onMounted(() => {
 
 <style scoped>
 .alert-config-view {
-  padding: 20px;
-}
-
-.page-header {
-  margin-bottom: 20px;
-}
-
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.header-content h2 {
-  margin: 0 0 8px 0;
-  font-size: 20px;
-}
-
-.header-content .description {
-  margin: 0;
-  color: #909399;
-  font-size: 14px;
-}
-
-.main-content {
-  min-height: 400px;
+  padding: 0;
 }
 
 .form-tip {

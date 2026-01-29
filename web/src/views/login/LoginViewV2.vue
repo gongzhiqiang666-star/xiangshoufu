@@ -101,7 +101,6 @@
             :model="loginForm"
             :rules="loginRules"
             class="login-form"
-            @keyup.enter="handleLogin"
           >
             <div class="form-group">
               <label class="form-label">
@@ -113,11 +112,13 @@
               </label>
               <el-form-item prop="username">
                 <el-input
+                  id="usernameInput"
                   v-model="loginForm.username"
                   placeholder="请输入用户名"
                   size="large"
                   clearable
                   class="gold-input"
+                  @keyup.enter="focusPassword"
                 >
                   <template #prefix>
                     <span class="input-prefix-line"></span>
@@ -136,12 +137,14 @@
               </label>
               <el-form-item prop="password">
                 <el-input
+                  id="passwordInput"
                   v-model="loginForm.password"
                   type="password"
                   placeholder="请输入密码"
                   size="large"
                   show-password
                   class="gold-input"
+                  @keyup.enter="handleLogin"
                 >
                   <template #prefix>
                     <span class="input-prefix-line"></span>
@@ -244,6 +247,14 @@ const loginRules: FormRules = {
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
   ],
+}
+
+// 用户名回车跳转到密码框
+function focusPassword() {
+  const passwordEl = document.getElementById('passwordInput')
+  if (passwordEl) {
+    passwordEl.focus()
+  }
 }
 
 // 处理登录

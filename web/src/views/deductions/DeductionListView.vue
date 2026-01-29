@@ -1,23 +1,16 @@
 <template>
   <div class="deduction-list-view">
-    <PageHeader title="代扣管理" sub-title="代扣计划列表">
-      <template #extra>
-        <el-button type="primary" :icon="Plus" @click="handleCreate">发起代扣</el-button>
-        <el-button :icon="Download" @click="handleExport">导出Excel</el-button>
-      </template>
-    </PageHeader>
-
     <!-- 搜索表单 -->
     <SearchForm v-model="searchForm" @search="handleSearch" @reset="handleReset">
       <el-form-item label="计划类型">
-        <el-select v-model="searchForm.plan_type" placeholder="请选择" clearable>
+        <el-select v-model="searchForm.plan_type" placeholder="请选择" clearable style="width: 120px">
           <el-option label="货款代扣" :value="1" />
           <el-option label="伙伴代扣" :value="2" />
           <el-option label="押金代扣" :value="3" />
         </el-select>
       </el-form-item>
       <el-form-item label="状态">
-        <el-select v-model="searchForm.status" placeholder="请选择" clearable>
+        <el-select v-model="searchForm.status" placeholder="请选择" clearable style="width: 100px">
           <el-option label="进行中" :value="1" />
           <el-option label="已完成" :value="2" />
           <el-option label="已暂停" :value="3" />
@@ -25,62 +18,24 @@
         </el-select>
       </el-form-item>
       <el-form-item label="被扣方">
-        <AgentSelect v-model="searchForm.deductee_id" placeholder="选择被扣款代理商" />
+        <AgentSelect v-model="searchForm.deductee_id" placeholder="选择被扣款代理商" style="width: 150px" />
       </el-form-item>
       <el-form-item label="日期范围">
         <el-date-picker
           v-model="dateRange"
           type="daterange"
           range-separator="至"
-          start-placeholder="开始日期"
-          end-placeholder="结束日期"
+          start-placeholder="开始"
+          end-placeholder="结束"
           value-format="YYYY-MM-DD"
+          style="width: 240px"
           @change="handleDateChange"
         />
       </el-form-item>
+      <template #extra>
+        <el-button type="primary" :icon="Plus" @click="handleCreate">发起代扣</el-button>
+      </template>
     </SearchForm>
-
-    <!-- 统计汇总 -->
-    <el-card class="summary-card">
-      <el-row :gutter="20">
-        <el-col :span="4">
-          <div class="summary-item">
-            <span class="label">总计划数</span>
-            <span class="value primary">{{ stats.total_count }}</span>
-          </div>
-        </el-col>
-        <el-col :span="4">
-          <div class="summary-item">
-            <span class="label">进行中</span>
-            <span class="value success">{{ stats.active_count }}</span>
-          </div>
-        </el-col>
-        <el-col :span="4">
-          <div class="summary-item">
-            <span class="label">已完成</span>
-            <span class="value">{{ stats.completed_count }}</span>
-          </div>
-        </el-col>
-        <el-col :span="4">
-          <div class="summary-item">
-            <span class="label">代扣总额</span>
-            <span class="value warning">¥{{ formatAmount(stats.total_amount) }}</span>
-          </div>
-        </el-col>
-        <el-col :span="4">
-          <div class="summary-item">
-            <span class="label">已扣金额</span>
-            <span class="value success">¥{{ formatAmount(stats.deducted_amount) }}</span>
-          </div>
-        </el-col>
-        <el-col :span="4">
-          <div class="summary-item total">
-            <span class="label">剩余待扣</span>
-            <span class="value danger">¥{{ formatAmount(stats.remaining_amount) }}</span>
-          </div>
-        </el-col>
-      </el-row>
-    </el-card>
 
     <!-- 表格 -->
     <ProTable
@@ -158,38 +113,25 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, Download } from '@element-plus/icons-vue'
+import { Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import PageHeader from '@/components/Common/PageHeader.vue'
 import SearchForm from '@/components/Common/SearchForm.vue'
 import ProTable from '@/components/Common/ProTable.vue'
 import AgentSelect from '@/components/Common/AgentSelect.vue'
 import {
   getDeductionPlans,
-  getDeductionPlanStats,
   pauseDeductionPlan,
   resumeDeductionPlan,
   cancelDeductionPlan,
 } from '@/api/deduction'
 import { formatAmount } from '@/utils/format'
-import type { DeductionPlan, DeductionPlanStatus, DeductionPlanType, DeductionPlanStats } from '@/types'
+import type { DeductionPlan, DeductionPlanStatus, DeductionPlanType } from '@/types'
 import {
   DEDUCTION_PLAN_STATUS_CONFIG,
   DEDUCTION_PLAN_TYPE_CONFIG,
 } from '@/types/deduction'
 
 const router = useRouter()
-
-// 统计数据
-const stats = ref<DeductionPlanStats>({
-  total_count: 0,
-  active_count: 0,
-  completed_count: 0,
-  paused_count: 0,
-  total_amount: 0,
-  deducted_amount: 0,
-  remaining_amount: 0,
-})
 
 // 搜索表单
 const searchForm = reactive({
@@ -240,19 +182,6 @@ function handleDateChange(val: [string, string] | null) {
   }
 }
 
-// 获取统计数据
-async function fetchStats() {
-  try {
-    stats.value = await getDeductionPlanStats({
-      plan_type: searchForm.plan_type,
-      start_date: searchForm.start_date,
-      end_date: searchForm.end_date,
-    })
-  } catch (error) {
-    console.error('Fetch deduction stats error:', error)
-  }
-}
-
 // 获取数据
 async function fetchData() {
   loading.value = true
@@ -275,7 +204,6 @@ async function fetchData() {
 function handleSearch() {
   page.value = 1
   fetchData()
-  fetchStats()
 }
 
 // 重置
@@ -283,7 +211,6 @@ function handleReset() {
   dateRange.value = null
   page.value = 1
   fetchData()
-  fetchStats()
 }
 
 // 创建代扣
@@ -347,7 +274,6 @@ async function handleCancel(row: DeductionPlan) {
     await cancelDeductionPlan(row.id)
     ElMessage.success('已取消')
     fetchData()
-    fetchStats()
   } catch (error) {
     if (error !== 'cancel') {
       console.error('Cancel error:', error)
@@ -355,13 +281,7 @@ async function handleCancel(row: DeductionPlan) {
   }
 }
 
-// 导出
-function handleExport() {
-  ElMessage.info('导出功能开发中...')
-}
-
 onMounted(() => {
-  fetchStats()
   fetchData()
 })
 </script>
@@ -369,48 +289,6 @@ onMounted(() => {
 <style lang="scss" scoped>
 .deduction-list-view {
   padding: 0;
-}
-
-.summary-card {
-  margin-bottom: $spacing-md;
-
-  .summary-item {
-    text-align: center;
-
-    .label {
-      display: block;
-      font-size: 12px;
-      color: $text-secondary;
-      margin-bottom: $spacing-xs;
-    }
-
-    .value {
-      font-size: 20px;
-      font-weight: 600;
-
-      &.primary {
-        color: $primary-color;
-      }
-
-      &.success {
-        color: $success-color;
-      }
-
-      &.warning {
-        color: $warning-color;
-      }
-
-      &.danger {
-        color: $danger-color;
-      }
-    }
-
-    &.total {
-      background: $bg-color;
-      padding: $spacing-sm;
-      border-radius: $border-radius-sm;
-    }
-  }
 }
 
 .success-text {

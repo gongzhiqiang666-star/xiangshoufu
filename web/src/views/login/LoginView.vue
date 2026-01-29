@@ -82,7 +82,6 @@
           :model="loginForm"
           :rules="loginRules"
           class="login-form"
-          @keyup.enter="handleLogin"
         >
           <div class="form-field">
             <label class="field-label" for="username">
@@ -100,6 +99,7 @@
                 size="large"
                 clearable
                 class="custom-input"
+                @keyup.enter="focusPassword"
               />
             </el-form-item>
           </div>
@@ -114,6 +114,7 @@
             </label>
             <el-form-item prop="password">
               <el-input
+                ref="passwordInputRef"
                 id="password"
                 v-model="loginForm.password"
                 type="password"
@@ -121,6 +122,7 @@
                 size="large"
                 show-password
                 class="custom-input"
+                @keyup.enter="handleLogin"
               />
             </el-form-item>
           </div>
@@ -170,7 +172,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { useUserStore } from '@/stores/user'
@@ -202,6 +204,17 @@ const loginRules: FormRules = {
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
   ],
+}
+
+// 用户名回车跳转到密码框
+function focusPassword() {
+  nextTick(() => {
+    // Element Plus Input 组件需要调用 focus 方法
+    const inputEl = document.getElementById('password')
+    if (inputEl) {
+      inputEl.focus()
+    }
+  })
 }
 
 // 处理登录

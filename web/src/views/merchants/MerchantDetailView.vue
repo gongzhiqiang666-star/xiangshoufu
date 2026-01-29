@@ -232,7 +232,8 @@ function formatRatePercent(rate: number | undefined): string {
 }
 
 // 获取同步状态类型
-function getSyncStatusType(status: number): string {
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
+function getSyncStatusType(status: number): TagType {
   switch (status) {
     case 0: return 'info'
     case 1: return 'warning'

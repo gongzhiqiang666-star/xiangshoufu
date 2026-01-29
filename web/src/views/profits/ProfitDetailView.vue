@@ -144,16 +144,17 @@ const loading = ref(false)
 const detail = ref<any>(null)
 
 // 获取类型标签
-function getTypeTag(type?: ProfitType) {
-  if (!type) return ''
-  const colorMap: Record<string, string> = {
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
+function getTypeTag(type?: ProfitType): TagType {
+  if (!type) return 'info'
+  const colorMap: Record<string, TagType> = {
     '#409eff': 'primary',
     '#67c23a': 'success',
     '#e6a23c': 'warning',
     '#f56c6c': 'danger',
   }
   const config = PROFIT_TYPE_CONFIG[type]
-  return colorMap[config?.color] || ''
+  return colorMap[config?.color] || 'info'
 }
 
 // 获取类型名称

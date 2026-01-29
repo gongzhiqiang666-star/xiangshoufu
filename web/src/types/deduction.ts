@@ -46,7 +46,9 @@ export const DEDUCTION_SOURCE = {
 }
 
 // 状态配置
-export const DEDUCTION_PLAN_STATUS_CONFIG: Record<DeductionPlanStatus, { label: string; color: string; type: string }> = {
+export type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
+
+export const DEDUCTION_PLAN_STATUS_CONFIG: Record<DeductionPlanStatus, { label: string; color: string; type: TagType }> = {
   1: { label: '进行中', color: '#409eff', type: 'primary' },
   2: { label: '已完成', color: '#67c23a', type: 'success' },
   3: { label: '已暂停', color: '#e6a23c', type: 'warning' },
@@ -59,14 +61,14 @@ export const DEDUCTION_PLAN_TYPE_CONFIG: Record<DeductionPlanType, { label: stri
   3: { label: '押金代扣', color: '#e6a23c' },
 }
 
-export const DEDUCTION_RECORD_STATUS_CONFIG: Record<DeductionRecordStatus, { label: string; color: string; type: string }> = {
+export const DEDUCTION_RECORD_STATUS_CONFIG: Record<DeductionRecordStatus, { label: string; color: string; type: TagType }> = {
   0: { label: '待扣款', color: '#909399', type: 'info' },
   1: { label: '成功', color: '#67c23a', type: 'success' },
   2: { label: '部分成功', color: '#e6a23c', type: 'warning' },
   3: { label: '失败', color: '#f56c6c', type: 'danger' },
 }
 
-export const GOODS_DEDUCTION_STATUS_CONFIG: Record<GoodsDeductionStatus, { label: string; color: string; type: string }> = {
+export const GOODS_DEDUCTION_STATUS_CONFIG: Record<GoodsDeductionStatus, { label: string; color: string; type: TagType }> = {
   1: { label: '待接收', color: '#e6a23c', type: 'warning' },
   2: { label: '进行中', color: '#409eff', type: 'primary' },
   3: { label: '已完成', color: '#67c23a', type: 'success' },

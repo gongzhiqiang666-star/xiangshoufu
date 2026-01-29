@@ -8,7 +8,7 @@ import {
   getMerchantDistribution,
   getAgentRanking,
 } from '@/api/dashboard'
-import { formatAmount, formatNumber, calculateTrend } from '@/utils/format'
+import { formatAmount, calculateTrend } from '@/utils/format'
 
 // 概览数据类型
 interface OverviewData {
@@ -22,6 +22,14 @@ interface OverviewData {
     profit_deposit: number
     profit_sim: number
     profit_reward: number
+    // 额外的兼容属性
+    profit_change_rate?: number
+    trans_profit?: number
+    deposit_cashback?: number
+    sim_cashback?: number
+    activation_reward?: number
+    trans_amount_change_rate?: number
+    trans_count_change_rate?: number
   }
   yesterday: {
     trans_amount: number
@@ -37,6 +45,7 @@ interface OverviewData {
     profit_total: number
     profit_total_yuan: number
     merchant_new: number
+    profit_target?: number
   }
   team: {
     direct_agent_count: number
@@ -53,6 +62,11 @@ interface OverviewData {
   wallet: {
     total_balance: number
     total_balance_yuan: number
+  }
+  merchant?: {
+    total?: number
+    active?: number
+    today_new?: number
   }
 }
 
@@ -91,6 +105,7 @@ interface AgentRankingItem {
   value_yuan: number
   change: number
   change_rate: number
+  level?: string
 }
 
 export const useDashboardStore = defineStore('dashboard', () => {

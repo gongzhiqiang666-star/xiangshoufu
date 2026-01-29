@@ -1,12 +1,5 @@
 <template>
   <div class="wallet-logs-view">
-    <PageHeader title="钱包流水" :sub-title="`钱包ID: ${route.params.id}`">
-      <template #extra>
-        <el-button @click="handleBack">返回</el-button>
-        <el-button :icon="Download" @click="handleExport">导出</el-button>
-      </template>
-    </PageHeader>
-
     <!-- 钱包信息 -->
     <el-card class="wallet-info-card">
       <el-descriptions :column="5" border>
@@ -96,10 +89,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { Download } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
-import PageHeader from '@/components/Common/PageHeader.vue'
+import { useRoute } from 'vue-router'
 import SearchForm from '@/components/Common/SearchForm.vue'
 import ProTable from '@/components/Common/ProTable.vue'
 import { getWallet, getWalletLogs } from '@/api/wallet'
@@ -108,7 +98,6 @@ import type { WalletType } from '@/types'
 import { WALLET_TYPE_CONFIG } from '@/types/wallet'
 
 const route = useRoute()
-const router = useRouter()
 
 // 钱包信息
 const wallet = ref<any>(null)
@@ -130,9 +119,9 @@ const page = ref(1)
 const pageSize = ref(10)
 
 // 获取钱包类型标签
-type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger' | ''
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
 function getWalletTypeTag(type?: WalletType): TagType {
-  if (!type) return ''
+  if (!type) return 'info'
   const colorMap: Record<string, TagType> = {
     '#409eff': 'primary',
     '#67c23a': 'success',
@@ -141,7 +130,7 @@ function getWalletTypeTag(type?: WalletType): TagType {
     '#909399': 'info',
   }
   const config = WALLET_TYPE_CONFIG[type]
-  return colorMap[config?.color] || ''
+  return colorMap[config?.color] || 'info'
 }
 
 // 获取钱包类型名称
@@ -158,7 +147,7 @@ function getLogTypeTag(type: string): TagType {
     freeze: 'warning',
     unfreeze: 'info',
   }
-  return tagMap[type] || ''
+  return tagMap[type] || 'info'
 }
 
 // 获取流水类型名称
@@ -221,16 +210,6 @@ function handleReset() {
   dateRange.value = null
   page.value = 1
   fetchData()
-}
-
-// 返回
-function handleBack() {
-  router.push('/wallets/list')
-}
-
-// 导出
-function handleExport() {
-  ElMessage.info('导出功能开发中...')
 }
 
 onMounted(() => {

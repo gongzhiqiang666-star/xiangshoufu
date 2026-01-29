@@ -1,41 +1,41 @@
 <template>
   <div class="poster-category">
-    <el-card>
-      <template #header>
-        <div class="card-header">
-          <span>海报分类管理</span>
-          <el-button type="primary" @click="handleCreate">
-            <el-icon><Plus /></el-icon>
-            新增分类
-          </el-button>
-        </div>
+    <!-- 搜索表单 -->
+    <SearchForm v-model="searchForm" @search="fetchData" @reset="fetchData">
+      <template #extra>
+        <el-button type="primary" :icon="Plus" @click="handleCreate">新增分类</el-button>
       </template>
+    </SearchForm>
 
-      <el-table v-loading="loading" :data="tableData" border style="width: 100%">
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="name" label="分类名称" min-width="150" />
-        <el-table-column prop="sort_order" label="排序" width="100" />
-        <el-table-column label="状态" width="100">
-          <template #default="{ row }">
-            <el-tag :type="row.status === 1 ? 'success' : 'info'">
-              {{ row.status === 1 ? '启用' : '禁用' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="poster_count" label="海报数量" width="100" />
-        <el-table-column label="创建时间" width="180">
-          <template #default="{ row }">
-            {{ formatDateTime(row.created_at) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right">
-          <template #default="{ row }">
-            <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
-            <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+    <!-- 数据表格 -->
+    <ProTable
+      :data="tableData"
+      :loading="loading"
+      :total="tableData.length"
+      :show-pagination="false"
+    >
+      <el-table-column prop="id" label="ID" width="80" />
+      <el-table-column prop="name" label="分类名称" min-width="150" />
+      <el-table-column prop="sort_order" label="排序" width="100" />
+      <el-table-column label="状态" width="100">
+        <template #default="{ row }">
+          <el-tag :type="row.status === 1 ? 'success' : 'info'">
+            {{ row.status === 1 ? '启用' : '禁用' }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column prop="poster_count" label="海报数量" width="100" />
+      <el-table-column label="创建时间" width="180">
+        <template #default="{ row }">
+          {{ formatDateTime(row.created_at) }}
+        </template>
+      </el-table-column>
+
+      <template #action="{ row }">
+        <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
+        <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
+      </template>
+    </ProTable>
 
     <!-- 新增/编辑对话框 -->
     <el-dialog
@@ -76,6 +76,8 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
+import SearchForm from '@/components/Common/SearchForm.vue'
+import ProTable from '@/components/Common/ProTable.vue'
 import {
   getPosterCategories,
   createPosterCategory,
@@ -85,6 +87,7 @@ import {
 import type { PosterCategory, PosterCategoryCreateRequest } from '@/types/poster'
 import { formatDateTime } from '@/utils/format'
 
+const searchForm = reactive({})
 const loading = ref(false)
 const tableData = ref<PosterCategory[]>([])
 const dialogVisible = ref(false)
@@ -187,13 +190,7 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .poster-category {
-  padding: 20px;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  padding: 0;
 }
 
 .form-tip {

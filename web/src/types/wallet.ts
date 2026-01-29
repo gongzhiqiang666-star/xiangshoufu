@@ -173,7 +173,7 @@ export interface IssueChargingRewardParams {
 
 // 充值记录查询参数
 export interface ChargingDepositQueryParams {
-  status?: ChargingDepositStatus
+  status?: ChargingDepositStatus | number
   page?: number
   page_size?: number
 }

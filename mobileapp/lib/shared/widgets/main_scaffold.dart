@@ -45,11 +45,6 @@ class MainScaffold extends StatelessWidget {
                 label: '首页',
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.devices_outlined),
-                activeIcon: Icon(Icons.devices),
-                label: '终端',
-              ),
-              BottomNavigationBarItem(
                 icon: Icon(Icons.analytics_outlined),
                 activeIcon: Icon(Icons.analytics),
                 label: '数据',

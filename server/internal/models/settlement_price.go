@@ -196,10 +196,13 @@ type SettlementPrice struct {
 	// 押金返现配置（JSONB数组）
 	DepositCashbacks DepositCashbacks `json:"deposit_cashbacks" gorm:"type:jsonb;default:'[]'"`
 
-	// 流量费返现配置
+	// 流量费返现配置（旧字段，保留兼容）
 	SimFirstCashback     int64 `json:"sim_first_cashback" gorm:"default:0"`
 	SimSecondCashback    int64 `json:"sim_second_cashback" gorm:"default:0"`
 	SimThirdPlusCashback int64 `json:"sim_third_plus_cashback" gorm:"default:0"`
+
+	// 流量费返现配置（新版N档动态配置）
+	SimCashbacks SimCashbacks `json:"sim_cashbacks" gorm:"type:jsonb;default:'[]'"`
 
 	// 高调费率配置（按费率类型）
 	HighRateConfigs HighRateConfigs `json:"high_rate_configs" gorm:"type:jsonb;default:'{}'"`

@@ -1,84 +1,75 @@
 <template>
   <div class="job-list-view">
-    <el-card class="page-header">
-      <div class="header-content">
-        <h2>定时任务管理</h2>
-        <p class="description">管理系统定时任务，查看运行状态，配置重试和告警策略</p>
-      </div>
-    </el-card>
+    <!-- 搜索表单 -->
+    <SearchForm v-model="searchForm" @search="loadJobs" @reset="loadJobs">
+      <template #extra>
+        <el-button :icon="Refresh" @click="loadJobs">刷新</el-button>
+      </template>
+    </SearchForm>
 
-    <el-card class="main-content">
-      <el-table
-        v-loading="loading"
-        :data="jobList"
-        stripe
-        border
-        style="width: 100%"
-      >
-        <el-table-column prop="job_name" label="任务名称" width="220">
-          <template #default="{ row }">
-            <el-link type="primary" @click="showJobDetail(row)">
-              {{ row.job_name }}
-            </el-link>
-          </template>
-        </el-table-column>
-        <el-table-column prop="job_desc" label="任务描述" min-width="200" />
-        <el-table-column prop="interval_seconds" label="执行间隔" width="120">
-          <template #default="{ row }">
-            {{ formatInterval(row.interval_seconds) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="is_enabled" label="状态" width="100" align="center">
-          <template #default="{ row }">
-            <el-switch
-              v-model="row.is_enabled"
-              @change="handleEnableChange(row)"
-            />
-          </template>
-        </el-table-column>
-        <el-table-column prop="is_running" label="运行状态" width="100" align="center">
-          <template #default="{ row }">
-            <el-tag v-if="row.is_running" type="warning" effect="dark">
-              <el-icon class="is-loading"><Loading /></el-icon>
-              运行中
-            </el-tag>
-            <el-tag v-else type="info">空闲</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="last_status" label="上次结果" width="100" align="center">
-          <template #default="{ row }">
-            <el-tag v-if="row.last_status === 1" type="success">成功</el-tag>
-            <el-tag v-else-if="row.last_status === 2" type="danger">失败</el-tag>
-            <el-tag v-else-if="row.last_status === 3" type="warning">运行中</el-tag>
-            <span v-else>-</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="last_run_at" label="上次执行" width="180">
-          <template #default="{ row }">
-            {{ row.last_run_at ? formatDateTime(row.last_run_at) : '-' }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
-          <template #default="{ row }">
-            <el-button
-              type="primary"
-              size="small"
-              :disabled="row.is_running"
-              @click="handleTrigger(row)"
-            >
-              立即执行
-            </el-button>
-            <el-button
-              type="default"
-              size="small"
-              @click="showConfigDialog(row)"
-            >
-              配置
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+    <!-- 数据表格 -->
+    <ProTable
+      :data="jobList"
+      :loading="loading"
+      :total="jobList.length"
+      :show-pagination="false"
+    >
+      <el-table-column prop="job_name" label="任务名称" width="220">
+        <template #default="{ row }">
+          <el-link type="primary" @click="showJobDetail(row)">
+            {{ row.job_name }}
+          </el-link>
+        </template>
+      </el-table-column>
+      <el-table-column prop="job_desc" label="任务描述" min-width="200" />
+      <el-table-column prop="interval_seconds" label="执行间隔" width="120">
+        <template #default="{ row }">
+          {{ formatInterval(row.interval_seconds) }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="is_enabled" label="状态" width="100" align="center">
+        <template #default="{ row }">
+          <el-switch
+            v-model="row.is_enabled"
+            @change="handleEnableChange(row)"
+          />
+        </template>
+      </el-table-column>
+      <el-table-column prop="is_running" label="运行状态" width="100" align="center">
+        <template #default="{ row }">
+          <el-tag v-if="row.is_running" type="warning" effect="dark">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            运行中
+          </el-tag>
+          <el-tag v-else type="info">空闲</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column prop="last_status" label="上次结果" width="100" align="center">
+        <template #default="{ row }">
+          <el-tag v-if="row.last_status === 1" type="success">成功</el-tag>
+          <el-tag v-else-if="row.last_status === 2" type="danger">失败</el-tag>
+          <el-tag v-else-if="row.last_status === 3" type="warning">运行中</el-tag>
+          <span v-else>-</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="last_run_at" label="上次执行" width="180">
+        <template #default="{ row }">
+          {{ row.last_run_at ? formatDateTime(row.last_run_at) : '-' }}
+        </template>
+      </el-table-column>
+
+      <template #action="{ row }">
+        <el-button
+          type="primary"
+          link
+          :disabled="row.is_running"
+          @click="handleTrigger(row)"
+        >
+          立即执行
+        </el-button>
+        <el-button type="primary" link @click="showConfigDialog(row)">配置</el-button>
+      </template>
+    </ProTable>
 
     <!-- 任务详情对话框 -->
     <el-dialog
@@ -205,10 +196,13 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Loading } from '@element-plus/icons-vue'
+import { Loading, Refresh } from '@element-plus/icons-vue'
+import SearchForm from '@/components/Common/SearchForm.vue'
+import ProTable from '@/components/Common/ProTable.vue'
 import { getJobs, getJob, updateJobConfig, triggerJob, enableJob } from '@/api/job'
 import type { JobListItem, JobDetail, UpdateJobConfigRequest } from '@/types/job'
 
+const searchForm = reactive({})
 const loading = ref(false)
 const saving = ref(false)
 const jobList = ref<JobListItem[]>([])
@@ -347,26 +341,7 @@ onMounted(() => {
 
 <style scoped>
 .job-list-view {
-  padding: 20px;
-}
-
-.page-header {
-  margin-bottom: 20px;
-}
-
-.header-content h2 {
-  margin: 0 0 8px 0;
-  font-size: 20px;
-}
-
-.header-content .description {
-  margin: 0;
-  color: #909399;
-  font-size: 14px;
-}
-
-.main-content {
-  min-height: 400px;
+  padding: 0;
 }
 
 .job-detail {

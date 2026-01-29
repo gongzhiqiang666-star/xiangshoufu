@@ -1,13 +1,10 @@
 <template>
   <div class="user-list-view">
-    <PageHeader title="系统管理" sub-title="用户管理">
+    <!-- 搜索表单 -->
+    <SearchForm v-model="searchForm" @search="handleSearch" @reset="handleReset">
       <template #extra>
         <el-button type="primary" :icon="Plus" @click="handleCreate">新建用户</el-button>
       </template>
-    </PageHeader>
-
-    <!-- 搜索表单 -->
-    <SearchForm v-model="searchForm" @search="handleSearch" @reset="handleReset">
       <el-form-item label="关键词">
         <el-input v-model="searchForm.keyword" placeholder="用户名/昵称/手机号" clearable />
       </el-form-item>
@@ -176,7 +173,6 @@ import { ref, reactive, onMounted } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import PageHeader from '@/components/Common/PageHeader.vue'
 import SearchForm from '@/components/Common/SearchForm.vue'
 import ProTable from '@/components/Common/ProTable.vue'
 import { getUsers, createUser, updateUser, deleteUser, resetPassword, toggleUserStatus } from '@/api/system'

@@ -1,7 +1,5 @@
 <template>
   <div class="tax-channel-view">
-    <PageHeader title="税筹通道" sub-title="税筹通道管理" />
-
     <!-- 税筹通道列表 -->
     <el-card class="list-card">
       <template #header>
@@ -156,7 +154,6 @@
 import { ref, reactive, onMounted } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import PageHeader from '@/components/Common/PageHeader.vue'
 import {
   getTaxChannelList,
   createTaxChannel,

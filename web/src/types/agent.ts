@@ -2,18 +2,29 @@
 export interface Agent {
   id: number
   agent_code: string
+  agent_no: string
+  agent_name: string
   name: string
   phone: string
+  contact_name: string
+  contact_phone: string
   id_card_no: string
   parent_id: number
   parent_name: string
   level: number
   invite_code: string
   status: number
+  status_name: string
   channel_id: number
   channel_name: string
+  register_time: string
   created_at: string
   updated_at: string
+  // 结算信息（部分接口会返回）
+  bank_name?: string
+  bank_card_no?: string
+  bank_branch?: string
+  bank_account?: string
 }
 
 // 代理商详情
@@ -22,16 +33,17 @@ export interface AgentDetail extends Agent {
   bank_name: string
   bank_card_no: string
   bank_branch: string
+  bank_account: string
 
-  // 统计数据
-  direct_agent_count: number
-  team_agent_count: number
-  direct_merchant_count: number
-  team_merchant_count: number
-  terminal_total: number
-  terminal_activated: number
-  month_transaction_amount: number
-  total_profit: number
+  // 统计数据（可选，按需返回）
+  direct_agent_count?: number
+  team_agent_count?: number
+  direct_merchant_count?: number
+  team_merchant_count?: number
+  terminal_total?: number
+  terminal_activated?: number
+  month_transaction_amount?: number
+  total_profit?: number
 }
 
 // 代理商统计

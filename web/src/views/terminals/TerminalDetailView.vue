@@ -162,7 +162,7 @@ function getStatusClass(status?: number) {
 }
 
 // 获取押金状态类型
-type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger' | ''
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
 function getDepositStatusType(status?: string): TagType {
   const typeMap: Record<string, TagType> = {
     paid: 'success',

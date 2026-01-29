@@ -24,7 +24,7 @@
             <el-option
               v-for="ch in channels"
               :key="ch.id"
-              :label="ch.name"
+              :label="ch.channel_name"
               :value="ch.id"
             />
           </el-select>
@@ -111,7 +111,7 @@
             <el-option
               v-for="ch in channels"
               :key="ch.id"
-              :label="ch.name"
+              :label="ch.channel_name"
               :value="ch.id"
             />
           </el-select>
@@ -167,18 +167,11 @@ import {
   type CreateDepositTierRequest,
   type UpdateDepositTierRequest
 } from '@/api/depositTier'
+import { getChannelList } from '@/api/channel'
+import type { Channel } from '@/types'
 
-// 通道列表（实际应从API获取）
-interface Channel {
-  id: number
-  name: string
-}
-
-const channels = ref<Channel[]>([
-  { id: 1, name: '恒信通' },
-  { id: 2, name: '拉卡拉' },
-  { id: 3, name: '乐刷' }
-])
+// 通道列表（从API加载）
+const channels = ref<Channel[]>([])
 
 // 搜索参数
 const searchParams = reactive({
@@ -338,8 +331,18 @@ const handleSubmit = async () => {
 }
 
 onMounted(() => {
-  // 可以在这里加载通道列表
+  // 加载通道列表
+  loadChannels()
 })
+
+// 加载通道列表
+async function loadChannels() {
+  try {
+    channels.value = await getChannelList()
+  } catch (e) {
+    console.error('加载通道列表失败', e)
+  }
+}
 </script>
 
 <style scoped>

@@ -77,6 +77,7 @@ interface Props {
   selection?: boolean
   showIndex?: boolean
   showToolbar?: boolean
+  /** @deprecated 不再使用，刷新功能由页面自行处理 */
   showRefresh?: boolean
   showExport?: boolean
   showPagination?: boolean
@@ -97,8 +98,8 @@ const props = withDefaults(defineProps<Props>(), {
   stripe: true,
   selection: false,
   showIndex: false,
-  showToolbar: true,
-  showRefresh: true,
+  showToolbar: false,
+  showRefresh: false,
   showExport: false,
   showPagination: true,
   paginationLayout: 'total, sizes, prev, pager, next, jumper',

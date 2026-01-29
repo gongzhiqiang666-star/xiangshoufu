@@ -16,11 +16,15 @@ export interface ExtendedMerchantStats {
   direct_count: number
   team_count: number
   today_new_count: number
-  quality_count: number   // 优质
-  medium_count: number    // 中等
-  normal_count: number    // 普通
-  warning_count: number   // 预警
-  churned_count: number   // 流失
+  quality_count: number      // 优质
+  medium_count: number       // 中等
+  normal_count: number       // 普通
+  warning_count: number      // 预警
+  churned_count: number      // 流失
+  loyal_count?: number       // 忠诚（可选）
+  potential_count?: number   // 潜力（可选）
+  low_active_count?: number  // 低活跃（可选）
+  inactive_count?: number    // 30天无交易（可选）
 }
 
 /**
@@ -94,8 +98,8 @@ export function updateMerchantRegister(
 export function updateMerchantRate(
   merchantId: number,
   data: { credit_rate: number; debit_rate?: number }
-): Promise<void> {
-  return put<void>(`/v1/merchants/${merchantId}/rate`, data)
+): Promise<{ sync_success: boolean; sync_message?: string }> {
+  return put<{ sync_success: boolean; sync_message?: string }>(`/v1/merchants/${merchantId}/rate`, data)
 }
 
 /**

@@ -1,7 +1,5 @@
 <template>
   <div class="settlement-wallet-view">
-    <PageHeader title="沉淀钱包" sub-title="沉淀钱包管理" />
-
     <!-- 钱包汇总 -->
     <el-card class="summary-card" v-loading="summaryLoading">
       <template #header>
@@ -201,7 +199,6 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { Download, Upload, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import PageHeader from '@/components/Common/PageHeader.vue'
 import {
   getSettlementWalletSummary,
   getSubordinateBalances,

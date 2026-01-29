@@ -17,6 +17,9 @@ export interface Merchant {
   terminal_sn: string
   activated_at: string
   created_at: string
+  // 登记信息（列表中可选）
+  registered_phone?: string
+  register_remark?: string
 }
 
 // 商户详情
@@ -72,6 +75,8 @@ export interface MerchantQueryParams {
   channel_id?: number
   merchant_type?: MerchantType
   owner_type?: 'all' | 'direct' | 'team'
+  is_direct?: boolean
+  status?: number
   keyword?: string
   page?: number
   page_size?: number

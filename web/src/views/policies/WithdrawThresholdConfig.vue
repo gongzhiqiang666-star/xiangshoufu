@@ -86,10 +86,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue'
+import { ref, reactive, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getWithdrawThresholds, batchSetWithdrawThresholds } from '@/api/walletSplit'
+import { getChannelList } from '@/api/channel'
 import type { PolicyWithdrawThreshold, SetWithdrawThresholdRequest } from '@/types/wallet'
+import type { Channel } from '@/types'
 
 const props = defineProps<{
   modelValue: boolean
@@ -112,13 +114,33 @@ const form = reactive({
   reward_threshold: 100,
 })
 
-// 通道列表（示例数据，实际应从API获取）
-const channelThresholds = ref([
-  { channel_id: 1, channel_name: '恒信通', profit_threshold: 0, service_threshold: 0 },
-  { channel_id: 2, channel_name: '拉卡拉', profit_threshold: 0, service_threshold: 0 },
-  { channel_id: 3, channel_name: '乐刷', profit_threshold: 0, service_threshold: 0 },
-  { channel_id: 4, channel_name: '随行付', profit_threshold: 0, service_threshold: 0 },
-])
+// 通道门槛列表（从API加载）
+interface ChannelThreshold {
+  channel_id: number
+  channel_name: string
+  profit_threshold: number
+  service_threshold: number
+}
+const channelThresholds = ref<ChannelThreshold[]>([])
+
+// 加载通道列表
+async function loadChannels() {
+  try {
+    const channels = await getChannelList()
+    channelThresholds.value = channels.map((ch: Channel) => ({
+      channel_id: ch.id,
+      channel_name: ch.channel_name,
+      profit_threshold: 0,
+      service_threshold: 0,
+    }))
+  } catch (e) {
+    console.error('加载通道列表失败', e)
+  }
+}
+
+onMounted(() => {
+  loadChannels()
+})
 
 watch(
   () => props.modelValue,

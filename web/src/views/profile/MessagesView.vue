@@ -35,8 +35,8 @@
           @click="handleMessageClick(message)"
         >
           <div class="message-icon">
-            <el-icon :size="24" :color="getMessageColor(message.type)">
-              <component :is="getMessageIcon(message.type)" />
+            <el-icon :size="24" :color="getMessageColor(String(message.message_type))">
+              <component :is="getMessageIcon(String(message.message_type))" />
             </el-icon>
           </div>
           <div class="message-content">
@@ -46,8 +46,8 @@
             </div>
             <div class="message-body">{{ message.content }}</div>
             <div class="message-footer">
-              <el-tag size="small" :type="getTagType(message.type)">
-                {{ message.type_name || message.type }}
+              <el-tag size="small" :type="getTagType(message.message_type)">
+                {{ message.type_name || message.message_type }}
               </el-tag>
               <el-tag v-if="!message.is_read" size="small" type="danger">未读</el-tag>
             </div>
@@ -75,8 +75,8 @@
     <el-dialog v-model="detailDialogVisible" :title="currentMessage?.title" width="600px">
       <div v-if="currentMessage" class="message-detail">
         <div class="detail-meta">
-          <el-tag size="small" :type="getTagType(currentMessage.type)">
-            {{ currentMessage.type_name || currentMessage.type }}
+          <el-tag size="small" :type="getTagType(currentMessage.message_type)">
+            {{ currentMessage.type_name || currentMessage.message_type }}
           </el-tag>
           <span class="detail-time">{{ formatTime(currentMessage.created_at) }}</span>
         </div>
@@ -246,15 +246,15 @@ function getMessageColor(type: string): string {
 }
 
 // 获取标签类型
-function getTagType(type: string): '' | 'success' | 'warning' | 'danger' | 'info' {
-  const typeMap: Record<string, '' | 'success' | 'warning' | 'danger' | 'info'> = {
+function getTagType(type: string | number): 'primary' | 'success' | 'warning' | 'danger' | 'info' {
+  const typeMap: Record<string, 'primary' | 'success' | 'warning' | 'danger' | 'info'> = {
     system: 'info',
     warning: 'warning',
     success: 'success',
     error: 'danger',
-    notice: '',
+    notice: 'primary',
   }
-  return typeMap[type] || 'info'
+  return typeMap[String(type)] || 'info'
 }
 
 // 页面加载

@@ -1,7 +1,7 @@
 /**
  * 代扣管理 API
  */
-import { get, post, put, del } from './request'
+import { get, post } from './request'
 import type { PaginatedResponse } from '@/types'
 import type {
   DeductionPlan,

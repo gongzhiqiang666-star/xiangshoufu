@@ -49,6 +49,9 @@ export interface Channel {
 
 // 政策模板详情
 export interface PolicyTemplateDetail extends PolicyTemplate {
+  // 模板名称（表单用别名）
+  template_name?: string
+
   // 费率阶梯
   rate_stages: RateStage[]
 
@@ -60,6 +63,9 @@ export interface PolicyTemplateDetail extends PolicyTemplate {
 
   // 流量返现
   sim_cashbacks: SimCashback[]
+
+  // 流量卡返现配置（表单用）
+  sim_cashback?: SimCashbackConfig | null
 }
 
 // 费率阶梯
@@ -129,15 +135,23 @@ export interface PolicyQueryParams {
   page_size?: number
 }
 
+// 流量卡返现配置（表单用）
+export interface SimCashbackConfig {
+  first_time_cashback: number
+  second_time_cashback: number
+  third_plus_cashback: number
+  sim_fee_amount?: number
+}
+
 // 创建/更新政策模板
 export interface PolicyTemplateForm {
-  name: string
-  channel_id: number
+  template_name: string
+  channel_id?: number
   is_default: boolean
   // 动态费率配置
   rate_configs: RateConfigs
-  rate_stages: Omit<RateStage, 'id' | 'template_id'>[]
-  activation_rewards: Omit<ActivationReward, 'id' | 'template_id'>[]
-  deposit_cashbacks: Omit<DepositCashback, 'id' | 'template_id'>[]
-  sim_cashbacks: Omit<SimCashback, 'id' | 'template_id'>[]
+  rate_stages: any[]
+  activation_rewards: any[]
+  deposit_cashbacks: any[]
+  sim_cashback?: SimCashbackConfig | null
 }

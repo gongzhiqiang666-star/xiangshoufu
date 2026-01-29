@@ -38,12 +38,3 @@ Object.defineProperty(window, 'localStorage', { value: localStorageMock })
 
 // Mock console.error 避免测试输出过多噪音
 vi.spyOn(console, 'error').mockImplementation(() => {})
-
-// 清理函数 - 每个测试后重置
-afterEach(() => {
-  vi.clearAllMocks()
-  localStorageMock.getItem.mockReset()
-  localStorageMock.setItem.mockReset()
-  localStorageMock.removeItem.mockReset()
-  localStorageMock.clear.mockReset()
-})

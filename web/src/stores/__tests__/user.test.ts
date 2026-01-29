@@ -26,7 +26,7 @@ vi.mock('@/utils/storage', () => ({
 
 // 导入 mocked 模块
 import { login as loginApi, logout as logoutApi, getProfile } from '@/api/auth'
-import { getToken, setToken, getUser, setUser, setExpires, clearAuth } from '@/utils/storage'
+import { getToken as _getToken, setToken, getUser as _getUser, setUser, setExpires, clearAuth } from '@/utils/storage'
 
 describe('useUserStore', () => {
   beforeEach(() => {
@@ -61,14 +61,19 @@ describe('useUserStore', () => {
     it('should login successfully and update state', async () => {
       const mockResponse = {
         access_token: 'test-token-123',
+        refresh_token: 'refresh-token-123',
         expires_in: 86400,
+        token_type: 'Bearer',
         user: {
           id: 1,
           username: 'testuser',
           role_type: 2,
         },
         agent: {
+          id: 100,
+          agent_no: 'A100',
           agent_name: '测试代理商',
+          level: 1,
         },
       }
 
@@ -116,9 +121,11 @@ describe('useUserStore', () => {
       // 完成登录
       resolveLogin!({
         access_token: 'token',
+        refresh_token: 'refresh-token',
         expires_in: 86400,
+        token_type: 'Bearer',
         user: { id: 1, username: 'user', role_type: 1 },
-        agent: { agent_name: 'Agent' },
+        agent: { id: 1, agent_no: 'A001', agent_name: 'Agent', level: 1 },
       })
 
       await loginTask
@@ -141,9 +148,11 @@ describe('useUserStore', () => {
       // role_type 2 -> admin
       vi.mocked(loginApi).mockResolvedValue({
         access_token: 'token',
+        refresh_token: 'refresh-token',
         expires_in: 86400,
+        token_type: 'Bearer',
         user: { id: 1, username: 'admin', role_type: 2 },
-        agent: { agent_name: 'Admin' },
+        agent: { id: 1, agent_no: 'A001', agent_name: 'Admin', level: 1 },
       })
 
       const store = useUserStore()
@@ -156,9 +165,11 @@ describe('useUserStore', () => {
 
       vi.mocked(loginApi).mockResolvedValue({
         access_token: 'token',
+        refresh_token: 'refresh-token',
         expires_in: 86400,
+        token_type: 'Bearer',
         user: { id: 2, username: 'agent', role_type: 1 },
-        agent: { agent_name: 'Agent' },
+        agent: { id: 2, agent_no: 'A002', agent_name: 'Agent', level: 2 },
       })
 
       await store2.login('agent', 'pass')
@@ -223,7 +234,7 @@ describe('useUserStore', () => {
       const mockUser = {
         id: 1,
         username: 'testuser',
-        role: 'admin',
+        role: 'admin' as const,
         real_name: '测试用户',
         phone: '13800138000',
         email: 'test@example.com',

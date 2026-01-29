@@ -448,7 +448,7 @@ import PageHeader from '@/components/Common/PageHeader.vue'
 import PolicyAssignDialog from '@/components/Policy/PolicyAssignDialog.vue'
 import {
   getAgentDetail,
-  getAgentPolicies,
+  getAgentPolicyList,
   getAgentWallets,
   getAgentSubordinates,
   getAgentMerchants,
@@ -517,7 +517,7 @@ async function fetchDetail() {
 // 获取政策
 async function fetchPolicies() {
   try {
-    policies.value = await getAgentPolicies(agentId)
+    policies.value = await getAgentPolicyList(agentId)
   } catch (error) {
     console.error('Fetch policies error:', error)
   }
@@ -658,7 +658,7 @@ async function handleInitChannels() {
 }
 
 // Tab切换
-function handleTabChange(tab: string) {
+function handleTabChange(tab: string | number) {
   switch (tab) {
     case 'policy':
       if (policies.value.length === 0) fetchPolicies()
@@ -736,15 +736,15 @@ function getWalletTypeName(type: string): string {
   return map[type] || type
 }
 
-function getWalletTagType(type: string): '' | 'success' | 'warning' | 'info' | 'danger' {
-  const map: Record<string, '' | 'success' | 'warning' | 'info' | 'danger'> = {
-    profit: '',
+function getWalletTagType(type: string): 'primary' | 'success' | 'warning' | 'info' | 'danger' {
+  const map: Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'> = {
+    profit: 'primary',
     service: 'success',
     reward: 'warning',
     recharge: 'danger',
     deposit: 'info',
   }
-  return map[type] || ''
+  return map[type] || 'info'
 }
 
 function getTerminalStatusName(status: number): string {
@@ -757,14 +757,14 @@ function getTerminalStatusName(status: number): string {
   return map[status] || '未知'
 }
 
-function getTerminalStatusType(status: number): '' | 'success' | 'warning' | 'info' | 'danger' {
-  const map: Record<number, '' | 'success' | 'warning' | 'info' | 'danger'> = {
+function getTerminalStatusType(status: number): 'primary' | 'success' | 'warning' | 'info' | 'danger' {
+  const map: Record<number, 'primary' | 'success' | 'warning' | 'info' | 'danger'> = {
     0: 'info',
     1: 'success',
     2: 'danger',
     3: 'warning',
   }
-  return map[status] || ''
+  return map[status] || 'info'
 }
 
 function getPayTypeName(type: number): string {

@@ -5,26 +5,23 @@
     :disabled="disabled"
     :size="size"
     :clearable="clearable"
+    :loading="loading"
     class="channel-select"
     @change="handleChange"
   >
     <el-option
       v-for="channel in channels"
       :key="channel.id"
-      :label="channel.name"
+      :label="channel.channel_name"
       :value="channel.id"
     />
   </el-select>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-
-interface Channel {
-  id: number
-  name: string
-  code: string
-}
+import { ref, computed, onMounted } from 'vue'
+import { getChannelList } from '@/api/channel'
+import type { Channel } from '@/types'
 
 interface Props {
   modelValue: number | undefined
@@ -46,17 +43,9 @@ const emit = defineEmits<{
   (e: 'change', channel: Channel | undefined): void
 }>()
 
-// 通道列表（后续可从API获取）
-const channels = ref<Channel[]>([
-  { id: 1, name: '恒信通', code: 'HENGXINTONG' },
-  { id: 2, name: '拉卡拉', code: 'LAKALA' },
-  { id: 3, name: '乐刷', code: 'YEAHKA' },
-  { id: 4, name: '随行付', code: 'SUIXINGFU' },
-  { id: 5, name: '连连支付', code: 'LIANLIAN' },
-  { id: 6, name: '杉德支付', code: 'SANDPAY' },
-  { id: 7, name: '富友支付', code: 'FUIOU' },
-  { id: 8, name: '汇付天下', code: 'HEEPAY' },
-])
+// 通道列表（从API加载）
+const channels = ref<Channel[]>([])
+const loading = ref(false)
 
 const selectedValue = computed({
   get: () => props.modelValue,
@@ -67,6 +56,22 @@ function handleChange(value: number | undefined) {
   const channel = channels.value.find((c) => c.id === value)
   emit('change', channel)
 }
+
+// 加载通道列表
+async function loadChannels() {
+  loading.value = true
+  try {
+    channels.value = await getChannelList()
+  } catch (e) {
+    console.error('加载通道列表失败', e)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  loadChannels()
+})
 </script>
 
 <style lang="scss" scoped>

@@ -112,8 +112,9 @@ export function assignAgentPolicy(
   data: {
     channel_id: number
     template_id: number
-    credit_rate: number
-    debit_rate: number
+    credit_rate?: number
+    debit_rate?: number
+    rate_configs?: Record<string, { rate: string }>
   }
 ): Promise<void> {
   return post<void>(`/v1/agents/${agentId}/policies`, data)

@@ -220,7 +220,7 @@ const formRules: FormRules = {
   ],
   agreement: [
     {
-      validator: (rule, value, callback) => {
+      validator: (_rule, value, callback) => {
         if (!value) {
           callback(new Error('请阅读并同意代扣服务协议'))
         } else {

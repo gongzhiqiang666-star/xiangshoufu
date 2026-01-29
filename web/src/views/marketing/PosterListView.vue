@@ -1,97 +1,76 @@
 <template>
   <div class="poster-list">
-    <!-- 页面标题和操作栏 -->
-    <div class="page-header">
-      <h2>营销海报管理</h2>
-      <div class="header-actions">
-        <el-button @click="router.push('/marketing/poster-categories')">
-          分类管理
-        </el-button>
-        <el-button type="primary" @click="handleCreate">
-          <el-icon><Plus /></el-icon>
-          新增海报
-        </el-button>
-      </div>
-    </div>
-
-    <!-- 搜索筛选 -->
-    <el-card class="filter-card" shadow="never">
-      <el-form :inline="true" :model="queryParams">
-        <el-form-item label="分类">
-          <el-select v-model="queryParams.category_id" placeholder="全部分类" clearable style="width: 150px">
-            <el-option
-              v-for="cat in categories"
-              :key="cat.id"
-              :label="cat.name"
-              :value="cat.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="queryParams.status" placeholder="全部状态" clearable style="width: 120px">
-            <el-option label="启用" :value="1" />
-            <el-option label="禁用" :value="0" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="关键词">
-          <el-input v-model="queryParams.keyword" placeholder="搜索标题" clearable style="width: 200px" />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch">
-            <el-icon><Search /></el-icon>
-            搜索
-          </el-button>
-          <el-button @click="handleReset">重置</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
+    <!-- 搜索表单 -->
+    <SearchForm v-model="queryParams" @search="handleSearch" @reset="handleReset">
+      <template #extra>
+        <el-button @click="router.push('/marketing/poster-categories')">分类管理</el-button>
+        <el-button type="primary" :icon="Plus" @click="handleCreate">新增海报</el-button>
+      </template>
+      <el-form-item label="分类">
+        <el-select v-model="queryParams.category_id" placeholder="全部分类" clearable style="width: 150px">
+          <el-option
+            v-for="cat in categories"
+            :key="cat.id"
+            :label="cat.name"
+            :value="cat.id"
+          />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="状态">
+        <el-select v-model="queryParams.status" placeholder="全部状态" clearable style="width: 120px">
+          <el-option label="启用" :value="1" />
+          <el-option label="禁用" :value="0" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="关键词">
+        <el-input v-model="queryParams.keyword" placeholder="搜索标题" clearable style="width: 200px" />
+      </el-form-item>
+    </SearchForm>
 
     <!-- 海报网格 -->
-    <el-card shadow="never">
-      <div v-loading="loading" class="poster-grid">
-        <div v-for="poster in tableData" :key="poster.id" class="poster-item">
-          <div class="poster-image">
-            <el-image
-              :src="poster.thumbnail_url || poster.image_url"
-              :preview-src-list="[poster.image_url]"
-              fit="cover"
-            />
-            <div class="poster-mask">
-              <el-button type="primary" size="small" @click="handleEdit(poster)">编辑</el-button>
-              <el-button type="danger" size="small" @click="handleDelete(poster)">删除</el-button>
-            </div>
+    <div v-loading="loading" class="poster-grid">
+      <div v-for="poster in tableData" :key="poster.id" class="poster-item">
+        <div class="poster-image">
+          <el-image
+            :src="poster.thumbnail_url || poster.image_url"
+            :preview-src-list="[poster.image_url]"
+            fit="cover"
+          />
+          <div class="poster-mask">
+            <el-button type="primary" size="small" @click="handleEdit(poster)">编辑</el-button>
+            <el-button type="danger" size="small" @click="handleDelete(poster)">删除</el-button>
           </div>
-          <div class="poster-info">
-            <div class="poster-title">{{ poster.title }}</div>
-            <div class="poster-meta">
-              <span class="category">{{ poster.category_name || '未分类' }}</span>
-              <el-tag :type="poster.status === 1 ? 'success' : 'info'" size="small">
-                {{ poster.status === 1 ? '启用' : '禁用' }}
-              </el-tag>
-            </div>
-            <div class="poster-stats">
-              <span>下载: {{ poster.download_count }}</span>
-              <span>分享: {{ poster.share_count }}</span>
-            </div>
+        </div>
+        <div class="poster-info">
+          <div class="poster-title">{{ poster.title }}</div>
+          <div class="poster-meta">
+            <span class="category">{{ poster.category_name || '未分类' }}</span>
+            <el-tag :type="poster.status === 1 ? 'success' : 'info'" size="small">
+              {{ poster.status === 1 ? '启用' : '禁用' }}
+            </el-tag>
+          </div>
+          <div class="poster-stats">
+            <span>下载: {{ poster.download_count }}</span>
+            <span>分享: {{ poster.share_count }}</span>
           </div>
         </div>
       </div>
+    </div>
 
-      <el-empty v-if="!loading && tableData.length === 0" description="暂无海报" />
+    <el-empty v-if="!loading && tableData.length === 0" description="暂无海报" />
 
-      <!-- 分页 -->
-      <div class="pagination-wrapper">
-        <el-pagination
-          v-model:current-page="queryParams.page"
-          v-model:page-size="queryParams.page_size"
-          :total="total"
-          :page-sizes="[12, 24, 48, 96]"
-          layout="total, sizes, prev, pager, next, jumper"
-          @size-change="fetchData"
-          @current-change="fetchData"
-        />
-      </div>
-    </el-card>
+    <!-- 分页 -->
+    <div class="pagination-wrapper">
+      <el-pagination
+        v-model:current-page="queryParams.page"
+        v-model:page-size="queryParams.page_size"
+        :total="total"
+        :page-sizes="[12, 24, 48, 96]"
+        layout="total, sizes, prev, pager, next, jumper"
+        @size-change="fetchData"
+        @current-change="fetchData"
+      />
+    </div>
   </div>
 </template>
 
@@ -99,7 +78,8 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search } from '@element-plus/icons-vue'
+import { Plus } from '@element-plus/icons-vue'
+import SearchForm from '@/components/Common/SearchForm.vue'
 import { getPosterList, deletePoster, getPosterCategories } from '@/api/poster'
 import type { Poster, PosterCategory } from '@/types/poster'
 
@@ -192,33 +172,7 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .poster-list {
-  padding: 20px;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-
-  h2 {
-    margin: 0;
-    font-size: 20px;
-    font-weight: 500;
-  }
-
-  .header-actions {
-    display: flex;
-    gap: 10px;
-  }
-}
-
-.filter-card {
-  margin-bottom: 20px;
-
-  :deep(.el-card__body) {
-    padding-bottom: 0;
-  }
+  padding: 0;
 }
 
 .poster-grid {

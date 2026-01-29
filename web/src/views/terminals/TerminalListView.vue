@@ -171,7 +171,7 @@
     <el-dialog v-model="importDialogVisible" title="终端入库" width="650px">
       <el-form :model="importForm" label-width="100px">
         <el-form-item label="选择通道" required>
-          <ChannelSelect v-model="importForm.channel_id" style="width: 100%" @change="handleChannelChange" />
+          <ChannelSelect v-model="importForm.channel_id" style="width: 100%" @change="(val: any) => handleChannelChange(val?.id ?? val)" />
         </el-form-item>
         <el-form-item label="终端类型">
           <el-select
@@ -360,15 +360,15 @@ const dispatchForm = reactive({
 })
 
 // 状态配置
-type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger' | ''
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
 function getStatusType(status: TerminalStatus): TagType {
   const map: Record<TerminalStatus, TagType> = {
     stock: 'info',
     distributed: 'warning',
     activated: 'success',
-    returned: '',
+    returned: 'info',
   }
-  return map[status] || ''
+  return map[status] || 'info'
 }
 
 function getStatusLabel(status: TerminalStatus) {
@@ -453,12 +453,12 @@ const rangePreview = reactive({
 })
 
 // 通道变更时加载终端类型
-async function handleChannelChange(channelId: number | undefined) {
+async function handleChannelChange(channelId: number | string | undefined) {
   importForm.terminal_type_id = undefined
   terminalTypes.value = []
   if (channelId) {
     try {
-      terminalTypes.value = await getTerminalTypesByChannel(channelId)
+      terminalTypes.value = await getTerminalTypesByChannel(Number(channelId))
     } catch (error) {
       console.error('获取终端类型失败:', error)
     }

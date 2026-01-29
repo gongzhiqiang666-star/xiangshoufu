@@ -32,10 +32,10 @@
           <div class="progress-section">
             <el-progress
               type="dashboard"
-              :percentage="detail?.progress || 0"
+              :percentage="detail?.progress ?? 0"
               :width="120"
               :stroke-width="10"
-              :status="detail?.progress >= 100 ? 'success' : ''"
+              :status="(detail?.progress ?? 0) >= 100 ? 'success' : undefined"
             >
               <template #default>
                 <div class="progress-content">
@@ -54,19 +54,19 @@
           <el-col :span="6">
             <div class="amount-item">
               <span class="label">代扣总额</span>
-              <span class="value">¥{{ formatAmount(detail?.total_amount) }}</span>
+              <span class="value">¥{{ formatAmount(detail?.total_amount || 0) }}</span>
             </div>
           </el-col>
           <el-col :span="6">
             <div class="amount-item success">
               <span class="label">已扣金额</span>
-              <span class="value">¥{{ formatAmount(detail?.deducted_amount) }}</span>
+              <span class="value">¥{{ formatAmount(detail?.deducted_amount || 0) }}</span>
             </div>
           </el-col>
           <el-col :span="6">
             <div class="amount-item danger">
               <span class="label">剩余待扣</span>
-              <span class="value">¥{{ formatAmount(detail?.remaining_amount) }}</span>
+              <span class="value">¥{{ formatAmount(detail?.remaining_amount || 0) }}</span>
             </div>
           </el-col>
           <el-col :span="6">
@@ -95,7 +95,7 @@
           </el-descriptions-item>
           <el-descriptions-item label="发起方">{{ detail?.from_agent_name }}</el-descriptions-item>
           <el-descriptions-item label="接收方">{{ detail?.to_agent_name }}</el-descriptions-item>
-          <el-descriptions-item label="终端单价">¥{{ formatAmount(detail?.unit_price) }}</el-descriptions-item>
+          <el-descriptions-item label="终端单价">¥{{ formatAmount(detail?.unit_price || 0) }}</el-descriptions-item>
           <el-descriptions-item label="创建时间">{{ detail?.created_at }}</el-descriptions-item>
           <el-descriptions-item v-if="detail?.accepted_at" label="接收时间">
             {{ detail?.accepted_at }}

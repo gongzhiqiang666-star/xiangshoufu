@@ -579,12 +579,21 @@ export const privateRoutes: RouteRecordRaw[] = [
       {
         path: 'channels',
         name: 'Channels',
-        redirect: '/channels/deposit-tiers',
+        redirect: '/channels/config',
         meta: {
           title: '通道管理',
           icon: 'Connection',
         },
         children: [
+          {
+            path: 'config',
+            name: 'ChannelConfig',
+            component: () => import('@/views/channel/config/index.vue'),
+            meta: {
+              title: '通道配置',
+              breadcrumb: [{ title: '首页' }, { title: '通道管理' }, { title: '通道配置' }],
+            },
+          },
           {
             path: 'deposit-tiers',
             name: 'DepositTiers',

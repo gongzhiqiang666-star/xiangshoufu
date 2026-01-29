@@ -30,7 +30,7 @@
             <div class="status-text">{{ getStatusLabel(detail?.status) }}</div>
             <div class="status-amount">
               <span class="label">代扣总额</span>
-              <span class="value">¥{{ formatAmount(detail?.total_amount) }}</span>
+              <span class="value">¥{{ formatAmount(detail?.total_amount || 0) }}</span>
             </div>
           </div>
           <div class="progress-info">
@@ -57,19 +57,19 @@
           <el-col :span="8">
             <div class="amount-item">
               <span class="label">代扣总额</span>
-              <span class="value">¥{{ formatAmount(detail?.total_amount) }}</span>
+              <span class="value">¥{{ formatAmount(detail?.total_amount || 0) }}</span>
             </div>
           </el-col>
           <el-col :span="8">
             <div class="amount-item success">
               <span class="label">已扣金额</span>
-              <span class="value">¥{{ formatAmount(detail?.deducted_amount) }}</span>
+              <span class="value">¥{{ formatAmount(detail?.deducted_amount || 0) }}</span>
             </div>
           </el-col>
           <el-col :span="8">
             <div class="amount-item danger">
               <span class="label">剩余待扣</span>
-              <span class="value">¥{{ formatAmount(detail?.remaining_amount) }}</span>
+              <span class="value">¥{{ formatAmount(detail?.remaining_amount || 0) }}</span>
             </div>
           </el-col>
         </el-row>
@@ -92,7 +92,7 @@
           </el-descriptions-item>
           <el-descriptions-item label="扣款方">{{ detail?.deductor_name }}</el-descriptions-item>
           <el-descriptions-item label="被扣款方">{{ detail?.deductee_name }}</el-descriptions-item>
-          <el-descriptions-item label="每期金额">¥{{ formatAmount(detail?.period_amount) }}</el-descriptions-item>
+          <el-descriptions-item label="每期金额">¥{{ formatAmount(detail?.period_amount || 0) }}</el-descriptions-item>
           <el-descriptions-item label="总期数">{{ detail?.total_periods }} 期</el-descriptions-item>
           <el-descriptions-item label="当前期数">第 {{ detail?.current_period }} 期</el-descriptions-item>
           <el-descriptions-item label="创建时间">{{ detail?.created_at }}</el-descriptions-item>

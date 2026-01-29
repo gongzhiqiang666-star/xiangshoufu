@@ -107,9 +107,9 @@ export function createAgent(data: {
 // ======== 代理商详情页Tab相关API ========
 
 /**
- * 获取代理商政策列表
+ * 获取单个代理商的政策列表
  */
-export function getAgentPolicies(agentId: number): Promise<AgentPolicy[]> {
+export function getAgentPolicyList(agentId: number): Promise<AgentPolicy[]> {
   return get<AgentPolicy[]>('/v1/policies/agent', { agent_id: agentId })
 }
 

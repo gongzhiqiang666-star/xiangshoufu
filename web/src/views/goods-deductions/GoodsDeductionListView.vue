@@ -1,23 +1,17 @@
 <template>
   <div class="goods-deduction-list-view">
-    <PageHeader title="货款代扣" sub-title="货款代扣管理">
-      <template #extra>
-        <el-button :icon="Download" @click="handleExport">导出Excel</el-button>
-      </template>
-    </PageHeader>
-
     <!-- Tab切换 -->
-    <el-card class="tab-card">
+    <div class="tab-wrapper">
       <el-tabs v-model="activeTab" @tab-change="handleTabChange">
         <el-tab-pane label="我发起的" name="sent" />
         <el-tab-pane label="我接收的" name="received" />
       </el-tabs>
-    </el-card>
+    </div>
 
     <!-- 搜索表单 -->
     <SearchForm v-model="searchForm" @search="handleSearch" @reset="handleReset">
       <el-form-item label="状态">
-        <el-select v-model="searchForm.status" placeholder="请选择" clearable>
+        <el-select v-model="searchForm.status" placeholder="请选择" clearable style="width: 100px">
           <el-option label="待接收" :value="1" />
           <el-option label="进行中" :value="2" />
           <el-option label="已完成" :value="3" />
@@ -25,7 +19,7 @@
         </el-select>
       </el-form-item>
       <el-form-item label="扣款来源">
-        <el-select v-model="searchForm.deduction_source" placeholder="请选择" clearable>
+        <el-select v-model="searchForm.deduction_source" placeholder="请选择" clearable style="width: 120px">
           <el-option label="分润钱包" :value="1" />
           <el-option label="服务费钱包" :value="2" />
           <el-option label="分润+服务费" :value="3" />
@@ -36,55 +30,14 @@
           v-model="dateRange"
           type="daterange"
           range-separator="至"
-          start-placeholder="开始日期"
-          end-placeholder="结束日期"
+          start-placeholder="开始"
+          end-placeholder="结束"
           value-format="YYYY-MM-DD"
+          style="width: 240px"
           @change="handleDateChange"
         />
       </el-form-item>
     </SearchForm>
-
-    <!-- 统计汇总 -->
-    <el-card class="summary-card">
-      <el-row :gutter="20">
-        <el-col :span="4">
-          <div class="summary-item">
-            <span class="label">总代扣数</span>
-            <span class="value primary">{{ summary.total_count }}</span>
-          </div>
-        </el-col>
-        <el-col :span="4">
-          <div class="summary-item">
-            <span class="label">待接收</span>
-            <span class="value warning">{{ summary.pending_count }}</span>
-          </div>
-        </el-col>
-        <el-col :span="4">
-          <div class="summary-item">
-            <span class="label">进行中</span>
-            <span class="value primary">{{ summary.in_progress_count }}</span>
-          </div>
-        </el-col>
-        <el-col :span="4">
-          <div class="summary-item">
-            <span class="label">代扣总额</span>
-            <span class="value">¥{{ formatAmount(summary.total_amount) }}</span>
-          </div>
-        </el-col>
-        <el-col :span="4">
-          <div class="summary-item">
-            <span class="label">已扣金额</span>
-            <span class="value success">¥{{ formatAmount(summary.deducted_amount) }}</span>
-          </div>
-        </el-col>
-        <el-col :span="4">
-          <div class="summary-item total">
-            <span class="label">剩余待扣</span>
-            <span class="value danger">¥{{ formatAmount(summary.remaining_amount) }}</span>
-          </div>
-        </el-col>
-      </el-row>
-    </el-card>
 
     <!-- 表格 -->
     <ProTable
@@ -185,16 +138,13 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Download } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import PageHeader from '@/components/Common/PageHeader.vue'
 import SearchForm from '@/components/Common/SearchForm.vue'
 import ProTable from '@/components/Common/ProTable.vue'
 import {
   getSentGoodsDeductions,
   getReceivedGoodsDeductions,
-  getGoodsDeductionSummary,
   acceptGoodsDeduction,
   rejectGoodsDeduction,
 } from '@/api/goodsDeduction'
@@ -203,7 +153,6 @@ import type {
   GoodsDeduction,
   GoodsDeductionStatus,
   DeductionSource,
-  GoodsDeductionSummary,
 } from '@/types'
 import { GOODS_DEDUCTION_STATUS_CONFIG, DEDUCTION_SOURCE_CONFIG } from '@/types/deduction'
 
@@ -211,17 +160,6 @@ const router = useRouter()
 
 // Tab状态
 const activeTab = ref<'sent' | 'received'>('sent')
-
-// 统计数据
-const summary = ref<GoodsDeductionSummary>({
-  total_count: 0,
-  pending_count: 0,
-  in_progress_count: 0,
-  completed_count: 0,
-  total_amount: 0,
-  deducted_amount: 0,
-  remaining_amount: 0,
-})
 
 // 搜索表单
 const searchForm = reactive({
@@ -278,16 +216,6 @@ function handleDateChange(val: [string, string] | null) {
 function handleTabChange() {
   page.value = 1
   fetchData()
-  fetchSummary()
-}
-
-// 获取统计数据
-async function fetchSummary() {
-  try {
-    summary.value = await getGoodsDeductionSummary(activeTab.value)
-  } catch (error) {
-    console.error('Fetch summary error:', error)
-  }
 }
 
 // 获取数据
@@ -313,7 +241,6 @@ async function fetchData() {
 function handleSearch() {
   page.value = 1
   fetchData()
-  fetchSummary()
 }
 
 // 重置
@@ -321,7 +248,6 @@ function handleReset() {
   dateRange.value = null
   page.value = 1
   fetchData()
-  fetchSummary()
 }
 
 // 查看详情
@@ -344,7 +270,6 @@ async function handleAccept(row: GoodsDeduction) {
     await acceptGoodsDeduction(row.id)
     ElMessage.success('接收成功，代扣已开始')
     fetchData()
-    fetchSummary()
   } catch (error) {
     if (error !== 'cancel') {
       console.error('Accept error:', error)
@@ -370,7 +295,6 @@ async function confirmReject() {
     ElMessage.success('已拒绝')
     rejectDialogVisible.value = false
     fetchData()
-    fetchSummary()
   } catch (error) {
     console.error('Reject error:', error)
   } finally {
@@ -378,13 +302,7 @@ async function confirmReject() {
   }
 }
 
-// 导出
-function handleExport() {
-  ElMessage.info('导出功能开发中...')
-}
-
 onMounted(() => {
-  fetchSummary()
   fetchData()
 })
 </script>
@@ -394,57 +312,15 @@ onMounted(() => {
   padding: 0;
 }
 
-.tab-card {
+.tab-wrapper {
   margin-bottom: $spacing-md;
-
-  :deep(.el-card__body) {
-    padding-bottom: 0;
-  }
+  background: #fff;
+  padding: 0 16px;
+  border-radius: 4px;
+  border: 1px solid #ebeef5;
 
   :deep(.el-tabs__header) {
     margin-bottom: 0;
-  }
-}
-
-.summary-card {
-  margin-bottom: $spacing-md;
-
-  .summary-item {
-    text-align: center;
-
-    .label {
-      display: block;
-      font-size: 12px;
-      color: $text-secondary;
-      margin-bottom: $spacing-xs;
-    }
-
-    .value {
-      font-size: 20px;
-      font-weight: 600;
-
-      &.primary {
-        color: $primary-color;
-      }
-
-      &.success {
-        color: $success-color;
-      }
-
-      &.warning {
-        color: $warning-color;
-      }
-
-      &.danger {
-        color: $danger-color;
-      }
-    }
-
-    &.total {
-      background: $bg-color;
-      padding: $spacing-sm;
-      border-radius: $border-radius-sm;
-    }
   }
 }
 

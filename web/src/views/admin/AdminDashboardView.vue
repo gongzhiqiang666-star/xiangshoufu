@@ -182,8 +182,19 @@ const alerts = ref([
 
 const alertCount = computed(() => alerts.value.reduce((sum, a) => sum + a.count, 0))
 
+// 统计卡片类型
+interface StatCard {
+  title: string
+  value: string
+  color: string
+  prefix?: string
+  suffix?: string
+  change?: string
+  changeType?: string
+}
+
 // 平台统计卡片
-const platformStats = computed(() => {
+const platformStats = computed<StatCard[]>(() => {
   const data = overview.value
   if (!data) return []
 

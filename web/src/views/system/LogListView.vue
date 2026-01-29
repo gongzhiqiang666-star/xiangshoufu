@@ -1,13 +1,10 @@
 <template>
   <div class="log-list-view">
-    <PageHeader title="系统管理" sub-title="操作日志">
+    <!-- 搜索表单 -->
+    <SearchForm v-model="searchForm" @search="handleSearch" @reset="handleReset">
       <template #extra>
         <el-button :icon="Download" @click="handleExport">导出日志</el-button>
       </template>
-    </PageHeader>
-
-    <!-- 搜索表单 -->
-    <SearchForm v-model="searchForm" @search="handleSearch" @reset="handleReset">
       <el-form-item label="操作用户">
         <el-input v-model="searchForm.username" placeholder="用户名" clearable />
       </el-form-item>
@@ -145,7 +142,6 @@
 import { ref, reactive, onMounted } from 'vue'
 import { Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import PageHeader from '@/components/Common/PageHeader.vue'
 import SearchForm from '@/components/Common/SearchForm.vue'
 import ProTable from '@/components/Common/ProTable.vue'
 import { getLogs, exportLogs } from '@/api/system'
@@ -174,7 +170,7 @@ const detailDialogVisible = ref(false)
 const currentLog = ref<OperationLog | null>(null)
 
 // 获取模块标签类型
-type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger' | ''
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
 function getModuleTagType(module: LogModule): TagType {
   const typeMap: Record<string, TagType> = {
     '#409eff': 'primary',
@@ -183,7 +179,7 @@ function getModuleTagType(module: LogModule): TagType {
     '#f56c6c': 'danger',
     '#909399': 'info',
   }
-  return typeMap[LOG_MODULE_CONFIG[module]?.color] || ''
+  return typeMap[LOG_MODULE_CONFIG[module]?.color] || 'info'
 }
 
 // 获取模块名称
@@ -200,7 +196,7 @@ function getMethodType(method: string): TagType {
     DELETE: 'danger',
     PATCH: 'info',
   }
-  return methodTypes[method] || ''
+  return methodTypes[method] || 'info'
 }
 
 // 格式化JSON
@@ -233,7 +229,7 @@ async function fetchData() {
       page: page.value,
       page_size: pageSize.value,
     })
-    tableData.value = res.list
+    tableData.value = res.list || []
     total.value = res.total
   } catch (error) {
     console.error('Fetch logs error:', error)

@@ -11,7 +11,7 @@ const whiteList = ['/login']
  */
 export function setupRouterGuards(router: Router) {
   // 前置守卫
-  router.beforeEach(async (to, from, next) => {
+  router.beforeEach(async (to, _from, next) => {
     const userStore = useUserStore()
     const appStore = useAppStore()
 

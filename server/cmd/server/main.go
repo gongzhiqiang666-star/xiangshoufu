@@ -396,6 +396,11 @@ func main() {
 	channelService := service.NewChannelService(channelRepo)
 	channelHandler := handler.NewChannelHandler(channelService)
 
+	// 20.4.2 初始化通道配置服务（费率范围、押金档位、流量费返现档位）
+	channelConfigRepo := repository.NewGormChannelConfigRepository(db)
+	channelConfigService := service.NewChannelConfigService(channelConfigRepo)
+	channelConfigHandler := handler.NewChannelConfigHandler(channelConfigService)
+
 	// 20.5 初始化营销模块（Banner、海报）
 	bannerRepo := repository.NewGormBannerRepository(db)
 	posterRepo := repository.NewGormPosterRepository(db)
@@ -533,6 +538,7 @@ func main() {
 		systemHandler, // 新增：系统管理Handler
 		terminalTypeHandler, // 新增：终端类型Handler
 		depositTierHandler, // 新增：押金档位Handler
+		channelConfigHandler, // 新增：通道配置Handler
 		authService, metricsService, config.SwaggerEnabled,
 	)
 
@@ -797,6 +803,7 @@ func setupRouter(
 	systemHandler *handler.SystemHandler, // 新增：系统管理Handler
 	terminalTypeHandler *handler.TerminalTypeHandler, // 新增：终端类型Handler
 	depositTierHandler *handler.DepositTierHandler, // 新增：押金档位Handler
+	channelConfigHandler *handler.ChannelConfigHandler, // 新增：通道配置Handler
 	authService *service.AuthService,
 	metricsService *service.MetricsService,
 	swaggerEnabled bool,
@@ -912,6 +919,9 @@ func setupRouter(
 
 			// 终端类型路由
 			terminalTypeHandler.RegisterRoutes(adminGroup)
+
+			// 通道配置路由（费率范围、押金档位、流量费返现档位）
+			handler.RegisterChannelConfigRoutes(adminGroup, channelConfigHandler)
 		}
 
 		// 注册分析统计路由

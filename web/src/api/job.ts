@@ -1,6 +1,6 @@
 // 定时任务管理API
 import { get, post, put, del } from './request'
-import type { PageResult } from '@/types'
+import type { PaginatedResponse } from '@/types'
 import type {
   JobListItem,
   JobDetail,
@@ -51,7 +51,7 @@ export function getJobLogs(params: {
   page?: number
   page_size?: number
 }) {
-  return get<PageResult<JobExecutionLog>>('/v1/admin/job-logs', params)
+  return get<PaginatedResponse<JobExecutionLog>>('/v1/admin/job-logs', params)
 }
 
 // 获取日志详情
@@ -114,7 +114,7 @@ export function getAlertLogs(params: {
   page?: number
   page_size?: number
 }) {
-  return get<PageResult<AlertLog>>('/v1/admin/alert-logs', params)
+  return get<PaginatedResponse<AlertLog>>('/v1/admin/alert-logs', params)
 }
 
 // 获取告警日志详情

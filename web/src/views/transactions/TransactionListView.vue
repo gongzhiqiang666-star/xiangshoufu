@@ -1,18 +1,12 @@
 <template>
   <div class="transaction-list-view">
-    <PageHeader title="交易管理" sub-title="交易记录">
-      <template #extra>
-        <el-button :icon="Download" @click="handleExport">导出Excel</el-button>
-      </template>
-    </PageHeader>
-
     <!-- 搜索表单 -->
     <SearchForm v-model="searchForm" @search="handleSearch" @reset="handleReset">
       <el-form-item label="通道">
-        <ChannelSelect v-model="searchForm.channel_id" />
+        <ChannelSelect v-model="searchForm.channel_id" style="width: 150px" />
       </el-form-item>
       <el-form-item label="交易类型">
-        <el-select v-model="searchForm.transaction_type" placeholder="请选择" clearable>
+        <el-select v-model="searchForm.transaction_type" placeholder="请选择" clearable style="width: 120px">
           <el-option label="贷记卡" value="credit" />
           <el-option label="借记卡" value="debit" />
           <el-option label="微信" value="wechat" />
@@ -21,7 +15,7 @@
         </el-select>
       </el-form-item>
       <el-form-item label="状态">
-        <el-select v-model="searchForm.status" placeholder="请选择" clearable>
+        <el-select v-model="searchForm.status" placeholder="请选择" clearable style="width: 100px">
           <el-option label="成功" value="success" />
           <el-option label="失败" value="failed" />
           <el-option label="处理中" value="pending" />
@@ -29,44 +23,21 @@
         </el-select>
       </el-form-item>
       <el-form-item label="机具号">
-        <el-input v-model="searchForm.terminal_sn" placeholder="请输入机具号" clearable />
+        <el-input v-model="searchForm.terminal_sn" placeholder="请输入机具号" clearable style="width: 150px" />
       </el-form-item>
       <el-form-item label="交易时间">
         <el-date-picker
           v-model="dateRange"
           type="daterange"
           range-separator="至"
-          start-placeholder="开始日期"
-          end-placeholder="结束日期"
+          start-placeholder="开始"
+          end-placeholder="结束"
           value-format="YYYY-MM-DD"
+          style="width: 240px"
           @change="handleDateChange"
         />
       </el-form-item>
     </SearchForm>
-
-    <!-- 统计汇总 -->
-    <el-card class="summary-card">
-      <el-row :gutter="20">
-        <el-col :span="8">
-          <div class="summary-item">
-            <span class="label">交易总额:</span>
-            <span class="value">¥{{ formatAmount(stats.total_amount) }}</span>
-          </div>
-        </el-col>
-        <el-col :span="8">
-          <div class="summary-item">
-            <span class="label">交易笔数:</span>
-            <span class="value">{{ formatNumber(stats.total_count) }}笔</span>
-          </div>
-        </el-col>
-        <el-col :span="8">
-          <div class="summary-item">
-            <span class="label">今日交易:</span>
-            <span class="value">¥{{ formatAmount(stats.today_amount) }}</span>
-          </div>
-        </el-col>
-      </el-row>
-    </el-card>
 
     <!-- 表格 -->
     <ProTable
@@ -119,28 +90,16 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import PageHeader from '@/components/Common/PageHeader.vue'
 import SearchForm from '@/components/Common/SearchForm.vue'
 import ProTable from '@/components/Common/ProTable.vue'
 import ChannelSelect from '@/components/Common/ChannelSelect.vue'
-import { getTransactions, getTransactionStats } from '@/api/transaction'
-import { formatAmount, formatNumber } from '@/utils/format'
-import type { Transaction, TransactionType, TransactionStatus, TransactionStats } from '@/types'
+import { getTransactions } from '@/api/transaction'
+import { formatAmount } from '@/utils/format'
+import type { Transaction, TransactionType, TransactionStatus } from '@/types'
 import { TRANSACTION_TYPE_CONFIG } from '@/types/transaction'
 
 const router = useRouter()
-
-// 统计数据
-const stats = ref<TransactionStats>({
-  total_amount: 0,
-  total_count: 0,
-  today_amount: 0,
-  today_count: 0,
-  month_amount: 0,
-  month_count: 0,
-})
 
 // 搜索表单
 const searchForm = reactive({
@@ -162,7 +121,7 @@ const page = ref(1)
 const pageSize = ref(10)
 
 // 类型配置
-type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger' | ''
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
 function getTypeTag(type: TransactionType): TagType {
   const colorMap: Record<string, TagType> = {
     '#409eff': 'primary',
@@ -172,7 +131,7 @@ function getTypeTag(type: TransactionType): TagType {
     '#e60012': 'danger',
   }
   const config = TRANSACTION_TYPE_CONFIG[type]
-  return colorMap[config?.color] || ''
+  return colorMap[config?.color] || 'info'
 }
 
 function getTypeLabel(type: TransactionType) {
@@ -186,7 +145,7 @@ function getStatusTag(status: TransactionStatus): TagType {
     pending: 'warning',
     refunded: 'info',
   }
-  return map[status] || ''
+  return map[status] || 'info'
 }
 
 function getStatusLabel(status: TransactionStatus) {
@@ -207,19 +166,6 @@ function handleDateChange(val: [string, string] | null) {
   } else {
     searchForm.start_date = ''
     searchForm.end_date = ''
-  }
-}
-
-// 获取统计数据
-async function fetchStats() {
-  try {
-    stats.value = await getTransactionStats({
-      channel_id: searchForm.channel_id,
-      start_date: searchForm.start_date,
-      end_date: searchForm.end_date,
-    })
-  } catch (error) {
-    console.error('Fetch transaction stats error:', error)
   }
 }
 
@@ -245,7 +191,6 @@ async function fetchData() {
 function handleSearch() {
   page.value = 1
   fetchData()
-  fetchStats()
 }
 
 // 重置
@@ -253,7 +198,6 @@ function handleReset() {
   dateRange.value = null
   page.value = 1
   fetchData()
-  fetchStats()
 }
 
 // 查看详情
@@ -267,7 +211,6 @@ function handleExport() {
 }
 
 onMounted(() => {
-  fetchStats()
   fetchData()
 })
 </script>

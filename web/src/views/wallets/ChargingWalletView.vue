@@ -1,7 +1,5 @@
 <template>
   <div class="charging-wallet-view">
-    <PageHeader title="充值钱包" sub-title="充值钱包管理" />
-
     <!-- 钱包配置状态 -->
     <el-card class="config-card" v-loading="configLoading">
       <template #header>
@@ -177,7 +175,7 @@
           <el-input v-model="depositForm.payment_ref" placeholder="转账流水号或截图" />
         </el-form-item>
         <el-form-item label="备注">
-          <el-input v-model="depositForm.remark" type="textarea" rows="2" />
+          <el-input v-model="depositForm.remark" type="textarea" :rows="2" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -197,7 +195,7 @@
           <span class="form-tip">元</span>
         </el-form-item>
         <el-form-item label="备注">
-          <el-input v-model="rewardForm.remark" type="textarea" rows="2" />
+          <el-input v-model="rewardForm.remark" type="textarea" :rows="2" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -212,7 +210,6 @@
 import { ref, reactive, onMounted } from 'vue'
 import { Wallet, Present, Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import PageHeader from '@/components/Common/PageHeader.vue'
 import AgentSelect from '@/components/Common/AgentSelect.vue'
 import {
   getMyWalletConfig,
@@ -228,7 +225,6 @@ import type {
   ChargingWalletSummary,
   ChargingWalletDeposit,
   ChargingWalletReward,
-  ChargingDepositStatus,
 } from '@/types'
 
 // 配置
@@ -246,7 +242,7 @@ const summary = ref<ChargingWalletSummary>({
 // 充值记录
 const deposits = ref<ChargingWalletDeposit[]>([])
 const depositsLoading = ref(false)
-const depositStatus = ref<ChargingDepositStatus | undefined>(undefined)
+const depositStatus = ref<number | undefined>(undefined)
 const depositPage = ref(1)
 const depositPageSize = ref(10)
 const depositTotal = ref(0)
@@ -334,14 +330,14 @@ async function fetchRewards() {
 }
 
 // 充值状态类型
-type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger' | ''
-function getDepositStatusType(status: ChargingDepositStatus): TagType {
-  const typeMap: Record<ChargingDepositStatus, TagType> = {
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
+function getDepositStatusType(status: number): TagType {
+  const typeMap: Record<number, TagType> = {
     0: 'warning',
     1: 'success',
     2: 'danger',
   }
-  return typeMap[status] || ''
+  return typeMap[status] || 'info'
 }
 
 // 开通钱包

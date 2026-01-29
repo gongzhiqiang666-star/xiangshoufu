@@ -1,38 +1,33 @@
 <template>
   <div class="settlement-price-list">
-    <div class="page-header">
-      <h2>结算价管理</h2>
-      <el-button type="primary" @click="handleCreate">
-        <el-icon><Plus /></el-icon>
-        新增结算价
-      </el-button>
-    </div>
-
-    <!-- 搜索栏 -->
-    <el-card class="search-card">
-      <el-form :inline="true" :model="searchForm" class="search-form">
-        <el-form-item label="代理商ID">
-          <el-input v-model.number="searchForm.agent_id" placeholder="请输入代理商ID" clearable />
-        </el-form-item>
-        <el-form-item label="通道ID">
-          <el-input v-model.number="searchForm.channel_id" placeholder="请输入通道ID" clearable />
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="searchForm.status" placeholder="请选择状态" clearable>
-            <el-option label="启用" :value="1" />
-            <el-option label="禁用" :value="0" />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch">查询</el-button>
-          <el-button @click="handleReset">重置</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
+    <!-- 搜索表单 -->
+    <SearchForm v-model="searchForm" @search="handleSearch" @reset="handleReset">
+      <template #extra>
+        <el-button type="primary" :icon="Plus" @click="handleCreate">新增结算价</el-button>
+      </template>
+      <el-form-item label="代理商">
+        <AgentSelect v-model="searchForm.agent_id" placeholder="请选择代理商" style="width: 180px" />
+      </el-form-item>
+      <el-form-item label="通道">
+        <ChannelSelect v-model="searchForm.channel_id" style="width: 150px" />
+      </el-form-item>
+      <el-form-item label="状态">
+        <el-select v-model="searchForm.status" placeholder="请选择状态" clearable style="width: 100px">
+          <el-option label="启用" :value="1" />
+          <el-option label="禁用" :value="0" />
+        </el-select>
+      </el-form-item>
+    </SearchForm>
 
     <!-- 数据表格 -->
-    <el-card class="table-card">
-      <el-table :data="tableData" v-loading="loading" stripe>
+    <ProTable
+      :data="tableData"
+      :loading="loading"
+      :total="pagination.total"
+      v-model:page="pagination.page"
+      v-model:page-size="pagination.pageSize"
+      @refresh="loadData"
+    >
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="agent_id" label="代理商ID" width="100" />
         <el-table-column prop="agent_name" label="代理商名称" min-width="120" />
@@ -71,27 +66,12 @@
             {{ formatDateTime(row.updated_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
-          <template #default="{ row }">
-            <el-button type="primary" link size="small" @click="handleEdit(row)">编辑</el-button>
-            <el-button type="primary" link size="small" @click="handleViewLogs(row)">调价记录</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
 
-      <!-- 分页 -->
-      <div class="pagination-wrapper">
-        <el-pagination
-          v-model:current-page="pagination.page"
-          v-model:page-size="pagination.pageSize"
-          :page-sizes="[10, 20, 50, 100]"
-          :total="pagination.total"
-          layout="total, sizes, prev, pager, next, jumper"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
-      </div>
-    </el-card>
+      <template #action="{ row }">
+        <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
+        <el-button type="primary" link @click="handleViewLogs(row)">调价记录</el-button>
+      </template>
+    </ProTable>
 
     <!-- 新增对话框：选择代理商+通道+模板 -->
     <el-dialog v-model="createDialogVisible" title="新增结算价" width="800px" destroy-on-close>
@@ -318,6 +298,10 @@
 import { ref, reactive, onMounted } from 'vue'
 import { Plus, Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import SearchForm from '@/components/Common/SearchForm.vue'
+import ProTable from '@/components/Common/ProTable.vue'
+import AgentSelect from '@/components/Common/AgentSelect.vue'
+import ChannelSelect from '@/components/Common/ChannelSelect.vue'
 import {
   getSettlementPrices,
   getSettlementPrice,
@@ -440,15 +424,6 @@ const handleReset = () => {
   searchForm.channel_id = undefined
   searchForm.status = undefined
   handleSearch()
-}
-
-// 分页
-const handleSizeChange = () => {
-  pagination.page = 1
-  loadData()
-}
-const handleCurrentChange = () => {
-  loadData()
 }
 
 // ============= 新增功能 =============
@@ -637,32 +612,7 @@ onMounted(() => {
 
 <style scoped>
 .settlement-price-list {
-  padding: 20px;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.page-header h2 {
-  margin: 0;
-}
-
-.search-card {
-  margin-bottom: 20px;
-}
-
-.table-card {
-  margin-bottom: 20px;
-}
-
-.pagination-wrapper {
-  margin-top: 20px;
-  display: flex;
-  justify-content: flex-end;
+  padding: 0;
 }
 
 .rate-tag {

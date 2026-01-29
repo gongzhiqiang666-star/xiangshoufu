@@ -316,14 +316,16 @@ const merchantChartData = computed(() => {
 })
 
 // 处理范围切换
-function handleScopeChange(scope: string) {
-  dashboardStore.setScope(scope)
+function handleScopeChange(scope: string | number) {
+  dashboardStore.setScope(scope as string)
   dashboardStore.refreshAll()
 }
 
 // 处理天数切换
-function handleDaysChange(days: number) {
-  dashboardStore.fetchChartData(days)
+function handleDaysChange(days: string | number | boolean | undefined) {
+  if (typeof days === 'number') {
+    dashboardStore.fetchChartData(days)
+  }
 }
 
 // 获取代理商排名

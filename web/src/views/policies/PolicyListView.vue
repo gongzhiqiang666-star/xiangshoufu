@@ -1,13 +1,10 @@
 <template>
   <div class="policy-list-view">
-    <PageHeader title="政策管理" sub-title="政策模板">
+    <!-- 搜索表单 -->
+    <SearchForm v-model="searchForm" @search="handleSearch" @reset="handleReset">
       <template #extra>
         <el-button type="primary" :icon="Plus" @click="handleCreate">新建模板</el-button>
       </template>
-    </PageHeader>
-
-    <!-- 搜索表单 -->
-    <SearchForm v-model="searchForm" @search="handleSearch" @reset="handleReset">
       <el-form-item label="通道">
         <ChannelSelect v-model="searchForm.channel_id" />
       </el-form-item>
@@ -85,7 +82,6 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus, StarFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import PageHeader from '@/components/Common/PageHeader.vue'
 import SearchForm from '@/components/Common/SearchForm.vue'
 import ProTable from '@/components/Common/ProTable.vue'
 import ChannelSelect from '@/components/Common/ChannelSelect.vue'

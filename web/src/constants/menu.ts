@@ -117,6 +117,14 @@ export const MENU_LIST: MenuItem[] = [
     ],
   },
   {
+    path: '/channels',
+    title: '通道管理',
+    icon: 'Connection',
+    children: [
+      { path: '/channels/config', title: '通道配置', icon: '' },
+    ],
+  },
+  {
     path: '/system',
     title: '系统管理',
     icon: 'Setting',

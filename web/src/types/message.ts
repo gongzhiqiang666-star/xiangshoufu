@@ -33,6 +33,7 @@ export interface Message {
 // 未读消息统计
 export interface UnreadCount {
   count: number
+  total: number
 }
 
 // 消息统计

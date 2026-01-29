@@ -8,6 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
+## 数据库操作
+   psql位置在 /opt/homebrew/opt/postgresql@15/bin/psql
+   执行数据库操作不要再说没有psql工具
+
 ## ⚠️ 重要行为规则（必读）
 
 ### 1. "开发完成"的定义
@@ -372,3 +376,136 @@ flutter analyze
 - Table-driven tests with `t.Run()` subtests
 - Error wrapping: `fmt.Errorf("message: %w", err)`
 - Repository naming: `Gorm<Entity>Repository`
+
+---
+
+## PC端布局风格规范
+
+### 核心原则
+
+> **有限的屏幕空间应最大化展示业务数据和操作**
+
+### 页面类型与布局
+
+| 页面类型 | 布局规范 |
+|---------|---------|
+| **列表页** | SearchForm + ProTable，不使用 PageHeader，padding: 0 |
+| **详情页** | 使用 PageHeader 显示标题和返回按钮 |
+| **表单页** | 使用 PageHeader，表单居中布局 |
+
+### 列表页标准结构
+
+```
+┌─────────────────────────────────────────────────┐
+│ SearchForm                        [操作按钮组]  │
+│ ┌───────────────────────────────────────────────┤
+│ │ 搜索条件1 │ 搜索条件2 │ 搜索条件3 │ 查询 重置 │
+│ └───────────────────────────────────────────────┤
+├─────────────────────────────────────────────────┤
+│ ProTable（含分页，无工具栏）                     │
+└─────────────────────────────────────────────────┘
+```
+
+### 组件使用规范
+
+#### SearchForm 组件
+
+```vue
+<SearchForm v-model="searchForm" @search="handleSearch" @reset="handleReset">
+  <!-- 搜索条件 -->
+  <el-form-item label="代理商">
+    <AgentSelect v-model="searchForm.agent_id" style="width: 180px" />
+  </el-form-item>
+  <el-form-item label="通道">
+    <ChannelSelect v-model="searchForm.channel_id" style="width: 150px" />
+  </el-form-item>
+
+  <!-- 操作按钮放 #extra 插槽 -->
+  <template #extra>
+    <el-button type="primary" :icon="Plus" @click="handleCreate">新增</el-button>
+  </template>
+</SearchForm>
+```
+
+#### ProTable 组件
+
+```vue
+<ProTable
+  :data="tableData"
+  :loading="loading"
+  :total="total"
+  v-model:page="page"
+  v-model:page-size="pageSize"
+  @refresh="fetchData"
+>
+  <el-table-column prop="field_name" label="字段名" width="120" />
+
+  <template #action="{ row }">
+    <el-button type="primary" link @click="handleView(row)">详情</el-button>
+    <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
+  </template>
+</ProTable>
+```
+
+### 禁止事项
+
+| ❌ 禁止 | ✅ 正确做法 |
+|--------|-----------|
+| 列表页使用 PageHeader | 标题和操作按钮放 SearchForm |
+| 使用 el-card 包裹搜索/表格 | 直接使用 SearchForm + ProTable |
+| 列表页显示统计卡片 | 统计只在 Dashboard 展示 |
+| 使用 ID 文本输入框 | 使用 AgentSelect / ChannelSelect 选择器 |
+| 自定义 .page-header 样式 | 使用 SearchForm 的 #extra 插槽 |
+| padding: 20px | padding: 0 |
+| 表格工具栏刷新按钮 | ProTable 默认 showToolbar: false |
+
+### 选择器组件优先级
+
+| 场景 | 组件 |
+|------|------|
+| 选择代理商 | `<AgentSelect v-model="form.agent_id" />` |
+| 选择通道 | `<ChannelSelect v-model="form.channel_id" />` |
+| 选择商户 | `<MerchantSelect v-model="form.merchant_id" />` |
+| 状态筛选 | `<el-select>` + 固定选项 |
+| 日期范围 | `<el-date-picker type="daterange" />` |
+
+### 表格列宽参考
+
+| 字段类型 | 建议宽度 |
+|---------|---------|
+| ID | 80px |
+| 编号 | 140-180px |
+| 名称 | min-width: 120px |
+| 手机号 | 130px |
+| 状态标签 | 80-100px |
+| 金额 | 120px |
+| 时间 | 160-170px |
+| 操作列 | 根据按钮数量自适应 |
+
+### 样式规范
+
+```scss
+// 列表页容器
+.xxx-list-view {
+  padding: 0;
+}
+
+// 金额高亮
+.profit-amount {
+  color: $success-color;
+  font-weight: 600;
+}
+
+// 危险金额
+.danger-text {
+  color: $danger-color;
+  font-weight: 600;
+}
+```
+
+### 示例：标准列表页
+
+参考文件：
+- `web/src/views/agents/AgentListView.vue`
+- `web/src/views/profits/ProfitListView.vue`
+- `web/src/views/agent/settlement-prices/index.vue`

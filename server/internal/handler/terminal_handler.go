@@ -604,20 +604,20 @@ func getTerminalStatusName(status int16) string {
 }
 
 // RegisterTerminalRoutes 注册终端路由
+// 注意：具体路径必须在参数路径之前注册，否则会被参数路径匹配
 func RegisterTerminalRoutes(r *gin.RouterGroup, h *TerminalHandler, authService *service.AuthService) {
 	terminals := r.Group("/terminals")
 	terminals.Use(middleware.AuthMiddleware(authService))
 	{
+		// 1. 列表和统计接口
 		terminals.GET("", h.GetTerminalList)
 		terminals.GET("/stats", h.GetTerminalStats)
-		terminals.GET("/filter-options", h.GetFilterOptions) // 新增：筛选选项API
-		terminals.GET("/:sn", h.GetTerminalDetail)
-		terminals.GET("/:sn/flow-logs", h.GetTerminalFlowLogs) // 新增：流动记录API
+		terminals.GET("/filter-options", h.GetFilterOptions) // 筛选选项API
 
-		// 终端入库
+		// 2. 终端入库
 		terminals.POST("/import", h.ImportTerminals)
 
-		// 终端回拨
+		// 3. 终端回拨 - 具体路径必须在 /:sn 之前注册
 		terminals.POST("/recall", h.RecallTerminal)
 		terminals.POST("/batch-recall", h.BatchRecallTerminals)
 		terminals.GET("/recall", h.GetRecallList)
@@ -625,12 +625,16 @@ func RegisterTerminalRoutes(r *gin.RouterGroup, h *TerminalHandler, authService 
 		terminals.POST("/recall/:id/reject", h.RejectRecall)
 		terminals.POST("/recall/:id/cancel", h.CancelRecall)
 
-		// 终端政策设置
+		// 4. 终端政策设置 - 具体路径必须在 /:sn 之前注册
 		terminals.GET("/policy-options", h.GetPolicyOptions)
-		terminals.GET("/:sn/policy", h.GetTerminalPolicy)
 		terminals.POST("/batch-set-rate", h.BatchSetRate)
 		terminals.POST("/batch-set-sim", h.BatchSetSimFee)
 		terminals.POST("/batch-set-deposit", h.BatchSetDeposit)
+
+		// 5. 终端详情相关 - 参数路径必须放在最后
+		terminals.GET("/:sn", h.GetTerminalDetail)
+		terminals.GET("/:sn/flow-logs", h.GetTerminalFlowLogs) // 流动记录API
+		terminals.GET("/:sn/policy", h.GetTerminalPolicy)
 	}
 }
 

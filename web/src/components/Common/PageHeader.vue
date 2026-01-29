@@ -8,16 +8,10 @@
         size="small"
         @click="handleBack"
       />
-      <!-- 面包屑导航 -->
-      <el-breadcrumb separator="/">
-        <el-breadcrumb-item
-          v-for="(item, index) in breadcrumbs"
-          :key="index"
-          :to="item.path"
-        >
-          {{ item.title }}
-        </el-breadcrumb-item>
-      </el-breadcrumb>
+      <div class="title-section">
+        <span class="page-title">{{ title }}</span>
+        <span v-if="subTitle" class="page-subtitle">{{ subTitle }}</span>
+      </div>
     </div>
     <div class="header-right">
       <slot name="extra"></slot>
@@ -26,10 +20,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft } from '@element-plus/icons-vue'
-import { useAppStore } from '@/stores/app'
 
 interface Props {
   title?: string
@@ -37,14 +29,11 @@ interface Props {
   showBack?: boolean
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   showBack: false,
 })
 
 const router = useRouter()
-const appStore = useAppStore()
-
-const breadcrumbs = computed(() => appStore.breadcrumbs)
 
 function handleBack() {
   router.back()
@@ -56,31 +45,39 @@ function handleBack() {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: $spacing-md;
-  padding: $spacing-sm $spacing-md;
+  margin-bottom: $spacing-sm;
+  padding: $spacing-xs $spacing-sm;
   background: $bg-white;
   border-radius: $border-radius-sm;
   box-shadow: $shadow-sm;
-  min-height: 40px;
+  min-height: 36px;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: $spacing-sm;
+  gap: $spacing-xs;
+}
+
+.title-section {
+  display: flex;
+  align-items: baseline;
+  gap: $spacing-xs;
+}
+
+.page-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: $text-primary;
+}
+
+.page-subtitle {
+  font-size: 12px;
+  color: $text-secondary;
 }
 
 .header-right {
   display: flex;
   gap: $spacing-xs;
-}
-
-:deep(.el-breadcrumb) {
-  font-size: 14px;
-
-  .el-breadcrumb__item:last-child .el-breadcrumb__inner {
-    font-weight: 600;
-    color: $text-primary;
-  }
 }
 </style>

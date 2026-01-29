@@ -1,13 +1,10 @@
 <template>
   <div class="message-list-view">
-    <PageHeader title="消息管理" sub-title="消息列表">
+    <!-- 搜索表单 -->
+    <SearchForm v-model="searchForm" @search="handleSearch" @reset="handleReset">
       <template #extra>
         <el-button type="primary" :icon="Plus" @click="handleSendMessage">发送消息</el-button>
       </template>
-    </PageHeader>
-
-    <!-- 搜索表单 -->
-    <SearchForm v-model="searchForm" @search="handleSearch" @reset="handleReset">
       <el-form-item label="消息类型">
         <el-select v-model="searchForm.message_type" placeholder="请选择" clearable>
           <el-option
@@ -27,34 +24,32 @@
     </SearchForm>
 
     <!-- 统计汇总 -->
-    <el-card class="summary-card">
-      <el-row :gutter="20">
-        <el-col :span="6">
-          <div class="summary-item">
-            <span class="label">总消息数:</span>
-            <span class="value">{{ stats.total }}</span>
-          </div>
-        </el-col>
-        <el-col :span="6">
-          <div class="summary-item">
-            <span class="label">未读消息:</span>
-            <span class="value warning">{{ stats.unread_total }}</span>
-          </div>
-        </el-col>
-        <el-col :span="6">
-          <div class="summary-item">
-            <span class="label">分润类:</span>
-            <span class="value">{{ stats.profit_count }}</span>
-          </div>
-        </el-col>
-        <el-col :span="6">
-          <div class="summary-item">
-            <span class="label">系统类:</span>
-            <span class="value">{{ stats.system_count }}</span>
-          </div>
-        </el-col>
-      </el-row>
-    </el-card>
+    <el-row :gutter="20" class="stats-row">
+      <el-col :span="6">
+        <div class="stat-card">
+          <span class="label">总消息数:</span>
+          <span class="value">{{ stats.total }}</span>
+        </div>
+      </el-col>
+      <el-col :span="6">
+        <div class="stat-card">
+          <span class="label">未读消息:</span>
+          <span class="value warning">{{ stats.unread_total }}</span>
+        </div>
+      </el-col>
+      <el-col :span="6">
+        <div class="stat-card">
+          <span class="label">分润类:</span>
+          <span class="value">{{ stats.profit_count }}</span>
+        </div>
+      </el-col>
+      <el-col :span="6">
+        <div class="stat-card">
+          <span class="label">系统类:</span>
+          <span class="value">{{ stats.system_count }}</span>
+        </div>
+      </el-col>
+    </el-row>
 
     <!-- 表格 -->
     <ProTable
@@ -128,7 +123,6 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import PageHeader from '@/components/Common/PageHeader.vue'
 import SearchForm from '@/components/Common/SearchForm.vue'
 import ProTable from '@/components/Common/ProTable.vue'
 import { getAdminMessages, getAdminMessageDetail, deleteMessage } from '@/api/message'
@@ -166,17 +160,18 @@ const detailDialogVisible = ref(false)
 const currentMessage = ref<Message | null>(null)
 
 // 获取类型标签颜色
-function getTypeTag(type: MessageTypeValue): string {
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
+function getTypeTag(type: MessageTypeValue): TagType {
   const config = MESSAGE_TYPE_CONFIG[type]
-  if (!config) return ''
-  const colorMap: Record<string, string> = {
+  if (!config) return 'info'
+  const colorMap: Record<string, TagType> = {
     '#67c23a': 'success',
     '#e6a23c': 'warning',
     '#409eff': 'primary',
     '#909399': 'info',
     '#f56c6c': 'danger',
   }
-  return colorMap[config.color] || ''
+  return colorMap[config.color] || 'info'
 }
 
 function getTypeLabel(type: MessageTypeValue): string {
@@ -259,13 +254,17 @@ onMounted(() => {
   padding: 0;
 }
 
-.summary-card {
+.stats-row {
   margin-bottom: 16px;
 
-  .summary-item {
+  .stat-card {
     display: flex;
     align-items: center;
     gap: 8px;
+    padding: 12px 16px;
+    background: #fff;
+    border-radius: 4px;
+    border: 1px solid #ebeef5;
 
     .label {
       color: #909399;

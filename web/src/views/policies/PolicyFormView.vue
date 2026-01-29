@@ -180,18 +180,13 @@ interface ActivationRewardItem {
   priority: number
 }
 
-// 费率阶梯类型
+// 费率阶梯类型（与 RateStageEditor 组件一致）
 interface RateStageItem {
-  stage_name: string
-  apply_to: number
-  min_days: number
-  max_days: number
+  stage_type: number
+  start_day: number
+  end_day: number
   credit_rate_delta: number
   debit_rate_delta: number
-  unionpay_rate_delta: number
-  wechat_rate_delta: number
-  alipay_rate_delta: number
-  priority: number
 }
 
 // 表单数据
@@ -204,8 +199,8 @@ const form = reactive({
   rate_configs: {} as RateConfigs,
   // 2. 押金返现
   deposit_cashbacks: [] as DepositCashbackItem[],
-  // 3. 流量卡返现
-  sim_cashback: null as SimCashbackConfig | null,
+  // 3. 流量卡返现（undefined 表示未配置）
+  sim_cashback: undefined as SimCashbackConfig | undefined,
   // 4. 激活奖励
   activation_rewards: [] as ActivationRewardItem[],
   // 5. 费率阶梯
