@@ -55,6 +55,7 @@
       <template #action="{ row }">
         <el-button type="primary" link @click="handleView(row)">详情</el-button>
         <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
+        <el-button type="primary" link @click="handleSplitConfig(row)">钱包拆分</el-button>
         <el-button
           :type="row.status === 1 ? 'danger' : 'success'"
           link
@@ -64,6 +65,14 @@
         </el-button>
       </template>
     </ProTable>
+
+    <!-- 钱包拆分配置对话框 -->
+    <AgentWalletSplitConfig
+      v-model="splitConfigVisible"
+      :agent-id="currentAgent?.id ?? 0"
+      :agent-name="currentAgent?.agent_name ?? ''"
+      @saved="fetchData"
+    />
   </div>
 </template>
 
@@ -75,6 +84,7 @@ import { ElMessageBox, ElMessage } from 'element-plus'
 import SearchForm from '@/components/Common/SearchForm.vue'
 import ProTable from '@/components/Common/ProTable.vue'
 import ChannelSelect from '@/components/Common/ChannelSelect.vue'
+import AgentWalletSplitConfig from './AgentWalletSplitConfig.vue'
 import { getAgents, updateAgentStatus } from '@/api/agent'
 import type { Agent } from '@/types'
 
@@ -93,6 +103,10 @@ const loading = ref(false)
 const total = ref(0)
 const page = ref(1)
 const pageSize = ref(10)
+
+// 钱包拆分配置
+const splitConfigVisible = ref(false)
+const currentAgent = ref<Agent | null>(null)
 
 // 获取数据
 async function fetchData() {
@@ -137,6 +151,12 @@ function handleCreate() {
 // 编辑
 function handleEdit(row: Agent) {
   router.push(`/agents/${row.id}/edit`)
+}
+
+// 钱包拆分配置
+function handleSplitConfig(row: Agent) {
+  currentAgent.value = row
+  splitConfigVisible.value = true
 }
 
 // 切换状态

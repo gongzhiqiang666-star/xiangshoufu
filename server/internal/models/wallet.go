@@ -231,6 +231,26 @@ func (PolicyWithdrawThreshold) TableName() string {
 }
 
 // ============================================================
+// 全局提现门槛配置
+// ============================================================
+
+// GlobalWithdrawThreshold 全局提现门槛配置
+// 统一管理各钱包类型的提现门槛，与政策模版无关
+type GlobalWithdrawThreshold struct {
+	ID              int64     `json:"id" gorm:"primaryKey"`
+	WalletType      int16     `json:"wallet_type" gorm:"not null"`             // 钱包类型: 1分润 2服务费 3奖励
+	ChannelID       int64     `json:"channel_id" gorm:"default:0"`             // 通道ID: 0表示通用门槛
+	ThresholdAmount int64     `json:"threshold_amount" gorm:"default:10000"`   // 提现门槛金额（分）
+	CreatedAt       time.Time `json:"created_at" gorm:"default:now()"`
+	UpdatedAt       time.Time `json:"updated_at" gorm:"default:now()"`
+}
+
+// TableName 表名
+func (GlobalWithdrawThreshold) TableName() string {
+	return "global_withdraw_thresholds"
+}
+
+// ============================================================
 // 钱包展示相关DTO
 // ============================================================
 
