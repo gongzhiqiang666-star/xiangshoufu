@@ -1,11 +1,11 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 )
 
 // RateSyncHandler 费率同步处理器
@@ -71,10 +71,7 @@ func (h *RateSyncHandler) GetSyncLogs(c *gin.Context) {
 
 	logs, total, err := h.rateSyncService.GetSyncLogsByMerchant(c.Request.Context(), merchantID, page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
@@ -113,16 +110,7 @@ func (h *RateSyncHandler) GetSyncLogs(c *gin.Context) {
 		items = append(items, item)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"items": items,
-			"total": total,
-			"page":  page,
-			"page_size": pageSize,
-		},
-	})
+	response.SuccessPage(c, items, total, page, pageSize)
 }
 
 // GetSyncLogDetail 获取费率同步日志详情
@@ -138,19 +126,13 @@ func (h *RateSyncHandler) GetSyncLogDetail(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	log, err := h.rateSyncService.GetSyncLogByID(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"code":    404,
-			"message": "记录不存在",
-		})
+		response.NotFound(c, "记录不存在")
 		return
 	}
 
@@ -183,11 +165,7 @@ func (h *RateSyncHandler) GetSyncLogDetail(c *gin.Context) {
 		item.SyncedAt = log.SyncedAt.Format("2006-01-02 15:04:05")
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    item,
-	})
+	response.Success(c, item)
 }
 
 // getSyncStatusName 获取同步状态名称

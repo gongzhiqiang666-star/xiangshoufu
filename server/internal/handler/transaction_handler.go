@@ -1,13 +1,13 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 	"time"
 
 	"xiangshoufu/internal/middleware"
 	"xiangshoufu/internal/repository"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -74,14 +74,10 @@ func (h *TransactionHandler) GetTransactionList(c *gin.Context) {
 
 	transactions, total, err := h.transactionRepo.FindByAgentID(agentID, startTime, endTime, tradeType, pageSize, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
-	// 转换为前端友好格式
 	list := make([]gin.H, 0, len(transactions))
 	for _, tx := range transactions {
 		list = append(list, gin.H{
@@ -104,16 +100,7 @@ func (h *TransactionHandler) GetTransactionList(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      list,
-			"total":     total,
-			"page":      page,
-			"page_size": pageSize,
-		},
-	})
+	response.SuccessPage(c, list, total, page, pageSize)
 }
 
 // GetTransactionStats 获取交易统计
@@ -131,22 +118,18 @@ func (h *TransactionHandler) GetTransactionStats(c *gin.Context) {
 	todayStats, _ := h.transactionRepo.GetAgentDailyStats(agentID, now)
 	monthStats, _ := h.transactionRepo.GetAgentMonthlyStats(agentID, now)
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"today": gin.H{
-				"amount":      todayStats.TotalAmount,
-				"amount_yuan": float64(todayStats.TotalAmount) / 100,
-				"count":       todayStats.TotalCount,
-				"fee":         todayStats.TotalFee,
-			},
-			"month": gin.H{
-				"amount":      monthStats.TotalAmount,
-				"amount_yuan": float64(monthStats.TotalAmount) / 100,
-				"count":       monthStats.TotalCount,
-				"fee":         monthStats.TotalFee,
-			},
+	response.Success(c, gin.H{
+		"today": gin.H{
+			"amount":      todayStats.TotalAmount,
+			"amount_yuan": float64(todayStats.TotalAmount) / 100,
+			"count":       todayStats.TotalCount,
+			"fee":         todayStats.TotalFee,
+		},
+		"month": gin.H{
+			"amount":      monthStats.TotalAmount,
+			"amount_yuan": float64(monthStats.TotalAmount) / 100,
+			"count":       monthStats.TotalCount,
+			"fee":         monthStats.TotalFee,
 		},
 	})
 }
@@ -173,20 +156,13 @@ func (h *TransactionHandler) GetTransactionTrend(c *gin.Context) {
 
 	trend, err := h.transactionRepo.GetTransactionTrend(agentID, startDate, endDate)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"trend": trend,
-			"days":  days,
-		},
+	response.Success(c, gin.H{
+		"trend": trend,
+		"days":  days,
 	})
 }
 

@@ -1,26 +1,23 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"xiangshoufu/internal/middleware"
 	"xiangshoufu/internal/models"
 	"xiangshoufu/internal/repository"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
 
-// AdminMessageHandler 管理端消息处理器
 type AdminMessageHandler struct {
 	messageService *service.MessageService
 	agentRepo      repository.AgentRepository
 }
 
-// NewAdminMessageHandler 创建管理端消息处理器
 func NewAdminMessageHandler(messageService *service.MessageService, agentRepo repository.AgentRepository) *AdminMessageHandler {
-	// 设置代理商仓库用于按层级发送
 	messageService.SetAgentRepo(agentRepo)
 	return &AdminMessageHandler{
 		messageService: messageService,
@@ -41,95 +38,58 @@ func NewAdminMessageHandler(messageService *service.MessageService, agentRepo re
 func (h *AdminMessageHandler) SendMessage(c *gin.Context) {
 	var req service.SendMessageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
-	// 验证消息类型（管理员只能发送系统公告）
 	if req.MessageType != models.MessageTypeAnnouncement {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "管理员只能发送系统公告类型的消息",
-		})
+		response.BadRequest(c, "管理员只能发送系统公告类型的消息")
 		return
 	}
 
-	// 获取目标代理商列表
 	var agentIDs []int64
 	switch req.SendScope {
 	case "all":
-		// 发送给所有代理商
 		agents, err := h.getAllAgentIDs()
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"code":    500,
-				"message": "获取代理商列表失败: " + err.Error(),
-			})
+			response.InternalError(c, "获取代理商列表失败: "+err.Error())
 			return
 		}
 		agentIDs = agents
 	case "agents":
-		// 发送给指定代理商
 		if len(req.AgentIDs) == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"code":    400,
-				"message": "请指定代理商ID列表",
-			})
+			response.BadRequest(c, "请指定代理商ID列表")
 			return
 		}
 		agentIDs = req.AgentIDs
 	case "level":
-		// 发送给指定层级的代理商
 		if req.Level <= 0 || req.Level > 5 {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"code":    400,
-				"message": "层级必须在1-5之间",
-			})
+			response.BadRequest(c, "层级必须在1-5之间")
 			return
 		}
 		agents, err := h.getAgentIDsByLevel(req.Level)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"code":    500,
-				"message": "获取代理商列表失败: " + err.Error(),
-			})
+			response.InternalError(c, "获取代理商列表失败: "+err.Error())
 			return
 		}
 		agentIDs = agents
 	default:
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的发送范围，支持: all/agents/level",
-		})
+		response.BadRequest(c, "无效的发送范围，支持: all/agents/level")
 		return
 	}
 
 	if len(agentIDs) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "没有可发送的代理商",
-		})
+		response.BadRequest(c, "没有可发送的代理商")
 		return
 	}
 
-	// 发送消息
 	if err := h.messageService.AdminSendMessage(&req, agentIDs); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "发送消息失败: " + err.Error(),
-		})
+		response.InternalError(c, "发送消息失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"sent_count": len(agentIDs),
-		},
+	response.Success(c, gin.H{
+		"sent_count": len(agentIDs),
 	})
 }
 
@@ -155,14 +115,10 @@ func (h *AdminMessageHandler) GetMessageList(c *gin.Context) {
 
 	messages, total, err := h.messageService.AdminGetAllMessages(page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
-	// 转换为前端友好格式
 	list := make([]gin.H, 0, len(messages))
 	for _, m := range messages {
 		list = append(list, gin.H{
@@ -178,16 +134,7 @@ func (h *AdminMessageHandler) GetMessageList(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      list,
-			"total":     total,
-			"page":      page,
-			"page_size": pageSize,
-		},
-	})
+	response.SuccessPage(c, list, total, page, pageSize)
 }
 
 // GetMessageDetail 获取消息详情
@@ -203,39 +150,29 @@ func (h *AdminMessageHandler) GetMessageDetail(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	message, err := h.messageService.AdminGetMessageByID(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"code":    404,
-			"message": "消息不存在",
-		})
+		response.NotFound(c, "消息不存在")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"id":           message.ID,
-			"agent_id":     message.AgentID,
-			"title":        message.Title,
-			"content":      message.Content,
-			"message_type": message.MessageType,
-			"type_name":    models.GetMessageTypeName(message.MessageType),
-			"is_read":      message.IsRead,
-			"is_pushed":    message.IsPushed,
-			"related_id":   message.RelatedID,
-			"related_type": message.RelatedType,
-			"expire_at":    message.ExpireAt,
-			"created_at":   message.CreatedAt,
-		},
+	response.Success(c, gin.H{
+		"id":           message.ID,
+		"agent_id":     message.AgentID,
+		"title":        message.Title,
+		"content":      message.Content,
+		"message_type": message.MessageType,
+		"type_name":    models.GetMessageTypeName(message.MessageType),
+		"is_read":      message.IsRead,
+		"is_pushed":    message.IsPushed,
+		"related_id":   message.RelatedID,
+		"related_type": message.RelatedType,
+		"expire_at":    message.ExpireAt,
+		"created_at":   message.CreatedAt,
 	})
 }
 
@@ -252,25 +189,16 @@ func (h *AdminMessageHandler) DeleteMessage(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	if err := h.messageService.AdminDeleteMessage(id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "删除失败: " + err.Error(),
-		})
+		response.InternalError(c, "删除失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-	})
+	response.SuccessMessage(c, "success")
 }
 
 // GetMessageTypes 获取消息类型列表
@@ -293,36 +221,27 @@ func (h *AdminMessageHandler) GetMessageTypes(c *gin.Context) {
 		{"value": models.MessageTypeTransaction, "label": "交易通知", "category": "consumption"},
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    types,
-	})
+	response.Success(c, types)
 }
 
-// getAllAgentIDs 获取所有代理商ID
 func (h *AdminMessageHandler) getAllAgentIDs() ([]int64, error) {
-	// 调用代理商仓库获取所有活跃代理商ID
 	if agentRepo, ok := h.agentRepo.(*repository.GormAgentRepository); ok {
 		return agentRepo.GetAllAgentIDs()
 	}
 	return []int64{}, nil
 }
 
-// getAgentIDsByLevel 根据层级获取代理商ID
 func (h *AdminMessageHandler) getAgentIDsByLevel(level int) ([]int64, error) {
-	// 调用代理商仓库获取指定层级的代理商ID
 	if agentRepo, ok := h.agentRepo.(*repository.GormAgentRepository); ok {
 		return agentRepo.GetAgentIDsByLevel(level)
 	}
 	return []int64{}, nil
 }
 
-// RegisterAdminMessageRoutes 注册管理端消息路由
 func RegisterAdminMessageRoutes(r *gin.RouterGroup, h *AdminMessageHandler, authService *service.AuthService) {
 	messages := r.Group("/admin/messages")
 	messages.Use(middleware.AuthMiddleware(authService))
-	messages.Use(middleware.AdminMiddleware()) // 管理员权限验证
+	messages.Use(middleware.AdminMiddleware())
 	{
 		messages.POST("", h.SendMessage)
 		messages.GET("", h.GetMessageList)

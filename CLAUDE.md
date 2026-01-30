@@ -386,6 +386,82 @@ flutter analyze
 
 ---
 
+## API 响应格式规范（必须遵守）
+
+### 统一响应格式
+
+所有 API 响应必须使用 `pkg/response` 包的统一函数，确保格式一致：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": { ... }
+}
+```
+
+### 可用的响应函数
+
+| 函数 | 用途 | HTTP状态码 |
+|------|------|-----------|
+| `response.Success(c, data)` | 成功响应（带数据） | 200 |
+| `response.SuccessMessage(c, msg)` | 成功响应（仅消息） | 200 |
+| `response.SuccessWithMessage(c, data, msg)` | 成功响应（数据+自定义消息） | 200 |
+| `response.SuccessPage(c, list, total, page, pageSize)` | 分页列表响应 | 200 |
+| `response.Created(c, data)` | 创建成功响应 | 201 |
+| `response.BadRequest(c, msg)` | 参数错误 | 400 |
+| `response.Unauthorized(c, msg)` | 未授权 | 401 |
+| `response.Forbidden(c, msg)` | 禁止访问 | 403 |
+| `response.NotFound(c, msg)` | 资源不存在 | 404 |
+| `response.InternalError(c, msg)` | 服务器错误 | 500 |
+
+### 使用示例
+
+```go
+// ❌ 禁止：直接使用 gin.H
+c.JSON(http.StatusOK, gin.H{
+    "code":    0,
+    "message": "success",
+    "data":    detail,
+})
+
+// ✅ 正确：使用统一响应函数
+response.Success(c, detail)
+
+// ❌ 禁止：手动构造分页响应
+c.JSON(http.StatusOK, gin.H{
+    "code": 0,
+    "message": "success",
+    "data": gin.H{
+        "list":      list,
+        "total":     total,
+        "page":      page,
+        "page_size": pageSize,
+    },
+})
+
+// ✅ 正确：使用分页响应函数
+response.SuccessPage(c, list, total, page, pageSize)
+
+// ❌ 禁止：手动构造错误响应
+c.JSON(http.StatusBadRequest, gin.H{
+    "code":    400,
+    "message": "参数错误",
+})
+
+// ✅ 正确：使用错误响应函数
+response.BadRequest(c, "参数错误")
+```
+
+### 检测违规代码
+
+```bash
+# 检测 Handler 中直接使用 gin.H 的情况（期望结果：0）
+grep -rn "c.JSON.*gin.H" server/internal/handler/*.go | grep -v "_test.go" | wc -l
+```
+
+---
+
 ## PC端布局风格规范
 
 ### 核心原则

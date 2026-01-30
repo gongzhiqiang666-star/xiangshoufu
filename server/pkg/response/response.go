@@ -81,3 +81,51 @@ func NotFound(c *gin.Context, message string) {
 func InternalError(c *gin.Context, message string) {
 	Error(c, http.StatusInternalServerError, message)
 }
+
+// SuccessPage 分页列表成功响应（与现有Handler格式保持一致）
+func SuccessPage(c *gin.Context, list interface{}, total int64, page, pageSize int) {
+	c.JSON(http.StatusOK, Response{
+		Code:    0,
+		Message: "success",
+		Data: gin.H{
+			"list":      list,
+			"total":     total,
+			"page":      page,
+			"page_size": pageSize,
+		},
+	})
+}
+
+// SuccessMessage 无数据成功响应（仅消息）
+func SuccessMessage(c *gin.Context, message string) {
+	c.JSON(http.StatusOK, Response{
+		Code:    0,
+		Message: message,
+	})
+}
+
+// SuccessWithMessage 带数据和消息的成功响应
+func SuccessWithMessage(c *gin.Context, data interface{}, message string) {
+	c.JSON(http.StatusOK, Response{
+		Code:    0,
+		Message: message,
+		Data:    data,
+	})
+}
+
+// Created 201创建成功响应
+func Created(c *gin.Context, data interface{}) {
+	c.JSON(http.StatusCreated, Response{
+		Code:    0,
+		Message: "success",
+		Data:    data,
+	})
+}
+
+// CreatedMessage 201创建成功响应（仅消息）
+func CreatedMessage(c *gin.Context, message string) {
+	c.JSON(http.StatusCreated, Response{
+		Code:    0,
+		Message: message,
+	})
+}

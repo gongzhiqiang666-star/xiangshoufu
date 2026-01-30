@@ -413,7 +413,7 @@ func main() {
 	taxChannelHandler := handler.NewTaxChannelHandler(taxChannelService)
 
 	// 20.4.1 初始化通道服务（费率类型动态化）
-	channelService := service.NewChannelService(channelRepo)
+	channelService := service.NewChannelService(channelRepo, channelConfigRepo)
 	channelHandler := handler.NewChannelHandler(channelService)
 
 	// 20.4.2 初始化通道配置服务（费率范围、押金档位、流量费返现档位）

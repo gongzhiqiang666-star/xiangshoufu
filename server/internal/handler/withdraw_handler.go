@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -33,20 +32,20 @@ func NewWithdrawHandler(withdrawService *service.WithdrawService) *WithdrawHandl
 func (h *WithdrawHandler) CreateWithdraw(c *gin.Context) {
 	agentID := c.GetInt64("agent_id")
 	if agentID == 0 {
-		response.Error(c, http.StatusUnauthorized, "未登录")
+		response.Unauthorized(c, "未登录")
 		return
 	}
 
 	var req service.CreateWithdrawRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "参数错误: "+err.Error())
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 	req.AgentID = agentID
 
 	record, err := h.withdrawService.CreateWithdraw(&req)
 	if err != nil {
-		response.Error(c, http.StatusBadRequest, err.Error())
+		response.BadRequest(c, err.Error())
 		return
 	}
 
@@ -73,7 +72,7 @@ func (h *WithdrawHandler) CreateWithdraw(c *gin.Context) {
 func (h *WithdrawHandler) GetWithdrawList(c *gin.Context) {
 	agentID := c.GetInt64("agent_id")
 	if agentID == 0 {
-		response.Error(c, http.StatusUnauthorized, "未登录")
+		response.Unauthorized(c, "未登录")
 		return
 	}
 
@@ -90,16 +89,11 @@ func (h *WithdrawHandler) GetWithdrawList(c *gin.Context) {
 
 	list, total, err := h.withdrawService.GetWithdrawList(agentID, status, page, pageSize)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, err.Error())
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	response.Success(c, gin.H{
-		"list":      list,
-		"total":     total,
-		"page":      page,
-		"page_size": pageSize,
-	})
+	response.SuccessPage(c, list, total, page, pageSize)
 }
 
 // GetWithdrawDetail 获取提现详情
@@ -114,19 +108,19 @@ func (h *WithdrawHandler) GetWithdrawList(c *gin.Context) {
 func (h *WithdrawHandler) GetWithdrawDetail(c *gin.Context) {
 	agentID := c.GetInt64("agent_id")
 	if agentID == 0 {
-		response.Error(c, http.StatusUnauthorized, "未登录")
+		response.Unauthorized(c, "未登录")
 		return
 	}
 
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		response.Error(c, http.StatusBadRequest, "参数错误")
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
 	detail, err := h.withdrawService.GetWithdrawDetail(agentID, id)
 	if err != nil {
-		response.Error(c, http.StatusBadRequest, err.Error())
+		response.BadRequest(c, err.Error())
 		return
 	}
 
@@ -144,13 +138,13 @@ func (h *WithdrawHandler) GetWithdrawDetail(c *gin.Context) {
 func (h *WithdrawHandler) GetWithdrawStats(c *gin.Context) {
 	agentID := c.GetInt64("agent_id")
 	if agentID == 0 {
-		response.Error(c, http.StatusUnauthorized, "未登录")
+		response.Unauthorized(c, "未登录")
 		return
 	}
 
 	stats, err := h.withdrawService.GetWithdrawStats(agentID)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, err.Error())
+		response.InternalError(c, err.Error())
 		return
 	}
 
@@ -169,18 +163,18 @@ func (h *WithdrawHandler) GetWithdrawStats(c *gin.Context) {
 func (h *WithdrawHandler) CancelWithdraw(c *gin.Context) {
 	agentID := c.GetInt64("agent_id")
 	if agentID == 0 {
-		response.Error(c, http.StatusUnauthorized, "未登录")
+		response.Unauthorized(c, "未登录")
 		return
 	}
 
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		response.Error(c, http.StatusBadRequest, "参数错误")
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
 	if err := h.withdrawService.CancelWithdraw(agentID, id); err != nil {
-		response.Error(c, http.StatusBadRequest, err.Error())
+		response.BadRequest(c, err.Error())
 		return
 	}
 
@@ -205,16 +199,11 @@ func (h *WithdrawHandler) GetPendingList(c *gin.Context) {
 
 	list, total, err := h.withdrawService.GetPendingList(page, pageSize)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, err.Error())
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	response.Success(c, gin.H{
-		"list":      list,
-		"total":     total,
-		"page":      page,
-		"page_size": pageSize,
-	})
+	response.SuccessPage(c, list, total, page, pageSize)
 }
 
 // ApproveWithdrawRequest 审核通过请求
@@ -235,13 +224,13 @@ type ApproveWithdrawRequest struct {
 func (h *WithdrawHandler) ApproveWithdraw(c *gin.Context) {
 	userID := c.GetInt64("user_id")
 	if userID == 0 {
-		response.Error(c, http.StatusUnauthorized, "未登录")
+		response.Unauthorized(c, "未登录")
 		return
 	}
 
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		response.Error(c, http.StatusBadRequest, "参数错误")
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
@@ -249,7 +238,7 @@ func (h *WithdrawHandler) ApproveWithdraw(c *gin.Context) {
 	c.ShouldBindJSON(&req)
 
 	if err := h.withdrawService.ApproveWithdraw(id, userID, req.Remark); err != nil {
-		response.Error(c, http.StatusBadRequest, err.Error())
+		response.BadRequest(c, err.Error())
 		return
 	}
 
@@ -274,24 +263,24 @@ type RejectWithdrawRequest struct {
 func (h *WithdrawHandler) RejectWithdraw(c *gin.Context) {
 	userID := c.GetInt64("user_id")
 	if userID == 0 {
-		response.Error(c, http.StatusUnauthorized, "未登录")
+		response.Unauthorized(c, "未登录")
 		return
 	}
 
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		response.Error(c, http.StatusBadRequest, "参数错误")
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
 	var req RejectWithdrawRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "请填写拒绝原因")
+		response.BadRequest(c, "请填写拒绝原因")
 		return
 	}
 
 	if err := h.withdrawService.RejectWithdraw(id, userID, req.Reason); err != nil {
-		response.Error(c, http.StatusBadRequest, err.Error())
+		response.BadRequest(c, err.Error())
 		return
 	}
 
@@ -317,24 +306,24 @@ type ConfirmPaidRequest struct {
 func (h *WithdrawHandler) ConfirmPaid(c *gin.Context) {
 	userID := c.GetInt64("user_id")
 	if userID == 0 {
-		response.Error(c, http.StatusUnauthorized, "未登录")
+		response.Unauthorized(c, "未登录")
 		return
 	}
 
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		response.Error(c, http.StatusBadRequest, "参数错误")
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
 	var req ConfirmPaidRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "请填写打款流水号")
+		response.BadRequest(c, "请填写打款流水号")
 		return
 	}
 
 	if err := h.withdrawService.ConfirmPaid(id, userID, req.PaidRef, req.Remark); err != nil {
-		response.Error(c, http.StatusBadRequest, err.Error())
+		response.BadRequest(c, err.Error())
 		return
 	}
 

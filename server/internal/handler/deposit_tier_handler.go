@@ -1,11 +1,11 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 )
 
 // DepositTierHandler 押金档位处理器
@@ -50,13 +50,13 @@ func (h *DepositTierHandler) List(c *gin.Context) {
 	brandCode := c.Query("brand_code")
 
 	if channelIDStr == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "channel_id is required"})
+		response.BadRequest(c, "channel_id is required")
 		return
 	}
 
 	channelID, err := strconv.ParseInt(channelIDStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid channel_id"})
+		response.BadRequest(c, "invalid channel_id")
 		return
 	}
 
@@ -68,11 +68,11 @@ func (h *DepositTierHandler) List(c *gin.Context) {
 	}
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": tiers})
+	response.Success(c, tiers)
 }
 
 // ListByChannel 根据通道ID获取押金档位列表
@@ -90,7 +90,7 @@ func (h *DepositTierHandler) ListByChannel(c *gin.Context) {
 
 	channelID, err := strconv.ParseInt(channelIDStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid channel_id"})
+		response.BadRequest(c, "invalid channel_id")
 		return
 	}
 
@@ -102,11 +102,11 @@ func (h *DepositTierHandler) ListByChannel(c *gin.Context) {
 	}
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": tiers})
+	response.Success(c, tiers)
 }
 
 // GetByID 根据ID获取押金档位
@@ -121,17 +121,17 @@ func (h *DepositTierHandler) GetByID(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid id"})
+		response.BadRequest(c, "invalid id")
 		return
 	}
 
 	tier, err := h.service.GetByID(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": err.Error()})
+		response.NotFound(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": tier})
+	response.Success(c, tier)
 }
 
 // Create 创建押金档位
@@ -145,17 +145,17 @@ func (h *DepositTierHandler) GetByID(c *gin.Context) {
 func (h *DepositTierHandler) Create(c *gin.Context) {
 	var req service.CreateDepositTierRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
 	tier, err := h.service.Create(&req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "创建成功", "data": tier})
+	response.SuccessWithMessage(c, tier, "创建成功")
 }
 
 // Update 更新押金档位
@@ -171,23 +171,23 @@ func (h *DepositTierHandler) Update(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid id"})
+		response.BadRequest(c, "invalid id")
 		return
 	}
 
 	var req service.UpdateDepositTierRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
 	tier, err := h.service.Update(id, &req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "更新成功", "data": tier})
+	response.SuccessWithMessage(c, tier, "更新成功")
 }
 
 // Delete 删除押金档位
@@ -202,14 +202,14 @@ func (h *DepositTierHandler) Delete(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid id"})
+		response.BadRequest(c, "invalid id")
 		return
 	}
 
 	if err := h.service.Delete(id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "删除成功"})
+	response.SuccessMessage(c, "删除成功")
 }

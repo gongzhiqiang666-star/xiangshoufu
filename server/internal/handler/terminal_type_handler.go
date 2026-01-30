@@ -1,11 +1,11 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"xiangshoufu/internal/models"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -49,10 +49,7 @@ func (h *TerminalTypeHandler) RegisterRoutes(rg *gin.RouterGroup) {
 func (h *TerminalTypeHandler) List(c *gin.Context) {
 	var req service.TerminalTypeListRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -65,23 +62,11 @@ func (h *TerminalTypeHandler) List(c *gin.Context) {
 
 	list, total, err := h.svc.List(c.Request.Context(), &req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "获取列表失败: " + err.Error(),
-		})
+		response.InternalError(c, "获取列表失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      h.svc.ToResponseList(list),
-			"total":     total,
-			"page":      req.Page,
-			"page_size": req.PageSize,
-		},
-	})
+	response.SuccessPage(c, h.svc.ToResponseList(list), total, req.Page, req.PageSize)
 }
 
 // Create 创建终端类型
@@ -95,27 +80,17 @@ func (h *TerminalTypeHandler) List(c *gin.Context) {
 func (h *TerminalTypeHandler) Create(c *gin.Context) {
 	var req service.CreateTerminalTypeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
 	terminalType, err := h.svc.Create(c.Request.Context(), &req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "创建成功",
-		"data":    h.svc.ToResponse(terminalType),
-	})
+	response.SuccessWithMessage(c, h.svc.ToResponse(terminalType), "创建成功")
 }
 
 // GetByID 获取终端类型详情
@@ -129,27 +104,17 @@ func (h *TerminalTypeHandler) Create(c *gin.Context) {
 func (h *TerminalTypeHandler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	terminalType, err := h.svc.GetByID(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"code":    404,
-			"message": err.Error(),
-		})
+		response.NotFound(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    h.svc.ToResponse(terminalType),
-	})
+	response.Success(c, h.svc.ToResponse(terminalType))
 }
 
 // Update 更新终端类型
@@ -164,36 +129,23 @@ func (h *TerminalTypeHandler) GetByID(c *gin.Context) {
 func (h *TerminalTypeHandler) Update(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	var req service.UpdateTerminalTypeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
 	terminalType, err := h.svc.Update(c.Request.Context(), id, &req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "更新成功",
-		"data":    h.svc.ToResponse(terminalType),
-	})
+	response.SuccessWithMessage(c, h.svc.ToResponse(terminalType), "更新成功")
 }
 
 // UpdateStatus 更新状态
@@ -208,10 +160,7 @@ func (h *TerminalTypeHandler) Update(c *gin.Context) {
 func (h *TerminalTypeHandler) UpdateStatus(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
@@ -219,18 +168,12 @@ func (h *TerminalTypeHandler) UpdateStatus(c *gin.Context) {
 		Status int16 `json:"status" binding:"oneof=0 1"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
 	if err := h.svc.UpdateStatus(c.Request.Context(), id, req.Status); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
@@ -239,10 +182,7 @@ func (h *TerminalTypeHandler) UpdateStatus(c *gin.Context) {
 		statusText = "启用"
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": statusText + "成功",
-	})
+	response.SuccessMessage(c, statusText+"成功")
 }
 
 // Delete 删除终端类型
@@ -256,25 +196,16 @@ func (h *TerminalTypeHandler) UpdateStatus(c *gin.Context) {
 func (h *TerminalTypeHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	if err := h.svc.Delete(c.Request.Context(), id); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "删除成功",
-	})
+	response.SuccessMessage(c, "删除成功")
 }
 
 // ListByChannel 根据通道ID获取终端类型列表（用于下拉选择）
@@ -288,25 +219,15 @@ func (h *TerminalTypeHandler) Delete(c *gin.Context) {
 func (h *TerminalTypeHandler) ListByChannel(c *gin.Context) {
 	channelID, err := strconv.ParseInt(c.Param("channel_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的通道ID",
-		})
+		response.BadRequest(c, "无效的通道ID")
 		return
 	}
 
 	list, err := h.svc.ListByChannelID(c.Request.Context(), channelID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "获取列表失败: " + err.Error(),
-		})
+		response.InternalError(c, "获取列表失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    h.svc.ToResponseList(list),
-	})
+	response.Success(c, h.svc.ToResponseList(list))
 }

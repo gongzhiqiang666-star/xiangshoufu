@@ -1,11 +1,11 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"xiangshoufu/internal/middleware"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -38,10 +38,7 @@ func (h *AgentChannelHandler) GetAgentChannels(c *gin.Context) {
 	if idStr := c.Query("agent_id"); idStr != "" {
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"code":    400,
-				"message": "无效的代理商ID",
-			})
+			response.BadRequest(c, "无效的代理商ID")
 			return
 		}
 		agentID = id
@@ -49,19 +46,11 @@ func (h *AgentChannelHandler) GetAgentChannels(c *gin.Context) {
 
 	channels, err := h.agentChannelService.GetAgentChannels(agentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "获取通道列表失败",
-			"error":   err.Error(),
-		})
+		response.InternalError(c, "获取通道列表失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    channels,
-	})
+	response.Success(c, channels)
 }
 
 // GetEnabledChannels 获取已启用的通道列表（用于APP端）
@@ -77,19 +66,11 @@ func (h *AgentChannelHandler) GetEnabledChannels(c *gin.Context) {
 
 	channels, err := h.agentChannelService.GetEnabledChannels(agentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "获取通道列表失败",
-			"error":   err.Error(),
-		})
+		response.InternalError(c, "获取通道列表失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    channels,
-	})
+	response.Success(c, channels)
 }
 
 // EnableChannelRequest 启用通道请求
@@ -111,28 +92,17 @@ type EnableChannelRequest struct {
 func (h *AgentChannelHandler) EnableChannel(c *gin.Context) {
 	var req EnableChannelRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误",
-			"error":   err.Error(),
-		})
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
 	operatorID := middleware.GetCurrentUserID(c)
 	if err := h.agentChannelService.EnableChannel(req.AgentID, req.ChannelID, operatorID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "启用通道失败",
-			"error":   err.Error(),
-		})
+		response.InternalError(c, "启用通道失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "启用成功",
-	})
+	response.SuccessMessage(c, "启用成功")
 }
 
 // DisableChannel 禁用代理商通道
@@ -148,28 +118,17 @@ func (h *AgentChannelHandler) EnableChannel(c *gin.Context) {
 func (h *AgentChannelHandler) DisableChannel(c *gin.Context) {
 	var req EnableChannelRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误",
-			"error":   err.Error(),
-		})
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
 	operatorID := middleware.GetCurrentUserID(c)
 	if err := h.agentChannelService.DisableChannel(req.AgentID, req.ChannelID, operatorID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "禁用通道失败",
-			"error":   err.Error(),
-		})
+		response.InternalError(c, "禁用通道失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "禁用成功",
-	})
+	response.SuccessMessage(c, "禁用成功")
 }
 
 // SetChannelVisibilityRequest 设置通道可见性请求
@@ -192,27 +151,16 @@ type SetChannelVisibilityRequest struct {
 func (h *AgentChannelHandler) SetChannelVisibility(c *gin.Context) {
 	var req SetChannelVisibilityRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误",
-			"error":   err.Error(),
-		})
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
 	if err := h.agentChannelService.SetChannelVisibility(req.AgentID, req.ChannelID, req.IsVisible); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "设置可见性失败",
-			"error":   err.Error(),
-		})
+		response.InternalError(c, "设置可见性失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "设置成功",
-	})
+	response.SuccessMessage(c, "设置成功")
 }
 
 // BatchEnableChannelsRequest 批量启用通道请求
@@ -234,28 +182,17 @@ type BatchEnableChannelsRequest struct {
 func (h *AgentChannelHandler) BatchEnableChannels(c *gin.Context) {
 	var req BatchEnableChannelsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误",
-			"error":   err.Error(),
-		})
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
 	operatorID := middleware.GetCurrentUserID(c)
 	if err := h.agentChannelService.BatchEnableChannels(req.AgentID, req.ChannelIDs, operatorID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "批量启用失败",
-			"error":   err.Error(),
-		})
+		response.InternalError(c, "批量启用失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "批量启用成功",
-	})
+	response.SuccessMessage(c, "批量启用成功")
 }
 
 // BatchDisableChannels 批量禁用通道
@@ -271,28 +208,17 @@ func (h *AgentChannelHandler) BatchEnableChannels(c *gin.Context) {
 func (h *AgentChannelHandler) BatchDisableChannels(c *gin.Context) {
 	var req BatchEnableChannelsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误",
-			"error":   err.Error(),
-		})
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
 	operatorID := middleware.GetCurrentUserID(c)
 	if err := h.agentChannelService.BatchDisableChannels(req.AgentID, req.ChannelIDs, operatorID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "批量禁用失败",
-			"error":   err.Error(),
-		})
+		response.InternalError(c, "批量禁用失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "批量禁用成功",
-	})
+	response.SuccessMessage(c, "批量禁用成功")
 }
 
 // GetAgentChannelStats 获取代理商通道统计
@@ -310,10 +236,7 @@ func (h *AgentChannelHandler) GetAgentChannelStats(c *gin.Context) {
 	if idStr := c.Query("agent_id"); idStr != "" {
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"code":    400,
-				"message": "无效的代理商ID",
-			})
+			response.BadRequest(c, "无效的代理商ID")
 			return
 		}
 		agentID = id
@@ -321,19 +244,11 @@ func (h *AgentChannelHandler) GetAgentChannelStats(c *gin.Context) {
 
 	stats, err := h.agentChannelService.GetAgentChannelStats(agentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "获取统计失败",
-			"error":   err.Error(),
-		})
+		response.InternalError(c, "获取统计失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    stats,
-	})
+	response.Success(c, stats)
 }
 
 // InitAgentChannelsRequest 初始化代理商通道请求
@@ -354,28 +269,17 @@ type InitAgentChannelsRequest struct {
 func (h *AgentChannelHandler) InitAgentChannels(c *gin.Context) {
 	var req InitAgentChannelsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误",
-			"error":   err.Error(),
-		})
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
 	operatorID := middleware.GetCurrentUserID(c)
 	if err := h.agentChannelService.InitAgentChannels(req.AgentID, operatorID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "初始化失败",
-			"error":   err.Error(),
-		})
+		response.InternalError(c, "初始化失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "初始化成功",
-	})
+	response.SuccessMessage(c, "初始化成功")
 }
 
 // GetAllChannels 获取所有可用通道列表
@@ -389,19 +293,11 @@ func (h *AgentChannelHandler) InitAgentChannels(c *gin.Context) {
 func (h *AgentChannelHandler) GetAllChannels(c *gin.Context) {
 	channels, err := h.agentChannelService.GetAllChannels()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "获取通道列表失败",
-			"error":   err.Error(),
-		})
+		response.InternalError(c, "获取通道列表失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    channels,
-	})
+	response.Success(c, channels)
 }
 
 // RegisterAgentChannelRoutes 注册代理商通道路由

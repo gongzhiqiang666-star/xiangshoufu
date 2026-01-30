@@ -1,11 +1,11 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"xiangshoufu/internal/models"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -45,10 +45,7 @@ type DistributeTerminalRequest struct {
 func (h *TerminalDistributeHandler) DistributeTerminal(c *gin.Context) {
 	var req DistributeTerminalRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -72,18 +69,11 @@ func (h *TerminalDistributeHandler) DistributeTerminal(c *gin.Context) {
 
 	distribute, err := h.distributeService.DistributeTerminal(serviceReq)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "下发成功，等待接收方确认",
-		"data":    distribute,
-	})
+	response.SuccessWithMessage(c, distribute, "下发成功，等待接收方确认")
 }
 
 // ConfirmDistribute 确认接收终端
@@ -98,27 +88,18 @@ func (h *TerminalDistributeHandler) ConfirmDistribute(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	confirmedBy := getCurrentUserID(c)
 
 	if err := h.distributeService.ConfirmDistribute(id, confirmedBy); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "确认成功",
-	})
+	response.SuccessMessage(c, "确认成功")
 }
 
 // RejectDistribute 拒绝终端下发
@@ -133,27 +114,18 @@ func (h *TerminalDistributeHandler) RejectDistribute(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	confirmedBy := getCurrentUserID(c)
 
 	if err := h.distributeService.RejectDistribute(id, confirmedBy); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "已拒绝",
-	})
+	response.SuccessMessage(c, "已拒绝")
 }
 
 // CancelDistribute 取消终端下发
@@ -168,27 +140,18 @@ func (h *TerminalDistributeHandler) CancelDistribute(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	cancelBy := getCurrentAgentID(c)
 
 	if err := h.distributeService.CancelDistribute(id, cancelBy); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "已取消",
-	})
+	response.SuccessMessage(c, "已取消")
 }
 
 // GetDistributeListRequest 获取下发列表请求
@@ -213,10 +176,7 @@ type GetDistributeListRequest struct {
 func (h *TerminalDistributeHandler) GetDistributeList(c *gin.Context) {
 	var req GetDistributeListRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -225,23 +185,11 @@ func (h *TerminalDistributeHandler) GetDistributeList(c *gin.Context) {
 
 	list, total, err := h.distributeService.GetDistributeList(agentID, req.Direction, req.Status, req.PageSize, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      list,
-			"total":     total,
-			"page":      req.Page,
-			"page_size": req.PageSize,
-		},
-	})
+	response.SuccessPage(c, list, total, req.Page, req.PageSize)
 }
 
 // RegisterTerminalDistributeRoutes 注册终端下发路由

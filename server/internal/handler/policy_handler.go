@@ -1,24 +1,22 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"xiangshoufu/internal/middleware"
 	"xiangshoufu/internal/repository"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
 
-// PolicyHandler 政策处理器
 type PolicyHandler struct {
 	policyTemplateRepo *repository.GormPolicyTemplateRepository
 	agentPolicyRepo    *repository.GormAgentPolicyRepository
 	policyService      *service.PolicyService
 }
 
-// NewPolicyHandler 创建政策处理器
 func NewPolicyHandler(
 	policyTemplateRepo *repository.GormPolicyTemplateRepository,
 	agentPolicyRepo *repository.GormAgentPolicyRepository,
@@ -56,23 +54,11 @@ func (h *PolicyHandler) GetPolicyTemplates(c *gin.Context) {
 
 	list, total, err := h.policyService.GetPolicyTemplateList(channelID, page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      list,
-			"total":     total,
-			"page":      page,
-			"page_size": pageSize,
-		},
-	})
+	response.SuccessPage(c, list, total, page, pageSize)
 }
 
 // GetPolicyTemplateDetail 获取政策模板详情（含4块政策配置）
@@ -88,27 +74,17 @@ func (h *PolicyHandler) GetPolicyTemplateDetail(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	detail, err := h.policyService.GetPolicyTemplateDetail(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"code":    404,
-			"message": "模板不存在",
-		})
+		response.NotFound(c, "模板不存在")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    detail,
-	})
+	response.Success(c, detail)
 }
 
 // CreatePolicyTemplate 创建政策模板
@@ -124,27 +100,17 @@ func (h *PolicyHandler) GetPolicyTemplateDetail(c *gin.Context) {
 func (h *PolicyHandler) CreatePolicyTemplate(c *gin.Context) {
 	var req service.CreatePolicyTemplateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
 	result, err := h.policyService.CreatePolicyTemplate(&req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "创建成功",
-		"data":    result,
-	})
+	response.Success(c, result)
 }
 
 // UpdatePolicyTemplate 更新政策模板
@@ -162,36 +128,23 @@ func (h *PolicyHandler) UpdatePolicyTemplate(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	var req service.CreatePolicyTemplateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
 	result, err := h.policyService.UpdatePolicyTemplate(id, &req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "更新成功",
-		"data":    result,
-	})
+	response.Success(c, result)
 }
 
 // GetMyPolicies 获取我的政策（只读）
@@ -209,18 +162,11 @@ func (h *PolicyHandler) GetMyPolicies(c *gin.Context) {
 
 	policy, err := h.policyService.GetAgentPolicy(agentID, channelID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    policy,
-	})
+	response.Success(c, policy)
 }
 
 // AssignAgentPolicy 分配政策给代理商
@@ -238,36 +184,24 @@ func (h *PolicyHandler) AssignAgentPolicy(c *gin.Context) {
 	agentIDStr := c.Param("id")
 	agentID, err := strconv.ParseInt(agentIDStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的代理商ID",
-		})
+		response.BadRequest(c, "无效的代理商ID")
 		return
 	}
 
 	var req service.AssignAgentPolicyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 	req.AgentID = agentID
 
 	operatorID := middleware.GetCurrentAgentID(c)
 	if err := h.policyService.AssignAgentPolicy(&req, operatorID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "分配成功",
-	})
+	response.SuccessMessage(c, "分配成功")
 }
 
 // GetSubordinatePolicy 获取下级代理商政策（APP用）
@@ -284,36 +218,24 @@ func (h *PolicyHandler) GetSubordinatePolicy(c *gin.Context) {
 	subordinateIDStr := c.Param("id")
 	subordinateID, err := strconv.ParseInt(subordinateIDStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的代理商ID",
-		})
+		response.BadRequest(c, "无效的代理商ID")
 		return
 	}
 
 	channelID, _ := strconv.ParseInt(c.DefaultQuery("channel_id", "1"), 10, 64)
 
-	// 获取下级政策
 	policy, err := h.policyService.GetAgentPolicy(subordinateID, channelID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
-	// 获取当前代理商的政策限制
 	operatorID := middleware.GetCurrentAgentID(c)
 	limits, _ := h.policyService.GetPolicyLimits(operatorID, channelID)
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"policy": policy,
-			"limits": limits,
-		},
+	response.Success(c, gin.H{
+		"policy": policy,
+		"limits": limits,
 	})
 }
 
@@ -332,36 +254,24 @@ func (h *PolicyHandler) UpdateSubordinatePolicy(c *gin.Context) {
 	subordinateIDStr := c.Param("id")
 	subordinateID, err := strconv.ParseInt(subordinateIDStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的代理商ID",
-		})
+		response.BadRequest(c, "无效的代理商ID")
 		return
 	}
 
 	var req service.UpdateSubordinatePolicyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 	req.SubordinateID = subordinateID
 
 	operatorID := middleware.GetCurrentAgentID(c)
 	if err := h.policyService.UpdateSubordinatePolicy(operatorID, &req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "更新成功",
-	})
+	response.SuccessMessage(c, "更新成功")
 }
 
 // GetPolicyLimits 获取政策限制（当前代理商可设置的范围）
@@ -379,46 +289,33 @@ func (h *PolicyHandler) GetPolicyLimits(c *gin.Context) {
 
 	limits, err := h.policyService.GetPolicyLimits(agentID, channelID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    limits,
-	})
+	response.Success(c, limits)
 }
 
-// RegisterPolicyRoutes 注册政策路由
 func RegisterPolicyRoutes(r *gin.RouterGroup, h *PolicyHandler, authService *service.AuthService) {
 	policies := r.Group("/policies")
 	policies.Use(middleware.AuthMiddleware(authService))
 	{
-		// 政策模板管理
 		policies.GET("/templates", h.GetPolicyTemplates)
 		policies.POST("/templates", h.CreatePolicyTemplate)
 		policies.GET("/templates/:id", h.GetPolicyTemplateDetail)
 		policies.PUT("/templates/:id", h.UpdatePolicyTemplate)
 
-		// 我的政策（只读）
 		policies.GET("/my", h.GetMyPolicies)
 
-		// 政策限制
 		policies.GET("/limits", h.GetPolicyLimits)
 	}
 
-	// 代理商政策分配
 	agents := r.Group("/agents")
 	agents.Use(middleware.AuthMiddleware(authService))
 	{
 		agents.POST("/:id/policies", h.AssignAgentPolicy)
 	}
 
-	// 下级代理商政策管理（APP端用）
 	subordinates := r.Group("/subordinates")
 	subordinates.Use(middleware.AuthMiddleware(authService))
 	{

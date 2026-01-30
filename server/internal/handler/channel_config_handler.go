@@ -1,11 +1,11 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"xiangshoufu/internal/models"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -34,17 +34,17 @@ func NewChannelConfigHandler(svc service.ChannelConfigService) *ChannelConfigHan
 func (h *ChannelConfigHandler) GetRateConfigs(c *gin.Context) {
 	channelID, err := strconv.ParseInt(c.Param("channelId"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的通道ID"})
+		response.BadRequest(c, "无效的通道ID")
 		return
 	}
 
 	configs, err := h.svc.GetRateConfigs(c.Request.Context(), channelID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"code": 0, "data": configs})
+	response.Success(c, configs)
 }
 
 // CreateRateConfig 创建费率配置
@@ -59,23 +59,23 @@ func (h *ChannelConfigHandler) GetRateConfigs(c *gin.Context) {
 func (h *ChannelConfigHandler) CreateRateConfig(c *gin.Context) {
 	channelID, err := strconv.ParseInt(c.Param("channelId"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的通道ID"})
+		response.BadRequest(c, "无效的通道ID")
 		return
 	}
 
 	var req models.CreateChannelRateConfigRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
 	config, err := h.svc.CreateRateConfig(c.Request.Context(), channelID, &req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"code": 0, "data": config})
+	response.Success(c, config)
 }
 
 // UpdateRateConfig 更新费率配置
@@ -91,28 +91,28 @@ func (h *ChannelConfigHandler) CreateRateConfig(c *gin.Context) {
 func (h *ChannelConfigHandler) UpdateRateConfig(c *gin.Context) {
 	channelID, err := strconv.ParseInt(c.Param("channelId"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的通道ID"})
+		response.BadRequest(c, "无效的通道ID")
 		return
 	}
 
 	configID, err := strconv.ParseInt(c.Param("configId"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的配置ID"})
+		response.BadRequest(c, "无效的配置ID")
 		return
 	}
 
 	var req models.UpdateChannelRateConfigRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
 	if err := h.svc.UpdateRateConfig(c.Request.Context(), channelID, configID, &req); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "更新成功"})
+	response.SuccessMessage(c, "更新成功")
 }
 
 // DeleteRateConfig 删除费率配置
@@ -125,22 +125,22 @@ func (h *ChannelConfigHandler) UpdateRateConfig(c *gin.Context) {
 func (h *ChannelConfigHandler) DeleteRateConfig(c *gin.Context) {
 	channelID, err := strconv.ParseInt(c.Param("channelId"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的通道ID"})
+		response.BadRequest(c, "无效的通道ID")
 		return
 	}
 
 	configID, err := strconv.ParseInt(c.Param("configId"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的配置ID"})
+		response.BadRequest(c, "无效的配置ID")
 		return
 	}
 
 	if err := h.svc.DeleteRateConfig(c.Request.Context(), channelID, configID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "删除成功"})
+	response.SuccessMessage(c, "删除成功")
 }
 
 // ============================================================
@@ -157,17 +157,17 @@ func (h *ChannelConfigHandler) DeleteRateConfig(c *gin.Context) {
 func (h *ChannelConfigHandler) GetDepositTiers(c *gin.Context) {
 	channelID, err := strconv.ParseInt(c.Param("channelId"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的通道ID"})
+		response.BadRequest(c, "无效的通道ID")
 		return
 	}
 
 	tiers, err := h.svc.GetDepositTiers(c.Request.Context(), channelID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"code": 0, "data": tiers})
+	response.Success(c, tiers)
 }
 
 // UpdateDepositTier 更新押金档位
@@ -183,28 +183,28 @@ func (h *ChannelConfigHandler) GetDepositTiers(c *gin.Context) {
 func (h *ChannelConfigHandler) UpdateDepositTier(c *gin.Context) {
 	channelID, err := strconv.ParseInt(c.Param("channelId"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的通道ID"})
+		response.BadRequest(c, "无效的通道ID")
 		return
 	}
 
 	tierID, err := strconv.ParseInt(c.Param("tierId"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的档位ID"})
+		response.BadRequest(c, "无效的档位ID")
 		return
 	}
 
 	var req models.UpdateChannelDepositTierRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
 	if err := h.svc.UpdateDepositTier(c.Request.Context(), channelID, tierID, &req); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "更新成功"})
+	response.SuccessMessage(c, "更新成功")
 }
 
 // ============================================================
@@ -221,17 +221,17 @@ func (h *ChannelConfigHandler) UpdateDepositTier(c *gin.Context) {
 func (h *ChannelConfigHandler) GetSimCashbackTiers(c *gin.Context) {
 	channelID, err := strconv.ParseInt(c.Param("channelId"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的通道ID"})
+		response.BadRequest(c, "无效的通道ID")
 		return
 	}
 
 	tiers, err := h.svc.GetSimCashbackTiers(c.Request.Context(), channelID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"code": 0, "data": tiers})
+	response.Success(c, tiers)
 }
 
 // BatchSetSimCashbackTiers 批量设置流量费返现档位
@@ -246,22 +246,22 @@ func (h *ChannelConfigHandler) GetSimCashbackTiers(c *gin.Context) {
 func (h *ChannelConfigHandler) BatchSetSimCashbackTiers(c *gin.Context) {
 	channelID, err := strconv.ParseInt(c.Param("channelId"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的通道ID"})
+		response.BadRequest(c, "无效的通道ID")
 		return
 	}
 
 	var req models.BatchSetSimCashbackTiersRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
 	if err := h.svc.BatchSetSimCashbackTiers(c.Request.Context(), channelID, &req); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "设置成功"})
+	response.SuccessMessage(c, "设置成功")
 }
 
 // ============================================================
@@ -278,15 +278,15 @@ func (h *ChannelConfigHandler) BatchSetSimCashbackTiers(c *gin.Context) {
 func (h *ChannelConfigHandler) GetFullConfig(c *gin.Context) {
 	channelID, err := strconv.ParseInt(c.Param("channelId"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的通道ID"})
+		response.BadRequest(c, "无效的通道ID")
 		return
 	}
 
 	config, err := h.svc.GetFullConfig(c.Request.Context(), channelID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"code": 0, "data": config})
+	response.Success(c, config)
 }

@@ -1,10 +1,9 @@
 package handler
 
 import (
-	"net/http"
-
 	"xiangshoufu/internal/middleware"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -48,39 +47,25 @@ func (h *TerminalRateHandler) UpdateTerminalRate(c *gin.Context) {
 
 	terminalSN := c.Param("sn")
 	if terminalSN == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "终端SN不能为空",
-		})
+		response.BadRequest(c, "终端SN不能为空")
 		return
 	}
 
 	var req UpdateTerminalRateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
-	// 验证费率范围（万分比，通常在50-100之间，即0.5%-1%）
 	if req.CreditRate < 0 || req.CreditRate > 1000 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "贷记卡费率范围无效（0-1000万分比）",
-		})
+		response.BadRequest(c, "贷记卡费率范围无效（0-1000万分比）")
 		return
 	}
 	if req.DebitRate < 0 || req.DebitRate > 1000 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "借记卡费率范围无效（0-1000万分比）",
-		})
+		response.BadRequest(c, "借记卡费率范围无效（0-1000万分比）")
 		return
 	}
 
-	// 调用服务层批量设置费率（单个终端）
 	batchReq := &service.BatchSetRateRequest{
 		TerminalSNs:  []string{terminalSN},
 		AgentID:      agentID,
@@ -95,35 +80,23 @@ func (h *TerminalRateHandler) UpdateTerminalRate(c *gin.Context) {
 
 	result, err := h.terminalService.BatchSetRate(batchReq)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "费率更新失败: " + err.Error(),
-		})
+		response.InternalError(c, "费率更新失败: "+err.Error())
 		return
 	}
 
-	// 检查结果
 	if result.FailedCount > 0 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": result.Errors[0],
-			"data": gin.H{
-				"success_count": result.SuccessCount,
-				"failed_count":  result.FailedCount,
-				"errors":        result.Errors,
-			},
+		response.ErrorWithData(c, 400, result.Errors[0], gin.H{
+			"success_count": result.SuccessCount,
+			"failed_count":  result.FailedCount,
+			"errors":        result.Errors,
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "费率更新成功",
-		"data": gin.H{
-			"terminal_sn": terminalSN,
-			"credit_rate": req.CreditRate,
-			"debit_rate":  req.DebitRate,
-		},
+	response.Success(c, gin.H{
+		"terminal_sn": terminalSN,
+		"credit_rate": req.CreditRate,
+		"debit_rate":  req.DebitRate,
 	})
 }
 
@@ -141,35 +114,25 @@ func (h *TerminalRateHandler) GetTerminalRate(c *gin.Context) {
 
 	terminalSN := c.Param("sn")
 	if terminalSN == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "终端SN不能为空",
-		})
+		response.BadRequest(c, "终端SN不能为空")
 		return
 	}
 
 	policy, err := h.terminalService.GetTerminalPolicy(terminalSN, agentID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"terminal_sn":   policy.TerminalSN,
-			"credit_rate":   policy.CreditRate,
-			"debit_rate":    policy.DebitRate,
-			"debit_cap":     policy.DebitCap,
-			"unionpay_rate": policy.UnionpayRate,
-			"wechat_rate":   policy.WechatRate,
-			"alipay_rate":   policy.AlipayRate,
-			"is_synced":     policy.IsSynced,
-		},
+	response.Success(c, gin.H{
+		"terminal_sn":   policy.TerminalSN,
+		"credit_rate":   policy.CreditRate,
+		"debit_rate":    policy.DebitRate,
+		"debit_cap":     policy.DebitCap,
+		"unionpay_rate": policy.UnionpayRate,
+		"wechat_rate":   policy.WechatRate,
+		"alipay_rate":   policy.AlipayRate,
+		"is_synced":     policy.IsSynced,
 	})
 }
 

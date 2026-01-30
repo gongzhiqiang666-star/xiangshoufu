@@ -1,11 +1,11 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"xiangshoufu/internal/middleware"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -43,10 +43,7 @@ func (h *SettlementWalletHandler) EnableSettlementWallet(c *gin.Context) {
 
 	var req EnableSettlementWalletRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -57,17 +54,11 @@ func (h *SettlementWalletHandler) EnableSettlementWallet(c *gin.Context) {
 	}
 
 	if err := h.settlementService.EnableSettlementWallet(serviceReq); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "开通成功",
-	})
+	response.SuccessMessage(c, "开通成功")
 }
 
 // DisableSettlementWallet 关闭沉淀钱包
@@ -83,25 +74,16 @@ func (h *SettlementWalletHandler) DisableSettlementWallet(c *gin.Context) {
 	agentIDStr := c.Param("agent_id")
 	agentID, err := strconv.ParseInt(agentIDStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的代理商ID",
-		})
+		response.BadRequest(c, "无效的代理商ID")
 		return
 	}
 
 	if err := h.settlementService.DisableSettlementWallet(agentID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "关闭成功",
-	})
+	response.SuccessMessage(c, "关闭成功")
 }
 
 // UpdateRatioRequest 更新沉淀比例请求
@@ -124,34 +106,22 @@ func (h *SettlementWalletHandler) UpdateSettlementRatio(c *gin.Context) {
 	agentIDStr := c.Param("agent_id")
 	agentID, err := strconv.ParseInt(agentIDStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的代理商ID",
-		})
+		response.BadRequest(c, "无效的代理商ID")
 		return
 	}
 
 	var req UpdateRatioRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
 	if err := h.settlementService.UpdateSettlementRatio(agentID, req.Ratio); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "更新成功",
-	})
+	response.SuccessMessage(c, "更新成功")
 }
 
 // GetSummary 获取沉淀钱包汇总
@@ -167,18 +137,11 @@ func (h *SettlementWalletHandler) GetSummary(c *gin.Context) {
 
 	summary, err := h.settlementService.GetSettlementWalletSummary(agentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    summary,
-	})
+	response.Success(c, summary)
 }
 
 // GetSubordinateBalances 获取下级余额明细
@@ -194,19 +157,12 @@ func (h *SettlementWalletHandler) GetSubordinateBalances(c *gin.Context) {
 
 	balances, err := h.settlementService.GetSubordinateBalances(agentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list": balances,
-		},
+	response.Success(c, gin.H{
+		"list": balances,
 	})
 }
 
@@ -232,10 +188,7 @@ func (h *SettlementWalletHandler) UseSettlement(c *gin.Context) {
 
 	var req UseSettlementRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -248,20 +201,13 @@ func (h *SettlementWalletHandler) UseSettlement(c *gin.Context) {
 
 	usage, err := h.settlementService.UseSettlement(serviceReq)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "使用成功",
-		"data": gin.H{
-			"usage_no": usage.UsageNo,
-		},
-	})
+	response.SuccessWithMessage(c, gin.H{
+		"usage_no": usage.UsageNo,
+	}, "使用成功")
 }
 
 // ReturnSettlementRequest 归还沉淀款请求
@@ -286,10 +232,7 @@ func (h *SettlementWalletHandler) ReturnSettlement(c *gin.Context) {
 
 	var req ReturnSettlementRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -302,20 +245,13 @@ func (h *SettlementWalletHandler) ReturnSettlement(c *gin.Context) {
 
 	usage, err := h.settlementService.ReturnSettlement(serviceReq)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "归还成功",
-		"data": gin.H{
-			"usage_no": usage.UsageNo,
-		},
-	})
+	response.SuccessWithMessage(c, gin.H{
+		"usage_no": usage.UsageNo,
+	}, "归还成功")
 }
 
 // GetUsageList 获取使用记录列表
@@ -344,23 +280,11 @@ func (h *SettlementWalletHandler) GetUsageList(c *gin.Context) {
 
 	list, total, err := h.settlementService.GetUsageList(agentID, usageType, page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      list,
-			"total":     total,
-			"page":      page,
-			"page_size": pageSize,
-		},
-	})
+	response.SuccessPage(c, list, total, page, pageSize)
 }
 
 // RegisterSettlementWalletRoutes 注册沉淀钱包路由
@@ -368,16 +292,13 @@ func RegisterSettlementWalletRoutes(r *gin.RouterGroup, h *SettlementWalletHandl
 	settlement := r.Group("/settlement-wallet")
 	settlement.Use(middleware.AuthMiddleware(authService))
 	{
-		// 配置
 		settlement.POST("/enable", h.EnableSettlementWallet)
 		settlement.POST("/disable/:agent_id", h.DisableSettlementWallet)
 		settlement.PUT("/ratio/:agent_id", h.UpdateSettlementRatio)
 
-		// 汇总
 		settlement.GET("/summary", h.GetSummary)
 		settlement.GET("/subordinates", h.GetSubordinateBalances)
 
-		// 使用和归还
 		settlement.POST("/use", h.UseSettlement)
 		settlement.POST("/return", h.ReturnSettlement)
 		settlement.GET("/usages", h.GetUsageList)

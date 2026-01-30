@@ -1,14 +1,14 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"xiangshoufu/internal/jobs"
 	"xiangshoufu/internal/models"
 	"xiangshoufu/internal/repository"
-	"xiangshoufu/internal/jobs"
+	"xiangshoufu/pkg/response"
 )
 
 // JobHandler 任务管理处理器
@@ -78,7 +78,7 @@ type JobListResponse struct {
 func (h *JobHandler) ListJobs(c *gin.Context) {
 	configs, err := h.configRepo.FindAll()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询任务配置失败"})
+		response.InternalError(c, "查询任务配置失败")
 		return
 	}
 
@@ -109,10 +109,7 @@ func (h *JobHandler) ListJobs(c *gin.Context) {
 		list = append(list, item)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"data": list,
-	})
+	response.Success(c, list)
 }
 
 // JobDetailResponse 任务详情响应
@@ -134,7 +131,7 @@ func (h *JobHandler) GetJob(c *gin.Context) {
 
 	config, err := h.configRepo.FindByName(jobName)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "任务不存在"})
+		response.NotFound(c, "任务不存在")
 		return
 	}
 
@@ -151,10 +148,7 @@ func (h *JobHandler) GetJob(c *gin.Context) {
 	logs, _ := h.logRepo.FindByJobName(jobName, 10, 0)
 	resp.LatestLogs = logs
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"data": resp,
-	})
+	response.Success(c, resp)
 }
 
 // UpdateJobConfigRequest 更新任务配置请求
@@ -180,13 +174,13 @@ func (h *JobHandler) UpdateJobConfig(c *gin.Context) {
 
 	config, err := h.configRepo.FindByName(jobName)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "任务不存在"})
+		response.NotFound(c, "任务不存在")
 		return
 	}
 
 	var req UpdateJobConfigRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
@@ -211,14 +205,11 @@ func (h *JobHandler) UpdateJobConfig(c *gin.Context) {
 	}
 
 	if err := h.configRepo.Update(config); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新失败"})
+		response.InternalError(c, "更新失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "更新成功",
-	})
+	response.SuccessMessage(c, "更新成功")
 }
 
 // TriggerJob 手动触发任务
@@ -233,22 +224,18 @@ func (h *JobHandler) TriggerJob(c *gin.Context) {
 
 	wrapper, ok := h.jobRegistry[jobName]
 	if !ok {
-		c.JSON(http.StatusNotFound, gin.H{"error": "任务不存在或未注册"})
+		response.NotFound(c, "任务不存在或未注册")
 		return
 	}
 
 	if wrapper.IsRunning() {
-		c.JSON(http.StatusConflict, gin.H{"error": "任务正在运行中"})
+		response.BadRequest(c, "任务正在运行中")
 		return
 	}
 
-	// 异步执行
 	go wrapper.RunManual()
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "任务已触发",
-	})
+	response.SuccessMessage(c, "任务已触发")
 }
 
 // EnableJobRequest 启用/禁用任务请求
@@ -269,12 +256,12 @@ func (h *JobHandler) EnableJob(c *gin.Context) {
 
 	var req EnableJobRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
 	if err := h.configRepo.UpdateEnabled(jobName, req.IsEnabled); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新失败"})
+		response.InternalError(c, "更新失败")
 		return
 	}
 
@@ -283,10 +270,7 @@ func (h *JobHandler) EnableJob(c *gin.Context) {
 		status = "禁用"
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "任务已" + status,
-	})
+	response.SuccessMessage(c, "任务已"+status)
 }
 
 // ListJobLogsRequest 执行日志列表请求
@@ -313,7 +297,7 @@ type ListJobLogsRequest struct {
 func (h *JobHandler) ListJobLogs(c *gin.Context) {
 	var req ListJobLogsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
@@ -347,19 +331,11 @@ func (h *JobHandler) ListJobLogs(c *gin.Context) {
 	}
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败"})
+		response.InternalError(c, "查询失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"data": gin.H{
-			"list":      logs,
-			"total":     total,
-			"page":      req.Page,
-			"page_size": req.PageSize,
-		},
-	})
+	response.SuccessPage(c, logs, total, req.Page, req.PageSize)
 }
 
 // GetJobLog 执行日志详情
@@ -373,20 +349,17 @@ func (h *JobHandler) GetJobLog(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
 	log, err := h.logRepo.FindByID(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "日志不存在"})
+		response.NotFound(c, "日志不存在")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"data": log,
-	})
+	response.Success(c, log)
 }
 
 // GetJobStatsRequest 任务统计请求
@@ -406,7 +379,7 @@ type GetJobStatsRequest struct {
 func (h *JobHandler) GetJobStats(c *gin.Context) {
 	var req GetJobStatsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "请提供开始日期和结束日期"})
+		response.BadRequest(c, "请提供开始日期和结束日期")
 		return
 	}
 
@@ -416,12 +389,9 @@ func (h *JobHandler) GetJobStats(c *gin.Context) {
 
 	stats, err := h.logRepo.GetStats(startDate, endDate)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败"})
+		response.InternalError(c, "查询失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"data": stats,
-	})
+	response.Success(c, stats)
 }

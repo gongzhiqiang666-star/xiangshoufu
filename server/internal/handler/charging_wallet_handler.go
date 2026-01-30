@@ -1,11 +1,11 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"xiangshoufu/internal/middleware"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -35,18 +35,11 @@ func (h *ChargingWalletHandler) GetWalletConfig(c *gin.Context) {
 
 	config, err := h.chargingService.GetWalletConfig(agentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    config,
-	})
+	response.Success(c, config)
 }
 
 // GetWalletConfigByAgent 获取指定代理商的钱包配置(管理员)
@@ -62,27 +55,17 @@ func (h *ChargingWalletHandler) GetWalletConfigByAgent(c *gin.Context) {
 	agentIDStr := c.Param("agent_id")
 	agentID, err := strconv.ParseInt(agentIDStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的代理商ID",
-		})
+		response.BadRequest(c, "无效的代理商ID")
 		return
 	}
 
 	config, err := h.chargingService.GetWalletConfig(agentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    config,
-	})
+	response.Success(c, config)
 }
 
 // EnableChargingWalletRequest 开通充值钱包请求
@@ -106,10 +89,7 @@ func (h *ChargingWalletHandler) EnableChargingWallet(c *gin.Context) {
 
 	var req EnableChargingWalletRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -120,17 +100,11 @@ func (h *ChargingWalletHandler) EnableChargingWallet(c *gin.Context) {
 	}
 
 	if err := h.chargingService.EnableChargingWallet(serviceReq); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "开通成功",
-	})
+	response.SuccessMessage(c, "开通成功")
 }
 
 // DisableChargingWallet 关闭充值钱包
@@ -146,25 +120,16 @@ func (h *ChargingWalletHandler) DisableChargingWallet(c *gin.Context) {
 	agentIDStr := c.Param("agent_id")
 	agentID, err := strconv.ParseInt(agentIDStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的代理商ID",
-		})
+		response.BadRequest(c, "无效的代理商ID")
 		return
 	}
 
 	if err := h.chargingService.DisableChargingWallet(agentID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "关闭成功",
-	})
+	response.SuccessMessage(c, "关闭成功")
 }
 
 // GetSummary 获取充值钱包汇总
@@ -180,18 +145,11 @@ func (h *ChargingWalletHandler) GetSummary(c *gin.Context) {
 
 	summary, err := h.chargingService.GetChargingWalletSummary(agentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    summary,
-	})
+	response.Success(c, summary)
 }
 
 // CreateDepositRequest 申请充值请求
@@ -218,10 +176,7 @@ func (h *ChargingWalletHandler) CreateDeposit(c *gin.Context) {
 
 	var req CreateDepositRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -236,20 +191,13 @@ func (h *ChargingWalletHandler) CreateDeposit(c *gin.Context) {
 
 	deposit, err := h.chargingService.CreateDeposit(serviceReq)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "充值申请已提交",
-		"data": gin.H{
-			"deposit_no": deposit.DepositNo,
-		},
-	})
+	response.SuccessWithMessage(c, gin.H{
+		"deposit_no": deposit.DepositNo,
+	}, "充值申请已提交")
 }
 
 // GetDepositList 获取充值记录
@@ -278,23 +226,11 @@ func (h *ChargingWalletHandler) GetDepositList(c *gin.Context) {
 
 	list, total, err := h.chargingService.GetDepositList(agentID, status, page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      list,
-			"total":     total,
-			"page":      page,
-			"page_size": pageSize,
-		},
-	})
+	response.SuccessPage(c, list, total, page, pageSize)
 }
 
 // GetPendingDeposits 获取待审核充值记录(管理员)
@@ -312,26 +248,13 @@ func (h *ChargingWalletHandler) GetPendingDeposits(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 
 	pending := int16(0)
-	// 这里简化处理，实际应该通过另一个service方法获取所有待审核的
 	list, total, err := h.chargingService.GetDepositList(0, &pending, page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      list,
-			"total":     total,
-			"page":      page,
-			"page_size": pageSize,
-		},
-	})
+	response.SuccessPage(c, list, total, page, pageSize)
 }
 
 // ConfirmDeposit 确认充值
@@ -349,25 +272,16 @@ func (h *ChargingWalletHandler) ConfirmDeposit(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	if err := h.chargingService.ConfirmDeposit(id, userID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "确认成功",
-	})
+	response.SuccessMessage(c, "确认成功")
 }
 
 // RejectDepositRequest 拒绝充值请求
@@ -392,10 +306,7 @@ func (h *ChargingWalletHandler) RejectDeposit(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
@@ -403,17 +314,11 @@ func (h *ChargingWalletHandler) RejectDeposit(c *gin.Context) {
 	c.ShouldBindJSON(&req)
 
 	if err := h.chargingService.RejectDeposit(id, userID, req.Reason); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "拒绝成功",
-	})
+	response.SuccessMessage(c, "拒绝成功")
 }
 
 // IssueRewardRequest 发放奖励请求
@@ -439,10 +344,7 @@ func (h *ChargingWalletHandler) IssueReward(c *gin.Context) {
 
 	var req IssueRewardRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -456,20 +358,13 @@ func (h *ChargingWalletHandler) IssueReward(c *gin.Context) {
 
 	reward, err := h.chargingService.IssueReward(serviceReq)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "发放成功",
-		"data": gin.H{
-			"reward_no": reward.RewardNo,
-		},
-	})
+	response.SuccessWithMessage(c, gin.H{
+		"reward_no": reward.RewardNo,
+	}, "发放成功")
 }
 
 // GetRewardList 获取奖励记录
@@ -492,23 +387,11 @@ func (h *ChargingWalletHandler) GetRewardList(c *gin.Context) {
 
 	list, total, err := h.chargingService.GetRewardList(agentID, direction, page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      list,
-			"total":     total,
-			"page":      page,
-			"page_size": pageSize,
-		},
-	})
+	response.SuccessPage(c, list, total, page, pageSize)
 }
 
 // RegisterChargingWalletRoutes 注册充值钱包路由
@@ -516,23 +399,19 @@ func RegisterChargingWalletRoutes(r *gin.RouterGroup, h *ChargingWalletHandler, 
 	charging := r.Group("/charging-wallet")
 	charging.Use(middleware.AuthMiddleware(authService))
 	{
-		// 配置
 		charging.GET("/config", h.GetWalletConfig)
 		charging.GET("/config/:agent_id", h.GetWalletConfigByAgent)
 		charging.POST("/enable", h.EnableChargingWallet)
 		charging.POST("/disable/:agent_id", h.DisableChargingWallet)
 
-		// 汇总
 		charging.GET("/summary", h.GetSummary)
 
-		// 充值
 		charging.POST("/deposits", h.CreateDeposit)
 		charging.GET("/deposits", h.GetDepositList)
 		charging.GET("/deposits/pending", h.GetPendingDeposits)
 		charging.POST("/deposits/:id/confirm", h.ConfirmDeposit)
 		charging.POST("/deposits/:id/reject", h.RejectDeposit)
 
-		// 奖励
 		charging.POST("/rewards", h.IssueReward)
 		charging.GET("/rewards", h.GetRewardList)
 	}

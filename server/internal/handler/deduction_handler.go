@@ -1,12 +1,12 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 	"strings"
 
 	"xiangshoufu/internal/models"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -49,10 +49,7 @@ func (h *DeductionHandler) ListDeductionPlans(c *gin.Context) {
 
 	plans, total, err := h.deductionService.ListPlans(page, pageSize, int16(status), int16(planType))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
@@ -80,16 +77,7 @@ func (h *DeductionHandler) ListDeductionPlans(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":  list,
-			"total": total,
-			"page":  page,
-			"page_size": pageSize,
-		},
-	})
+	response.SuccessPage(c, list, total, page, pageSize)
 }
 
 // CreateDeductionPlanRequest API请求
@@ -116,10 +104,7 @@ type CreateDeductionPlanRequest struct {
 func (h *DeductionHandler) CreateDeductionPlan(c *gin.Context) {
 	var req CreateDeductionPlanRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -140,18 +125,11 @@ func (h *DeductionHandler) CreateDeductionPlan(c *gin.Context) {
 
 	plan, err := h.deductionService.CreateDeductionPlan(serviceReq)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "创建成功",
-		"data":    plan,
-	})
+	response.SuccessWithMessage(c, plan, "创建成功")
 }
 
 // GetDeductionPlan 获取代扣计划详情
@@ -165,19 +143,13 @@ func (h *DeductionHandler) GetDeductionPlan(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	detail, err := h.deductionService.GetPlanByID(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"code":    404,
-			"message": err.Error(),
-		})
+		response.NotFound(c, err.Error())
 		return
 	}
 
@@ -198,37 +170,33 @@ func (h *DeductionHandler) GetDeductionPlan(c *gin.Context) {
 	}
 
 	plan := detail.Plan
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"plan": gin.H{
-				"id":               plan.ID,
-				"plan_no":          plan.PlanNo,
-				"deductor_id":      plan.DeductorID,
-				"deductee_id":      plan.DeducteeID,
-				"plan_type":        plan.PlanType,
-				"plan_type_name":   DeductionPlanTypeDesc(plan.PlanType),
-				"total_amount":     plan.TotalAmount,
-				"total_amount_yuan": float64(plan.TotalAmount) / 100,
-				"deducted_amount":  plan.DeductedAmount,
-				"deducted_yuan":    float64(plan.DeductedAmount) / 100,
-				"remaining_amount": plan.RemainingAmount,
-				"remaining_yuan":   float64(plan.RemainingAmount) / 100,
-				"total_periods":    plan.TotalPeriods,
-				"current_period":   plan.CurrentPeriod,
-				"period_amount":    plan.PeriodAmount,
-				"period_yuan":      float64(plan.PeriodAmount) / 100,
-				"status":           plan.Status,
-				"status_name":      DeductionPlanStatusDesc(plan.Status),
-				"related_type":     plan.RelatedType,
-				"related_id":       plan.RelatedID,
-				"remark":           plan.Remark,
-				"created_at":       plan.CreatedAt,
-				"updated_at":       plan.UpdatedAt,
-			},
-			"records": records,
+	response.Success(c, gin.H{
+		"plan": gin.H{
+			"id":               plan.ID,
+			"plan_no":          plan.PlanNo,
+			"deductor_id":      plan.DeductorID,
+			"deductee_id":      plan.DeducteeID,
+			"plan_type":        plan.PlanType,
+			"plan_type_name":   DeductionPlanTypeDesc(plan.PlanType),
+			"total_amount":     plan.TotalAmount,
+			"total_amount_yuan": float64(plan.TotalAmount) / 100,
+			"deducted_amount":  plan.DeductedAmount,
+			"deducted_yuan":    float64(plan.DeductedAmount) / 100,
+			"remaining_amount": plan.RemainingAmount,
+			"remaining_yuan":   float64(plan.RemainingAmount) / 100,
+			"total_periods":    plan.TotalPeriods,
+			"current_period":   plan.CurrentPeriod,
+			"period_amount":    plan.PeriodAmount,
+			"period_yuan":      float64(plan.PeriodAmount) / 100,
+			"status":           plan.Status,
+			"status_name":      DeductionPlanStatusDesc(plan.Status),
+			"related_type":     plan.RelatedType,
+			"related_id":       plan.RelatedID,
+			"remark":           plan.Remark,
+			"created_at":       plan.CreatedAt,
+			"updated_at":       plan.UpdatedAt,
 		},
+		"records": records,
 	})
 }
 
@@ -243,25 +211,16 @@ func (h *DeductionHandler) PauseDeductionPlan(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	if err := h.deductionService.PauseDeductionPlan(id); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "暂停成功",
-	})
+	response.SuccessMessage(c, "暂停成功")
 }
 
 // ResumeDeductionPlan 恢复代扣计划
@@ -275,25 +234,16 @@ func (h *DeductionHandler) ResumeDeductionPlan(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	if err := h.deductionService.ResumeDeductionPlan(id); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "恢复成功",
-	})
+	response.SuccessMessage(c, "恢复成功")
 }
 
 // CancelDeductionPlan 取消代扣计划
@@ -307,25 +257,16 @@ func (h *DeductionHandler) CancelDeductionPlan(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	if err := h.deductionService.CancelDeductionPlan(id); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "取消成功",
-	})
+	response.SuccessMessage(c, "取消成功")
 }
 
 // CreateDeductionChainRequest 创建代扣链请求
@@ -349,10 +290,7 @@ type CreateDeductionChainRequest struct {
 func (h *DeductionHandler) CreateDeductionChain(c *gin.Context) {
 	var req CreateDeductionChainRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -369,18 +307,11 @@ func (h *DeductionHandler) CreateDeductionChain(c *gin.Context) {
 
 	chain, err := h.deductionService.CreateDeductionChain(serviceReq)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "创建成功",
-		"data":    chain,
-	})
+	response.SuccessWithMessage(c, chain, "创建成功")
 }
 
 // ExecuteDailyDeduction 手动触发每日代扣（管理员接口）
@@ -392,17 +323,11 @@ func (h *DeductionHandler) CreateDeductionChain(c *gin.Context) {
 // @Router /api/v1/deduction/execute [post]
 func (h *DeductionHandler) ExecuteDailyDeduction(c *gin.Context) {
 	if err := h.deductionService.ExecuteDailyDeduction(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "执行成功",
-	})
+	response.SuccessMessage(c, "执行成功")
 }
 
 // CreateDeductionPlanWithAcceptRequest 创建需要确认的代扣计划请求
@@ -428,10 +353,7 @@ type CreateDeductionPlanWithAcceptRequest struct {
 func (h *DeductionHandler) CreateDeductionPlanWithAccept(c *gin.Context) {
 	var req CreateDeductionPlanWithAcceptRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -449,18 +371,11 @@ func (h *DeductionHandler) CreateDeductionPlanWithAccept(c *gin.Context) {
 
 	plan, err := h.deductionService.CreateDeductionPlanWithAccept(serviceReq, createdBy)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "创建成功，等待对方确认",
-		"data":    plan,
-	})
+	response.SuccessWithMessage(c, plan, "创建成功，等待对方确认")
 }
 
 // AcceptDeductionPlan 接收确认代扣计划
@@ -475,35 +390,23 @@ func (h *DeductionHandler) AcceptDeductionPlan(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	// 获取当前登录的代理商ID
 	agentID := getCurrentAgentID(c)
 	if agentID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"code":    401,
-			"message": "未登录或无权操作",
-		})
+		response.Unauthorized(c, "未登录或无权操作")
 		return
 	}
 
 	if err := h.deductionService.AcceptDeductionPlan(id, agentID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "接收成功",
-	})
+	response.SuccessMessage(c, "接收成功")
 }
 
 // RejectDeductionPlan 拒绝代扣计划
@@ -518,35 +421,23 @@ func (h *DeductionHandler) RejectDeductionPlan(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	// 获取当前登录的代理商ID
 	agentID := getCurrentAgentID(c)
 	if agentID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"code":    401,
-			"message": "未登录或无权操作",
-		})
+		response.Unauthorized(c, "未登录或无权操作")
 		return
 	}
 
 	if err := h.deductionService.RejectDeductionPlan(id, agentID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "已拒绝",
-	})
+	response.SuccessMessage(c, "已拒绝")
 }
 
 // GetReceivedDeductions 获取我接收的代扣列表
@@ -562,10 +453,7 @@ func (h *DeductionHandler) RejectDeductionPlan(c *gin.Context) {
 func (h *DeductionHandler) GetReceivedDeductions(c *gin.Context) {
 	agentID := getCurrentAgentID(c)
 	if agentID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"code":    401,
-			"message": "未登录",
-		})
+		response.Unauthorized(c, "未登录")
 		return
 	}
 
@@ -592,23 +480,11 @@ func (h *DeductionHandler) GetReceivedDeductions(c *gin.Context) {
 
 	plans, total, err := h.deductionService.GetReceivedPlans(agentID, status, page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      plans,
-			"total":     total,
-			"page":      page,
-			"page_size": pageSize,
-		},
-	})
+	response.SuccessPage(c, plans, total, page, pageSize)
 }
 
 // GetSentDeductions 获取我发起的代扣列表
@@ -624,10 +500,7 @@ func (h *DeductionHandler) GetReceivedDeductions(c *gin.Context) {
 func (h *DeductionHandler) GetSentDeductions(c *gin.Context) {
 	agentID := getCurrentAgentID(c)
 	if agentID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"code":    401,
-			"message": "未登录",
-		})
+		response.Unauthorized(c, "未登录")
 		return
 	}
 
@@ -654,23 +527,11 @@ func (h *DeductionHandler) GetSentDeductions(c *gin.Context) {
 
 	plans, total, err := h.deductionService.GetSentPlans(agentID, status, page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      plans,
-			"total":     total,
-			"page":      page,
-			"page_size": pageSize,
-		},
-	})
+	response.SuccessPage(c, plans, total, page, pageSize)
 }
 
 // GetDeductionSummary 获取代扣统计摘要
@@ -683,27 +544,17 @@ func (h *DeductionHandler) GetSentDeductions(c *gin.Context) {
 func (h *DeductionHandler) GetDeductionSummary(c *gin.Context) {
 	agentID := getCurrentAgentID(c)
 	if agentID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"code":    401,
-			"message": "未登录",
-		})
+		response.Unauthorized(c, "未登录")
 		return
 	}
 
 	summary, err := h.deductionService.GetDeductionSummary(agentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "获取统计失败: " + err.Error(),
-		})
+		response.InternalError(c, "获取统计失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    summary,
-	})
+	response.Success(c, summary)
 }
 
 // splitAndTrim 分割字符串并去除空格
@@ -742,18 +593,11 @@ func getCurrentAgentID(c *gin.Context) int64 {
 func (h *DeductionHandler) GetDeductionStats(c *gin.Context) {
 	stats, err := h.deductionService.GetDeductionStats()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "获取统计失败: " + err.Error(),
-		})
+		response.InternalError(c, "获取统计失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    stats,
-	})
+	response.Success(c, stats)
 }
 
 // RegisterDeductionRoutes 注册代扣管理路由

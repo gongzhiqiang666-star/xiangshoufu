@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"net/http"
-
 	"xiangshoufu/internal/service"
 	"xiangshoufu/pkg/response"
 
@@ -34,7 +32,7 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 	// 获取上传的文件
 	file, err := c.FormFile("file")
 	if err != nil {
-		response.Error(c, http.StatusBadRequest, "请选择要上传的文件")
+		response.BadRequest(c, "请选择要上传的文件")
 		return
 	}
 
@@ -47,7 +45,7 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 	// 调用上传服务
 	result, err := h.uploadService.UploadImage(file, module, userID)
 	if err != nil {
-		response.Error(c, http.StatusBadRequest, err.Error())
+		response.BadRequest(c, err.Error())
 		return
 	}
 

@@ -1,12 +1,12 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"xiangshoufu/internal/middleware"
 	"xiangshoufu/internal/models"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -54,20 +54,14 @@ type CreateGoodsDeductionTerminalRequest struct {
 func (h *GoodsDeductionHandler) CreateGoodsDeduction(c *gin.Context) {
 	var req CreateGoodsDeductionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
 	// 获取当前代理商ID
 	fromAgentID := getCurrentAgentID(c)
 	if fromAgentID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"code":    401,
-			"message": "未登录或登录已过期",
-		})
+		response.Unauthorized(c, "未登录或登录已过期")
 		return
 	}
 
@@ -95,18 +89,11 @@ func (h *GoodsDeductionHandler) CreateGoodsDeduction(c *gin.Context) {
 
 	deduction, err := h.goodsDeductionService.CreateGoodsDeduction(serviceReq, fromAgentID, createdBy)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "创建成功，等待下级接收确认",
-		"data":    deduction,
-	})
+	response.SuccessWithMessage(c, deduction, "创建成功，等待下级接收确认")
 }
 
 // AcceptGoodsDeduction 接收货款代扣
@@ -122,34 +109,22 @@ func (h *GoodsDeductionHandler) AcceptGoodsDeduction(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	agentID := getCurrentAgentID(c)
 	if agentID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"code":    401,
-			"message": "未登录或登录已过期",
-		})
+		response.Unauthorized(c, "未登录或登录已过期")
 		return
 	}
 
 	if err := h.goodsDeductionService.AcceptGoodsDeduction(id, agentID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "接收成功",
-	})
+	response.SuccessMessage(c, "接收成功")
 }
 
 // RejectGoodsDeduction 拒绝货款代扣
@@ -165,34 +140,22 @@ func (h *GoodsDeductionHandler) RejectGoodsDeduction(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	agentID := getCurrentAgentID(c)
 	if agentID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"code":    401,
-			"message": "未登录或登录已过期",
-		})
+		response.Unauthorized(c, "未登录或登录已过期")
 		return
 	}
 
 	if err := h.goodsDeductionService.RejectGoodsDeduction(id, agentID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "拒绝成功",
-	})
+	response.SuccessMessage(c, "拒绝成功")
 }
 
 // GetGoodsDeduction 获取货款代扣详情
@@ -208,19 +171,13 @@ func (h *GoodsDeductionHandler) GetGoodsDeduction(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	deduction, err := h.goodsDeductionService.GetGoodsDeductionByID(id)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
@@ -230,38 +187,34 @@ func (h *GoodsDeductionHandler) GetGoodsDeduction(c *gin.Context) {
 		progress = float64(deduction.DeductedAmount) / float64(deduction.TotalAmount) * 100
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"id":               deduction.ID,
-			"deduction_no":     deduction.DeductionNo,
-			"from_agent_id":    deduction.FromAgentID,
-			"from_agent_name":  deduction.FromAgentName,
-			"to_agent_id":      deduction.ToAgentID,
-			"to_agent_name":    deduction.ToAgentName,
-			"total_amount":     deduction.TotalAmount,
-			"total_amount_yuan": float64(deduction.TotalAmount) / 100,
-			"deducted_amount":  deduction.DeductedAmount,
-			"deducted_amount_yuan": float64(deduction.DeductedAmount) / 100,
-			"remaining_amount": deduction.RemainingAmount,
-			"remaining_amount_yuan": float64(deduction.RemainingAmount) / 100,
-			"deduction_source": deduction.DeductionSource,
-			"source_name":      models.GetGoodsDeductionSourceName(deduction.DeductionSource),
-			"terminal_count":   deduction.TerminalCount,
-			"unit_price":       deduction.UnitPrice,
-			"unit_price_yuan":  float64(deduction.UnitPrice) / 100,
-			"status":           deduction.Status,
-			"status_name":      models.GetGoodsDeductionStatusName(deduction.Status),
-			"progress":         progress,
-			"agreement_signed": deduction.AgreementSigned,
-			"agreement_url":    deduction.AgreementURL,
-			"remark":           deduction.Remark,
-			"terminals":        deduction.Terminals,
-			"created_at":       deduction.CreatedAt,
-			"accepted_at":      deduction.AcceptedAt,
-			"completed_at":     deduction.CompletedAt,
-		},
+	response.Success(c, gin.H{
+		"id":               deduction.ID,
+		"deduction_no":     deduction.DeductionNo,
+		"from_agent_id":    deduction.FromAgentID,
+		"from_agent_name":  deduction.FromAgentName,
+		"to_agent_id":      deduction.ToAgentID,
+		"to_agent_name":    deduction.ToAgentName,
+		"total_amount":     deduction.TotalAmount,
+		"total_amount_yuan": float64(deduction.TotalAmount) / 100,
+		"deducted_amount":  deduction.DeductedAmount,
+		"deducted_amount_yuan": float64(deduction.DeductedAmount) / 100,
+		"remaining_amount": deduction.RemainingAmount,
+		"remaining_amount_yuan": float64(deduction.RemainingAmount) / 100,
+		"deduction_source": deduction.DeductionSource,
+		"source_name":      models.GetGoodsDeductionSourceName(deduction.DeductionSource),
+		"terminal_count":   deduction.TerminalCount,
+		"unit_price":       deduction.UnitPrice,
+		"unit_price_yuan":  float64(deduction.UnitPrice) / 100,
+		"status":           deduction.Status,
+		"status_name":      models.GetGoodsDeductionStatusName(deduction.Status),
+		"progress":         progress,
+		"agreement_signed": deduction.AgreementSigned,
+		"agreement_url":    deduction.AgreementURL,
+		"remark":           deduction.Remark,
+		"terminals":        deduction.Terminals,
+		"created_at":       deduction.CreatedAt,
+		"accepted_at":      deduction.AcceptedAt,
+		"completed_at":     deduction.CompletedAt,
 	})
 }
 
@@ -279,10 +232,7 @@ func (h *GoodsDeductionHandler) GetGoodsDeduction(c *gin.Context) {
 func (h *GoodsDeductionHandler) GetSentList(c *gin.Context) {
 	agentID := getCurrentAgentID(c)
 	if agentID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"code":    401,
-			"message": "未登录或登录已过期",
-		})
+		response.Unauthorized(c, "未登录或登录已过期")
 		return
 	}
 
@@ -306,23 +256,11 @@ func (h *GoodsDeductionHandler) GetSentList(c *gin.Context) {
 
 	list, total, err := h.goodsDeductionService.GetSentList(agentID, statusFilter, page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      list,
-			"total":     total,
-			"page":      page,
-			"page_size": pageSize,
-		},
-	})
+	response.SuccessPage(c, list, total, page, pageSize)
 }
 
 // GetReceivedList 获取我接收的货款代扣列表
@@ -339,10 +277,7 @@ func (h *GoodsDeductionHandler) GetSentList(c *gin.Context) {
 func (h *GoodsDeductionHandler) GetReceivedList(c *gin.Context) {
 	agentID := getCurrentAgentID(c)
 	if agentID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"code":    401,
-			"message": "未登录或登录已过期",
-		})
+		response.Unauthorized(c, "未登录或登录已过期")
 		return
 	}
 
@@ -366,23 +301,11 @@ func (h *GoodsDeductionHandler) GetReceivedList(c *gin.Context) {
 
 	list, total, err := h.goodsDeductionService.GetReceivedList(agentID, statusFilter, page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      list,
-			"total":     total,
-			"page":      page,
-			"page_size": pageSize,
-		},
-	})
+	response.SuccessPage(c, list, total, page, pageSize)
 }
 
 // GetDeductionDetails 获取扣款明细列表
@@ -400,10 +323,7 @@ func (h *GoodsDeductionHandler) GetDeductionDetails(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
@@ -419,23 +339,11 @@ func (h *GoodsDeductionHandler) GetDeductionDetails(c *gin.Context) {
 
 	details, total, err := h.goodsDeductionService.GetDeductionDetails(id, page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      details,
-			"total":     total,
-			"page":      page,
-			"page_size": pageSize,
-		},
-	})
+	response.SuccessPage(c, details, total, page, pageSize)
 }
 
 // GetSummary 获取货款代扣统计
@@ -450,10 +358,7 @@ func (h *GoodsDeductionHandler) GetDeductionDetails(c *gin.Context) {
 func (h *GoodsDeductionHandler) GetSummary(c *gin.Context) {
 	agentID := getCurrentAgentID(c)
 	if agentID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"code":    401,
-			"message": "未登录或登录已过期",
-		})
+		response.Unauthorized(c, "未登录或登录已过期")
 		return
 	}
 
@@ -462,28 +367,21 @@ func (h *GoodsDeductionHandler) GetSummary(c *gin.Context) {
 
 	summary, err := h.goodsDeductionService.GetSummary(agentID, isSent)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"total_count":           summary.TotalCount,
-			"pending_count":         summary.PendingCount,
-			"in_progress_count":     summary.InProgressCount,
-			"completed_count":       summary.CompletedCount,
-			"total_amount":          summary.TotalAmount,
-			"total_amount_yuan":     float64(summary.TotalAmount) / 100,
-			"deducted_amount":       summary.DeductedAmount,
-			"deducted_amount_yuan":  float64(summary.DeductedAmount) / 100,
-			"remaining_amount":      summary.RemainingAmount,
-			"remaining_amount_yuan": float64(summary.RemainingAmount) / 100,
-		},
+	response.Success(c, gin.H{
+		"total_count":           summary.TotalCount,
+		"pending_count":         summary.PendingCount,
+		"in_progress_count":     summary.InProgressCount,
+		"completed_count":       summary.CompletedCount,
+		"total_amount":          summary.TotalAmount,
+		"total_amount_yuan":     float64(summary.TotalAmount) / 100,
+		"deducted_amount":       summary.DeductedAmount,
+		"deducted_amount_yuan":  float64(summary.DeductedAmount) / 100,
+		"remaining_amount":      summary.RemainingAmount,
+		"remaining_amount_yuan": float64(summary.RemainingAmount) / 100,
 	})
 }
 
@@ -501,10 +399,7 @@ func (h *GoodsDeductionHandler) GetSummary(c *gin.Context) {
 func (h *GoodsDeductionHandler) GetNotifications(c *gin.Context) {
 	agentID := getCurrentAgentID(c)
 	if agentID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"code":    401,
-			"message": "未登录或登录已过期",
-		})
+		response.Unauthorized(c, "未登录或登录已过期")
 		return
 	}
 
@@ -527,26 +422,19 @@ func (h *GoodsDeductionHandler) GetNotifications(c *gin.Context) {
 
 	notifications, total, err := h.goodsDeductionService.GetNotifications(agentID, isRead, page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
 	// 获取未读数量
 	unreadCount, _ := h.goodsDeductionService.GetUnreadNotificationCount(agentID)
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":         notifications,
-			"total":        total,
-			"unread_count": unreadCount,
-			"page":         page,
-			"page_size":    pageSize,
-		},
+	response.Success(c, gin.H{
+		"list":         notifications,
+		"total":        total,
+		"unread_count": unreadCount,
+		"page":         page,
+		"page_size":    pageSize,
 	})
 }
 
@@ -563,25 +451,16 @@ func (h *GoodsDeductionHandler) MarkNotificationAsRead(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	if err := h.goodsDeductionService.MarkNotificationAsRead(id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "操作失败: " + err.Error(),
-		})
+		response.InternalError(c, "操作失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-	})
+	response.SuccessMessage(c, "success")
 }
 
 // MarkAllNotificationsAsRead 标记所有通知为已读
@@ -595,25 +474,16 @@ func (h *GoodsDeductionHandler) MarkNotificationAsRead(c *gin.Context) {
 func (h *GoodsDeductionHandler) MarkAllNotificationsAsRead(c *gin.Context) {
 	agentID := getCurrentAgentID(c)
 	if agentID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"code":    401,
-			"message": "未登录或登录已过期",
-		})
+		response.Unauthorized(c, "未登录或登录已过期")
 		return
 	}
 
 	if err := h.goodsDeductionService.MarkAllNotificationsAsRead(agentID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "操作失败: " + err.Error(),
-		})
+		response.InternalError(c, "操作失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-	})
+	response.SuccessMessage(c, "success")
 }
 
 // RegisterGoodsDeductionRoutes 注册货款代扣路由

@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 	"time"
 
@@ -10,6 +9,7 @@ import (
 	"xiangshoufu/internal/models"
 	"xiangshoufu/internal/repository"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 )
 
 // SystemHandler 系统管理处理器
@@ -75,7 +75,7 @@ type UserListResponse struct {
 func (h *SystemHandler) ListUsers(c *gin.Context) {
 	var req UserListRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
@@ -96,7 +96,7 @@ func (h *SystemHandler) ListUsers(c *gin.Context) {
 
 	users, total, err := h.userRepo.FindByParams(params)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询用户失败"})
+		response.InternalError(c, "查询用户失败")
 		return
 	}
 
@@ -118,16 +118,7 @@ func (h *SystemHandler) ListUsers(c *gin.Context) {
 		list = append(list, item)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"message": "success",
-		"data": gin.H{
-			"list":  list,
-			"total": total,
-			"page":  req.Page,
-			"page_size": req.PageSize,
-		},
-	})
+	response.SuccessPage(c, list, total, req.Page, req.PageSize)
 }
 
 // GetUser 获取用户详情
@@ -141,24 +132,21 @@ func (h *SystemHandler) GetUser(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的用户ID"})
+		response.BadRequest(c, "无效的用户ID")
 		return
 	}
 
 	user, err := h.userRepo.FindByID(id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询用户失败"})
+		response.InternalError(c, "查询用户失败")
 		return
 	}
 	if user == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
+		response.NotFound(c, "用户不存在")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"message": "success",
-		"data": UserListResponse{
+	response.Success(c, UserListResponse{
 			ID:          user.ID,
 			Username:    user.Username,
 			AgentID:     user.AgentID,
@@ -168,9 +156,8 @@ func (h *SystemHandler) GetUser(c *gin.Context) {
 			StatusName:  getUserStatusName(user.Status),
 			LastLoginAt: user.LastLoginAt,
 			LastLoginIP: user.LastLoginIP,
-			CreatedAt:   user.CreatedAt,
-			UpdatedAt:   user.UpdatedAt,
-		},
+		CreatedAt:   user.CreatedAt,
+		UpdatedAt:   user.UpdatedAt,
 	})
 }
 
@@ -192,34 +179,32 @@ func (h *SystemHandler) UpdateUserStatus(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的用户ID"})
+		response.BadRequest(c, "无效的用户ID")
 		return
 	}
 
 	var req UpdateUserStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
-	// 检查用户是否存在
 	user, err := h.userRepo.FindByID(id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询用户失败"})
+		response.InternalError(c, "查询用户失败")
 		return
 	}
 	if user == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
+		response.NotFound(c, "用户不存在")
 		return
 	}
 
-	// 更新状态
 	if err := h.userRepo.UpdateStatus(id, req.Status); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新状态失败"})
+		response.InternalError(c, "更新状态失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "更新成功", "data": nil})
+	response.SuccessMessage(c, "更新成功")
 }
 
 // ========== 操作日志 ==========
@@ -277,7 +262,7 @@ type LogListResponse struct {
 func (h *SystemHandler) ListLogs(c *gin.Context) {
 	var req LogListRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
@@ -322,7 +307,7 @@ func (h *SystemHandler) ListLogs(c *gin.Context) {
 
 	logs, total, err := h.auditLogRepo.FindByParams(params)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询日志失败"})
+		response.InternalError(c, "查询日志失败")
 		return
 	}
 
@@ -351,16 +336,7 @@ func (h *SystemHandler) ListLogs(c *gin.Context) {
 		list = append(list, item)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"message": "success",
-		"data": gin.H{
-			"list":      list,
-			"total":     total,
-			"page":      req.Page,
-			"page_size": req.PageSize,
-		},
-	})
+	response.SuccessPage(c, list, total, req.Page, req.PageSize)
 }
 
 // GetLog 获取日志详情
@@ -374,45 +350,41 @@ func (h *SystemHandler) GetLog(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的日志ID"})
+		response.BadRequest(c, "无效的日志ID")
 		return
 	}
 
 	log, err := h.auditLogRepo.FindByID(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "日志不存在"})
+		response.NotFound(c, "日志不存在")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"message": "success",
-		"data": gin.H{
-			"id":             log.ID,
-			"log_type":       log.LogType,
-			"log_type_name":  models.GetLogTypeName(log.LogType),
-			"log_level":      log.LogLevel,
-			"log_level_name": models.GetLogLevelName(log.LogLevel),
-			"user_id":        log.UserID,
-			"username":       log.Username,
-			"agent_id":       log.AgentID,
-			"agent_name":     log.AgentName,
-			"target_type":    log.TargetType,
-			"target_id":      log.TargetID,
-			"target_name":    log.TargetName,
-			"action":         log.Action,
-			"description":    log.Description,
-			"old_value":      log.OldValue,
-			"new_value":      log.NewValue,
-			"ip":             log.IP,
-			"user_agent":     log.UserAgent,
-			"request_path":   log.RequestPath,
-			"request_method": log.RequestMethod,
-			"result":         log.Result,
-			"result_name":    getResultName(log.Result),
-			"error_msg":      log.ErrorMsg,
-			"created_at":     log.CreatedAt,
-		},
+	response.Success(c, gin.H{
+		"id":             log.ID,
+		"log_type":       log.LogType,
+		"log_type_name":  models.GetLogTypeName(log.LogType),
+		"log_level":      log.LogLevel,
+		"log_level_name": models.GetLogLevelName(log.LogLevel),
+		"user_id":        log.UserID,
+		"username":       log.Username,
+		"agent_id":       log.AgentID,
+		"agent_name":     log.AgentName,
+		"target_type":    log.TargetType,
+		"target_id":      log.TargetID,
+		"target_name":    log.TargetName,
+		"action":         log.Action,
+		"description":    log.Description,
+		"old_value":      log.OldValue,
+		"new_value":      log.NewValue,
+		"ip":             log.IP,
+		"user_agent":     log.UserAgent,
+		"request_path":   log.RequestPath,
+		"request_method": log.RequestMethod,
+		"result":         log.Result,
+		"result_name":    getResultName(log.Result),
+		"error_msg":      log.ErrorMsg,
+		"created_at":     log.CreatedAt,
 	})
 }
 

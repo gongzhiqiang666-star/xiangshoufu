@@ -1,13 +1,13 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 	"time"
 
 	"xiangshoufu/internal/middleware"
 	"xiangshoufu/internal/repository"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -74,14 +74,10 @@ func (h *ProfitHandler) GetProfitList(c *gin.Context) {
 
 	records, total, err := h.profitRepo.FindByAgentID(agentID, profitType, startTime, endTime, pageSize, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
-	// 转换为前端友好格式
 	list := make([]gin.H, 0, len(records))
 	for _, r := range records {
 		list = append(list, gin.H{
@@ -103,16 +99,7 @@ func (h *ProfitHandler) GetProfitList(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      list,
-			"total":     total,
-			"page":      page,
-			"page_size": pageSize,
-		},
-	})
+	response.SuccessPage(c, list, total, page, pageSize)
 }
 
 // GetProfitStats 获取分润统计
@@ -130,20 +117,16 @@ func (h *ProfitHandler) GetProfitStats(c *gin.Context) {
 	todayStats, _ := h.profitRepo.GetAgentDailyProfitStats(agentID, now)
 	monthStats, _ := h.profitRepo.GetAgentMonthlyProfitStats(agentID, now)
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"today": gin.H{
-				"amount":      todayStats.TotalAmount,
-				"amount_yuan": float64(todayStats.TotalAmount) / 100,
-				"count":       todayStats.TotalCount,
-			},
-			"month": gin.H{
-				"amount":      monthStats.TotalAmount,
-				"amount_yuan": float64(monthStats.TotalAmount) / 100,
-				"count":       monthStats.TotalCount,
-			},
+	response.Success(c, gin.H{
+		"today": gin.H{
+			"amount":      todayStats.TotalAmount,
+			"amount_yuan": float64(todayStats.TotalAmount) / 100,
+			"count":       todayStats.TotalCount,
+		},
+		"month": gin.H{
+			"amount":      monthStats.TotalAmount,
+			"amount_yuan": float64(monthStats.TotalAmount) / 100,
+			"count":       monthStats.TotalCount,
 		},
 	})
 }

@@ -1,11 +1,10 @@
 package handler
 
 import (
-	"net/http"
-
 	"xiangshoufu/internal/middleware"
 	"xiangshoufu/internal/service"
 	"xiangshoufu/pkg/crypto"
+	"xiangshoufu/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -53,10 +52,7 @@ type LoginRequest struct {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -65,10 +61,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	if req.Encrypted {
 		decrypted, err := crypto.DecryptPassword(req.Password)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"code":    400,
-				"message": "密码解密失败，请刷新页面重试",
-			})
+			response.BadRequest(c, "密码解密失败，请刷新页面重试")
 			return
 		}
 		password = decrypted
@@ -94,10 +87,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			}
 			h.auditService.LogLogin(auditCtx, false, err.Error())
 		}
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"code":    401,
-			"message": err.Error(),
-		})
+		response.Unauthorized(c, err.Error())
 		return
 	}
 
@@ -119,11 +109,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		h.auditService.LogLogin(auditCtx, true, "")
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "登录成功",
-		"data":    resp,
-	})
+	response.Success(c, resp)
 }
 
 // LogoutRequest 登出请求
@@ -154,10 +140,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		h.auditService.LogLogout(auditCtx)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "登出成功",
-	})
+	response.SuccessMessage(c, "登出成功")
 }
 
 // RefreshRequest 刷新令牌请求
@@ -177,27 +160,17 @@ type RefreshRequest struct {
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	var req RefreshRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
 	resp, err := h.authService.RefreshAccessToken(req.RefreshToken)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"code":    401,
-			"message": err.Error(),
-		})
+		response.Unauthorized(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "刷新成功",
-		"data":    resp,
-	})
+	response.Success(c, resp)
 }
 
 // GetProfile 获取当前用户信息
@@ -211,27 +184,17 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 func (h *AuthHandler) GetProfile(c *gin.Context) {
 	userID := middleware.GetCurrentUserID(c)
 	if userID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"code":    401,
-			"message": "请先登录",
-		})
+		response.Unauthorized(c, "请先登录")
 		return
 	}
 
 	resp, err := h.authService.GetUserProfile(userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    resp,
-	})
+	response.Success(c, resp)
 }
 
 // ChangePasswordRequest 修改密码请求
@@ -253,19 +216,13 @@ type ChangePasswordRequest struct {
 func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	var req ChangePasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
 	userID := middleware.GetCurrentUserID(c)
 	if userID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"code":    401,
-			"message": "请先登录",
-		})
+		response.Unauthorized(c, "请先登录")
 		return
 	}
 
@@ -275,10 +232,7 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 			auditCtx := service.NewAuditContextFromGin(c)
 			h.auditService.LogPasswordChange(auditCtx, false, err.Error())
 		}
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
@@ -288,10 +242,7 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 		h.auditService.LogPasswordChange(auditCtx, true, "")
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "密码修改成功，请重新登录",
-	})
+	response.SuccessMessage(c, "密码修改成功，请重新登录")
 }
 
 // RegisterRequest 公开注册请求
@@ -315,19 +266,13 @@ type RegisterRequest struct {
 // @Router /api/v1/auth/register [post]
 func (h *AuthHandler) Register(c *gin.Context) {
 	if h.agentService == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "服务未初始化",
-		})
+		response.InternalError(c, "服务未初始化")
 		return
 	}
 
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -343,18 +288,11 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	agent, err := h.agentService.RegisterByInviteCode(serviceReq)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "注册成功，请等待上级代理商审核",
-		"data":    agent,
-	})
+	response.Success(c, agent)
 }
 
 // GetPublicKey 获取RSA公钥
@@ -367,19 +305,12 @@ func (h *AuthHandler) Register(c *gin.Context) {
 func (h *AuthHandler) GetPublicKey(c *gin.Context) {
 	publicKey, err := crypto.GetPublicKeyPEM()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "获取公钥失败",
-		})
+		response.InternalError(c, "获取公钥失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"public_key": publicKey,
-		},
+	response.Success(c, gin.H{
+		"public_key": publicKey,
 	})
 }
 

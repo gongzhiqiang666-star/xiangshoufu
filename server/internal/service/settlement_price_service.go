@@ -98,6 +98,16 @@ func (s *SettlementPriceService) CreateFromTemplate(
 		}
 	}
 
+	// 校验结算价配置是否符合约束
+	simCashbacks := models.SimCashbacks{
+		{TierOrder: 1, CashbackAmount: price.SimFirstCashback},
+		{TierOrder: 2, CashbackAmount: price.SimSecondCashback},
+		{TierOrder: 3, CashbackAmount: price.SimThirdPlusCashback},
+	}
+	if err := s.ValidateSettlementPriceConstraints(agentID, channelID, brandCode, price.RateConfigs, price.DepositCashbacks, simCashbacks); err != nil {
+		return nil, fmt.Errorf("结算价约束校验失败: %w", err)
+	}
+
 	// 保存结算价
 	err = s.repo.Create(price)
 	if err != nil {
@@ -150,6 +160,16 @@ func (s *SettlementPriceService) UpdateRate(
 		price.AlipayRate = req.AlipayRate
 	}
 
+	// 校验费率配置是否符合约束
+	simCashbacks := models.SimCashbacks{
+		{TierOrder: 1, CashbackAmount: price.SimFirstCashback},
+		{TierOrder: 2, CashbackAmount: price.SimSecondCashback},
+		{TierOrder: 3, CashbackAmount: price.SimThirdPlusCashback},
+	}
+	if err := s.ValidateSettlementPriceConstraints(price.AgentID, price.ChannelID, price.BrandCode, price.RateConfigs, price.DepositCashbacks, simCashbacks); err != nil {
+		return nil, fmt.Errorf("费率约束校验失败: %w", err)
+	}
+
 	// 版本号+1
 	price.Version++
 	price.UpdatedBy = &operatorID
@@ -181,6 +201,16 @@ func (s *SettlementPriceService) UpdateDepositCashback(
 
 	// 保存变更前的快照
 	snapshotBefore := s.createSnapshot(price)
+
+	// 校验押金返现配置是否符合约束
+	simCashbacks := models.SimCashbacks{
+		{TierOrder: 1, CashbackAmount: price.SimFirstCashback},
+		{TierOrder: 2, CashbackAmount: price.SimSecondCashback},
+		{TierOrder: 3, CashbackAmount: price.SimThirdPlusCashback},
+	}
+	if err := s.ValidateSettlementPriceConstraints(price.AgentID, price.ChannelID, price.BrandCode, price.RateConfigs, req.DepositCashbacks, simCashbacks); err != nil {
+		return nil, fmt.Errorf("押金返现约束校验失败: %w", err)
+	}
 
 	// 更新押金返现
 	price.DepositCashbacks = req.DepositCashbacks
@@ -214,6 +244,16 @@ func (s *SettlementPriceService) UpdateSimCashback(
 
 	// 保存变更前的快照
 	snapshotBefore := s.createSnapshot(price)
+
+	// 校验流量费返现配置是否符合约束
+	simCashbacks := models.SimCashbacks{
+		{TierOrder: 1, CashbackAmount: req.SimFirstCashback},
+		{TierOrder: 2, CashbackAmount: req.SimSecondCashback},
+		{TierOrder: 3, CashbackAmount: req.SimThirdPlusCashback},
+	}
+	if err := s.ValidateSettlementPriceConstraints(price.AgentID, price.ChannelID, price.BrandCode, price.RateConfigs, price.DepositCashbacks, simCashbacks); err != nil {
+		return nil, fmt.Errorf("流量费返现约束校验失败: %w", err)
+	}
 
 	// 更新流量费返现
 	price.SimFirstCashback = req.SimFirstCashback

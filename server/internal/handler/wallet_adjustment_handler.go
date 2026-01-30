@@ -1,12 +1,12 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 	"time"
 
 	"xiangshoufu/internal/middleware"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -48,19 +48,12 @@ func (h *WalletAdjustmentHandler) CreateAdjustment(c *gin.Context) {
 
 	var req CreateAdjustmentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
-	// 验证金额不能为0
 	if req.Amount == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "调账金额不能为0",
-		})
+		response.BadRequest(c, "调账金额不能为0")
 		return
 	}
 
@@ -76,18 +69,11 @@ func (h *WalletAdjustmentHandler) CreateAdjustment(c *gin.Context) {
 
 	adjustment, err := h.adjustmentService.CreateAdjustment(serviceReq)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "调账成功",
-		"data":    adjustment,
-	})
+	response.SuccessWithMessage(c, adjustment, "调账成功")
 }
 
 // GetAdjustmentList 获取调账列表
@@ -114,26 +100,22 @@ func (h *WalletAdjustmentHandler) GetAdjustmentList(c *gin.Context) {
 		PageSize: pageSize,
 	}
 
-	// 代理商ID
 	if agentIDStr := c.Query("agent_id"); agentIDStr != "" {
 		agentID, _ := strconv.ParseInt(agentIDStr, 10, 64)
 		params.AgentID = agentID
 	}
 
-	// 钱包类型
 	if walletTypeStr := c.Query("wallet_type"); walletTypeStr != "" {
 		wt, _ := strconv.Atoi(walletTypeStr)
 		wt16 := int16(wt)
 		params.WalletType = &wt16
 	}
 
-	// 通道ID
 	if channelIDStr := c.Query("channel_id"); channelIDStr != "" {
 		chID, _ := strconv.ParseInt(channelIDStr, 10, 64)
 		params.ChannelID = &chID
 	}
 
-	// 日期范围
 	if startDate := c.Query("start_date"); startDate != "" {
 		if t, err := time.Parse("2006-01-02", startDate); err == nil {
 			params.StartTime = &t
@@ -141,7 +123,6 @@ func (h *WalletAdjustmentHandler) GetAdjustmentList(c *gin.Context) {
 	}
 	if endDate := c.Query("end_date"); endDate != "" {
 		if t, err := time.Parse("2006-01-02", endDate); err == nil {
-			// 结束日期+1天，查询到当天结束
 			t = t.AddDate(0, 0, 1)
 			params.EndTime = &t
 		}
@@ -149,23 +130,11 @@ func (h *WalletAdjustmentHandler) GetAdjustmentList(c *gin.Context) {
 
 	list, total, err := h.adjustmentService.GetAdjustmentList(params)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      list,
-			"total":     total,
-			"page":      page,
-			"page_size": pageSize,
-		},
-	})
+	response.SuccessPage(c, list, total, page, pageSize)
 }
 
 // GetAdjustmentDetail 获取调账详情
@@ -181,27 +150,17 @@ func (h *WalletAdjustmentHandler) GetAdjustmentDetail(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	adjustment, err := h.adjustmentService.GetAdjustmentDetail(id)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    adjustment,
-	})
+	response.Success(c, adjustment)
 }
 
 // RegisterWalletAdjustmentRoutes 注册钱包调账路由

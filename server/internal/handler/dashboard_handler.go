@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 	"time"
 
@@ -9,6 +8,7 @@ import (
 	"xiangshoufu/internal/models"
 	"xiangshoufu/internal/repository"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -76,47 +76,43 @@ func (h *DashboardHandler) GetDashboardOverview(c *gin.Context) {
 		totalBalance += w.Balance
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"today": gin.H{
-				"trans_amount":       todayStats.TransAmount,
-				"trans_amount_yuan":  todayStats.TransAmountYuan,
-				"trans_count":        todayStats.TransCount,
-				"profit_total":       todayStats.ProfitTotal,
-				"profit_total_yuan":  todayStats.ProfitTotalYuan,
-				"profit_trade":       todayStats.ProfitTrade,
-				"profit_deposit":     todayStats.ProfitDeposit,
-				"profit_sim":         todayStats.ProfitSim,
-				"profit_reward":      todayStats.ProfitReward,
-			},
-			"yesterday": gin.H{
-				"trans_amount":       yesterdayStats.TransAmount,
-				"trans_amount_yuan":  yesterdayStats.TransAmountYuan,
-				"trans_count":        yesterdayStats.TransCount,
-				"profit_total":       yesterdayStats.ProfitTotal,
-				"profit_total_yuan":  yesterdayStats.ProfitTotalYuan,
-			},
-			"month": gin.H{
-				"trans_amount":       monthStats.TransAmount,
-				"trans_amount_yuan":  monthStats.TransAmountYuan,
-				"trans_count":        monthStats.TransCount,
-				"profit_total":       monthStats.ProfitTotal,
-				"profit_total_yuan":  monthStats.ProfitTotalYuan,
-				"merchant_new":       monthStats.MerchantNew,
-			},
-			"team": gin.H{
-				"direct_agent_count":    agent.DirectAgentCount,
-				"direct_merchant_count": agent.DirectMerchantCount,
-				"team_agent_count":      agent.TeamAgentCount,
-				"team_merchant_count":   agent.TeamMerchantCount,
-			},
-			"terminal": terminalStats,
-			"wallet": gin.H{
-				"total_balance":      totalBalance,
-				"total_balance_yuan": float64(totalBalance) / 100,
-			},
+	response.Success(c, gin.H{
+		"today": gin.H{
+			"trans_amount":       todayStats.TransAmount,
+			"trans_amount_yuan":  todayStats.TransAmountYuan,
+			"trans_count":        todayStats.TransCount,
+			"profit_total":       todayStats.ProfitTotal,
+			"profit_total_yuan":  todayStats.ProfitTotalYuan,
+			"profit_trade":       todayStats.ProfitTrade,
+			"profit_deposit":     todayStats.ProfitDeposit,
+			"profit_sim":         todayStats.ProfitSim,
+			"profit_reward":      todayStats.ProfitReward,
+		},
+		"yesterday": gin.H{
+			"trans_amount":       yesterdayStats.TransAmount,
+			"trans_amount_yuan":  yesterdayStats.TransAmountYuan,
+			"trans_count":        yesterdayStats.TransCount,
+			"profit_total":       yesterdayStats.ProfitTotal,
+			"profit_total_yuan":  yesterdayStats.ProfitTotalYuan,
+		},
+		"month": gin.H{
+			"trans_amount":       monthStats.TransAmount,
+			"trans_amount_yuan":  monthStats.TransAmountYuan,
+			"trans_count":        monthStats.TransCount,
+			"profit_total":       monthStats.ProfitTotal,
+			"profit_total_yuan":  monthStats.ProfitTotalYuan,
+			"merchant_new":       monthStats.MerchantNew,
+		},
+		"team": gin.H{
+			"direct_agent_count":    agent.DirectAgentCount,
+			"direct_merchant_count": agent.DirectMerchantCount,
+			"team_agent_count":      agent.TeamAgentCount,
+			"team_merchant_count":   agent.TeamMerchantCount,
+		},
+		"terminal": terminalStats,
+		"wallet": gin.H{
+			"total_balance":      totalBalance,
+			"total_balance_yuan": float64(totalBalance) / 100,
 		},
 	})
 }
@@ -143,12 +139,8 @@ func (h *DashboardHandler) GetDashboardCharts(c *gin.Context) {
 	// 从汇总表获取趋势数据
 	trend, _ := h.statsRepo.GetTrendData(agentID, days, scope)
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"trans_trend": trend,
-		},
+	response.Success(c, gin.H{
+		"trans_trend": trend,
 	})
 }
 
@@ -173,12 +165,8 @@ func (h *DashboardHandler) GetProfitTrend(c *gin.Context) {
 
 	trend, _ := h.statsRepo.GetTrendData(agentID, days, scope)
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"profit_trend": trend,
-		},
+	response.Success(c, gin.H{
+		"profit_trend": trend,
 	})
 }
 
@@ -214,12 +202,8 @@ func (h *DashboardHandler) GetChannelStats(c *gin.Context) {
 
 	stats, _ := h.statsRepo.GetChannelStats(agentID, startDate, endDate, scope)
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"channel_stats": stats,
-		},
+	response.Success(c, gin.H{
+		"channel_stats": stats,
 	})
 }
 
@@ -238,12 +222,8 @@ func (h *DashboardHandler) GetMerchantDistribution(c *gin.Context) {
 
 	distribution, _ := h.statsRepo.GetMerchantDistribution(agentID, scope)
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"distribution": distribution,
-		},
+	response.Success(c, gin.H{
+		"distribution": distribution,
 	})
 }
 
@@ -266,12 +246,8 @@ func (h *DashboardHandler) GetRecentTransactions(c *gin.Context) {
 
 	transactions, _ := h.statsRepo.GetRecentTransactions(agentID, limit)
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"transactions": transactions,
-		},
+	response.Success(c, gin.H{
+		"transactions": transactions,
 	})
 }
 

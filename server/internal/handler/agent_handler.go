@@ -1,11 +1,11 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"xiangshoufu/internal/middleware"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -44,10 +44,7 @@ func (h *AgentHandler) GetAgentDetail(c *gin.Context) {
 	if idStr := c.Query("id"); idStr != "" {
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"code":    400,
-				"message": "无效的ID",
-			})
+			response.BadRequest(c, "无效的ID")
 			return
 		}
 
@@ -55,10 +52,7 @@ func (h *AgentHandler) GetAgentDetail(c *gin.Context) {
 		if id != agentID {
 			isSubordinate, err := h.agentService.IsSubordinate(agentID, id)
 			if err != nil || !isSubordinate {
-				c.JSON(http.StatusForbidden, gin.H{
-					"code":    403,
-					"message": "无权查看该代理商信息",
-				})
+				response.Forbidden(c, "无权查看该代理商信息")
 				return
 			}
 		}
@@ -67,18 +61,11 @@ func (h *AgentHandler) GetAgentDetail(c *gin.Context) {
 
 	detail, err := h.agentService.GetAgentDetail(agentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    detail,
-	})
+	response.Success(c, detail)
 }
 
 // GetSubordinateList 获取下级代理商列表
@@ -98,10 +85,7 @@ func (h *AgentHandler) GetSubordinateList(c *gin.Context) {
 
 	var req service.SubordinateListRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -115,23 +99,11 @@ func (h *AgentHandler) GetSubordinateList(c *gin.Context) {
 
 	list, total, err := h.agentService.GetSubordinateList(&req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      list,
-			"total":     total,
-			"page":      req.Page,
-			"page_size": req.PageSize,
-		},
-	})
+	response.SuccessPage(c, list, total, req.Page, req.PageSize)
 }
 
 // GetTeamTree 获取团队层级树
@@ -155,18 +127,11 @@ func (h *AgentHandler) GetTeamTree(c *gin.Context) {
 
 	tree, err := h.agentService.GetTeamTree(agentID, maxDepth)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    tree,
-	})
+	response.Success(c, tree)
 }
 
 // GetAgentStats 获取代理商统计
@@ -182,18 +147,11 @@ func (h *AgentHandler) GetAgentStats(c *gin.Context) {
 
 	stats, err := h.agentService.GetAgentStats(agentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    stats,
-	})
+	response.Success(c, stats)
 }
 
 // UpdateAgentProfileRequest 更新资料请求
@@ -221,10 +179,7 @@ func (h *AgentHandler) UpdateProfile(c *gin.Context) {
 
 	var req UpdateAgentProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -239,17 +194,11 @@ func (h *AgentHandler) UpdateProfile(c *gin.Context) {
 	}
 
 	if err := h.agentService.UpdateAgentProfile(serviceReq); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "更新成功",
-	})
+	response.SuccessMessage(c, "更新成功")
 }
 
 // GetInviteCode 获取邀请码
@@ -265,24 +214,17 @@ func (h *AgentHandler) GetInviteCode(c *gin.Context) {
 
 	inviteCode, qrCodeURL, err := h.agentService.GetInviteCode(agentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
 	// 构造邀请链接
 	inviteLink := "https://app.xiangshoufu.com/register?code=" + inviteCode
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"invite_code": inviteCode,
-			"invite_link": inviteLink,
-			"qr_code_url": qrCodeURL,
-		},
+	response.Success(c, gin.H{
+		"invite_code": inviteCode,
+		"invite_link": inviteLink,
+		"qr_code_url": qrCodeURL,
 	})
 }
 
@@ -306,10 +248,7 @@ func (h *AgentHandler) SetCustomInviteCode(c *gin.Context) {
 
 	var req SetCustomInviteCodeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -319,17 +258,11 @@ func (h *AgentHandler) SetCustomInviteCode(c *gin.Context) {
 	}
 
 	if err := h.agentService.SetCustomInviteCode(serviceReq); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "邀请码设置成功",
-	})
+	response.SuccessMessage(c, "邀请码设置成功")
 }
 
 // CreateAgentRequest 创建代理商请求
@@ -359,10 +292,7 @@ func (h *AgentHandler) CreateAgent(c *gin.Context) {
 
 	var req CreateAgentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -375,10 +305,7 @@ func (h *AgentHandler) CreateAgent(c *gin.Context) {
 	if req.ParentID != operatorID {
 		isSubordinate, err := h.agentService.IsSubordinate(operatorID, req.ParentID)
 		if err != nil || !isSubordinate {
-			c.JSON(http.StatusForbidden, gin.H{
-				"code":    403,
-				"message": "无权在该代理商下创建下级",
-			})
+			response.Forbidden(c, "无权在该代理商下创建下级")
 			return
 		}
 	}
@@ -396,10 +323,7 @@ func (h *AgentHandler) CreateAgent(c *gin.Context) {
 
 	agent, err := h.agentService.CreateAgent(serviceReq, operatorID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
@@ -409,11 +333,7 @@ func (h *AgentHandler) CreateAgent(c *gin.Context) {
 		h.auditService.LogAgentCreate(auditCtx, agent.ID, agent.AgentName)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "创建成功",
-		"data":    agent,
-	})
+	response.Success(c, agent)
 }
 
 // UpdateAgentStatusRequest 更新状态请求
@@ -437,10 +357,7 @@ func (h *AgentHandler) UpdateAgentStatus(c *gin.Context) {
 
 	agentID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
@@ -448,20 +365,14 @@ func (h *AgentHandler) UpdateAgentStatus(c *gin.Context) {
 	if agentID != operatorID {
 		isSubordinate, err := h.agentService.IsSubordinate(operatorID, agentID)
 		if err != nil || !isSubordinate {
-			c.JSON(http.StatusForbidden, gin.H{
-				"code":    403,
-				"message": "无权操作该代理商",
-			})
+			response.Forbidden(c, "无权操作该代理商")
 			return
 		}
 	}
 
 	var req UpdateAgentStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -471,10 +382,7 @@ func (h *AgentHandler) UpdateAgentStatus(c *gin.Context) {
 	}
 
 	if err := h.agentService.UpdateAgentStatus(serviceReq); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
@@ -494,10 +402,7 @@ func (h *AgentHandler) UpdateAgentStatus(c *gin.Context) {
 		h.auditService.LogAgentStatusChange(auditCtx, agentID, agentName, oldStatus, req.Status)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "更新成功",
-	})
+	response.SuccessMessage(c, "更新成功")
 }
 
 // SearchAgents 搜索代理商
@@ -515,32 +420,17 @@ func (h *AgentHandler) UpdateAgentStatus(c *gin.Context) {
 func (h *AgentHandler) SearchAgents(c *gin.Context) {
 	var req service.SearchAgentsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
 	list, total, err := h.agentService.SearchAgents(&req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      list,
-			"total":     total,
-			"page":      req.Page,
-			"page_size": req.PageSize,
-		},
-	})
+	response.SuccessPage(c, list, total, req.Page, req.PageSize)
 }
 
 // RegisterAgentRoutes 注册代理商路由

@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -9,6 +8,7 @@ import (
 	"xiangshoufu/internal/middleware"
 	"xiangshoufu/internal/models"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 )
 
 // RewardHandler 奖励处理器
@@ -57,23 +57,11 @@ func (h *RewardHandler) GetRewardTemplates(c *gin.Context) {
 
 	list, total, err := h.rewardService.GetRewardTemplateList(enabled, page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      list,
-			"total":     total,
-			"page":      page,
-			"page_size": pageSize,
-		},
-	})
+	response.SuccessPage(c, list, total, page, pageSize)
 }
 
 // GetRewardTemplateDetail 获取奖励模版详情
@@ -89,27 +77,17 @@ func (h *RewardHandler) GetRewardTemplateDetail(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	detail, err := h.rewardService.GetRewardTemplateDetail(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"code":    404,
-			"message": "模版不存在",
-		})
+		response.NotFound(c, "模版不存在")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    detail,
-	})
+	response.Success(c, detail)
 }
 
 // CreateRewardTemplate 创建奖励模版
@@ -125,27 +103,17 @@ func (h *RewardHandler) GetRewardTemplateDetail(c *gin.Context) {
 func (h *RewardHandler) CreateRewardTemplate(c *gin.Context) {
 	var req models.CreateRewardTemplateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
 	result, err := h.rewardService.CreateRewardTemplate(&req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "创建成功",
-		"data":    result,
-	})
+	response.SuccessWithMessage(c, result, "创建成功")
 }
 
 // UpdateRewardTemplate 更新奖励模版
@@ -163,36 +131,23 @@ func (h *RewardHandler) UpdateRewardTemplate(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	var req models.UpdateRewardTemplateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
 	result, err := h.rewardService.UpdateRewardTemplate(id, &req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "更新成功",
-		"data":    result,
-	})
+	response.SuccessWithMessage(c, result, "更新成功")
 }
 
 // DeleteRewardTemplate 删除奖励模版
@@ -208,25 +163,16 @@ func (h *RewardHandler) DeleteRewardTemplate(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	if err := h.rewardService.DeleteRewardTemplate(id); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "删除成功",
-	})
+	response.SuccessMessage(c, "删除成功")
 }
 
 // UpdateRewardTemplateStatus 更新模版启用状态
@@ -244,10 +190,7 @@ func (h *RewardHandler) UpdateRewardTemplateStatus(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
@@ -255,25 +198,16 @@ func (h *RewardHandler) UpdateRewardTemplateStatus(c *gin.Context) {
 		Enabled bool `json:"enabled"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误",
-		})
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
 	if err := h.rewardService.UpdateRewardTemplateEnabled(id, req.Enabled); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "更新成功",
-	})
+	response.SuccessMessage(c, "更新成功")
 }
 
 // ============================================================
@@ -294,43 +228,29 @@ func (h *RewardHandler) GetAgentRewardAmount(c *gin.Context) {
 	idStr := c.Param("id")
 	agentID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的代理商ID",
-		})
+		response.BadRequest(c, "无效的代理商ID")
 		return
 	}
 
 	templateIDStr := c.Query("template_id")
 	templateID, err := strconv.ParseInt(templateIDStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的模版ID",
-		})
+		response.BadRequest(c, "无效的模版ID")
 		return
 	}
 
 	rate, err := h.rewardService.GetAgentRewardAmount(agentID, templateID)
 	if err != nil {
 		// 未配置时返回默认值
-		c.JSON(http.StatusOK, gin.H{
-			"code":    0,
-			"message": "success",
-			"data": gin.H{
-				"agent_id":      agentID,
-				"template_id":   templateID,
-				"reward_amount": 0,
-			},
+		response.Success(c, gin.H{
+			"agent_id":      agentID,
+			"template_id":   templateID,
+			"reward_amount": 0,
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    rate,
-	})
+	response.Success(c, rate)
 }
 
 // SetAgentRewardAmount 设置代理商奖励金额
@@ -348,35 +268,23 @@ func (h *RewardHandler) SetAgentRewardAmount(c *gin.Context) {
 	idStr := c.Param("id")
 	agentID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的代理商ID",
-		})
+		response.BadRequest(c, "无效的代理商ID")
 		return
 	}
 
 	var req models.AgentRewardRateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 	req.AgentID = agentID
 
 	if err := h.rewardService.SetAgentRewardAmount(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "设置成功",
-	})
+	response.SuccessMessage(c, "设置成功")
 }
 
 // ============================================================
@@ -395,27 +303,17 @@ func (h *RewardHandler) SetAgentRewardAmount(c *gin.Context) {
 func (h *RewardHandler) GetTerminalRewardProgress(c *gin.Context) {
 	terminalSN := c.Param("terminal_sn")
 	if terminalSN == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "终端SN不能为空",
-		})
+		response.BadRequest(c, "终端SN不能为空")
 		return
 	}
 
 	progress, err := h.rewardService.GetTerminalRewardProgress(terminalSN)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"code":    404,
-			"message": "未找到奖励进度: " + err.Error(),
-		})
+		response.NotFound(c, "未找到奖励进度: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    progress,
-	})
+	response.Success(c, progress)
 }
 
 // InitTerminalRewardProgress 初始化终端奖励进度
@@ -437,27 +335,17 @@ func (h *RewardHandler) InitTerminalRewardProgress(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
 	progress, err := h.rewardService.InitTerminalRewardProgress(req.TerminalSN, req.TerminalID, req.AgentID, req.TemplateID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "初始化成功",
-		"data":    progress,
-	})
+	response.SuccessWithMessage(c, progress, "初始化成功")
 }
 
 // ============================================================
@@ -487,23 +375,11 @@ func (h *RewardHandler) GetOverflowLogs(c *gin.Context) {
 
 	logs, total, err := h.rewardService.GetUnresolvedOverflowLogs(page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      logs,
-			"total":     total,
-			"page":      page,
-			"page_size": pageSize,
-		},
-	})
+	response.SuccessPage(c, logs, total, page, pageSize)
 }
 
 // ResolveOverflowLog 解决溢出日志
@@ -519,10 +395,7 @@ func (h *RewardHandler) ResolveOverflowLog(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
@@ -533,17 +406,11 @@ func (h *RewardHandler) ResolveOverflowLog(c *gin.Context) {
 	}
 
 	if err := h.rewardService.ResolveOverflowLog(id, operatorName); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "解决成功",
-	})
+	response.SuccessMessage(c, "解决成功")
 }
 
 // ============================================================

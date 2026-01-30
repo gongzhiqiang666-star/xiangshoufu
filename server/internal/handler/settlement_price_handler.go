@@ -1,12 +1,12 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"xiangshoufu/internal/models"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 )
 
 // SettlementPriceHandler 结算价处理器
@@ -41,7 +41,7 @@ func NewSettlementPriceHandler(
 func (h *SettlementPriceHandler) List(c *gin.Context) {
 	var req models.SettlementPriceListRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
@@ -54,11 +54,11 @@ func (h *SettlementPriceHandler) List(c *gin.Context) {
 
 	resp, err := h.service.List(&req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, resp)
+	response.Success(c, resp)
 }
 
 // GetByID 获取结算价详情
@@ -73,17 +73,17 @@ func (h *SettlementPriceHandler) GetByID(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	price, err := h.service.GetByID(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "结算价不存在"})
+		response.NotFound(c, "结算价不存在")
 		return
 	}
 
-	c.JSON(http.StatusOK, price)
+	response.Success(c, price)
 }
 
 // Create 创建结算价
@@ -97,25 +97,23 @@ func (h *SettlementPriceHandler) GetByID(c *gin.Context) {
 func (h *SettlementPriceHandler) Create(c *gin.Context) {
 	var req models.CreateSettlementPriceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	// 验证必填字段
 	if req.AgentID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "请选择代理商"})
+		response.BadRequest(c, "请选择代理商")
 		return
 	}
 	if req.ChannelID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "请选择通道"})
+		response.BadRequest(c, "请选择通道")
 		return
 	}
 	if req.TemplateID == nil || *req.TemplateID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "请选择政策模板"})
+		response.BadRequest(c, "请选择政策模板")
 		return
 	}
 
-	// 获取操作者信息
 	operatorID := getOperatorID(c)
 	operatorName := getOperatorName(c)
 	source := getSource(c)
@@ -125,17 +123,17 @@ func (h *SettlementPriceHandler) Create(c *gin.Context) {
 		req.ChannelID,
 		req.TemplateID,
 		req.BrandCode,
-		nil, // 模板详情由service层查询
+		nil,
 		operatorID,
 		operatorName,
 		source,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, price)
+	response.Success(c, price)
 }
 
 // UpdateRate 更新费率
@@ -151,17 +149,16 @@ func (h *SettlementPriceHandler) UpdateRate(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	var req models.UpdateRateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	// 获取操作者信息
 	operatorID := getOperatorID(c)
 	operatorName := getOperatorName(c)
 	source := getSource(c)
@@ -169,11 +166,11 @@ func (h *SettlementPriceHandler) UpdateRate(c *gin.Context) {
 
 	price, err := h.service.UpdateRate(id, &req, operatorID, operatorName, source, ipAddress)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, price)
+	response.Success(c, price)
 }
 
 // UpdateDeposit 更新押金返现
@@ -189,17 +186,16 @@ func (h *SettlementPriceHandler) UpdateDeposit(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	var req models.UpdateDepositCashbackRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	// 获取操作者信息
 	operatorID := getOperatorID(c)
 	operatorName := getOperatorName(c)
 	source := getSource(c)
@@ -207,11 +203,11 @@ func (h *SettlementPriceHandler) UpdateDeposit(c *gin.Context) {
 
 	price, err := h.service.UpdateDepositCashback(id, &req, operatorID, operatorName, source, ipAddress)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, price)
+	response.Success(c, price)
 }
 
 // UpdateSim 更新流量费返现
@@ -227,17 +223,16 @@ func (h *SettlementPriceHandler) UpdateSim(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	var req models.UpdateSimCashbackRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	// 获取操作者信息
 	operatorID := getOperatorID(c)
 	operatorName := getOperatorName(c)
 	source := getSource(c)
@@ -245,11 +240,11 @@ func (h *SettlementPriceHandler) UpdateSim(c *gin.Context) {
 
 	price, err := h.service.UpdateSimCashback(id, &req, operatorID, operatorName, source, ipAddress)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, price)
+	response.Success(c, price)
 }
 
 // GetChangeLogs 获取结算价调价记录
@@ -266,7 +261,7 @@ func (h *SettlementPriceHandler) GetChangeLogs(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
@@ -275,11 +270,11 @@ func (h *SettlementPriceHandler) GetChangeLogs(c *gin.Context) {
 
 	resp, err := h.changeLogSvc.ListBySettlementPrice(id, page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, resp)
+	response.Success(c, resp)
 }
 
 // 辅助函数：获取操作者ID
@@ -327,17 +322,16 @@ func (h *SettlementPriceHandler) UpdateHighRate(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	var req service.UpdateHighRateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	// 获取操作者信息
 	operatorID := getOperatorID(c)
 	operatorName := getOperatorName(c)
 	source := getSource(c)
@@ -345,11 +339,11 @@ func (h *SettlementPriceHandler) UpdateHighRate(c *gin.Context) {
 
 	price, err := h.service.UpdateHighRate(id, &req, operatorID, operatorName, source, ipAddress)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, price)
+	response.Success(c, price)
 }
 
 // UpdateD0Extra 更新P+0加价配置
@@ -365,17 +359,16 @@ func (h *SettlementPriceHandler) UpdateD0Extra(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	var req service.UpdateD0ExtraRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	// 获取操作者信息
 	operatorID := getOperatorID(c)
 	operatorName := getOperatorName(c)
 	source := getSource(c)
@@ -383,9 +376,9 @@ func (h *SettlementPriceHandler) UpdateD0Extra(c *gin.Context) {
 
 	price, err := h.service.UpdateD0Extra(id, &req, operatorID, operatorName, source, ipAddress)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, price)
+	response.Success(c, price)
 }

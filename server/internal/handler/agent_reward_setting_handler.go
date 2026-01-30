@@ -1,12 +1,12 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"xiangshoufu/internal/models"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 )
 
 // AgentRewardSettingHandler 代理商奖励配置处理器
@@ -41,16 +41,11 @@ func (h *AgentRewardSettingHandler) List(c *gin.Context) {
 
 	settings, total, err := h.service.List(page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"list":  settings,
-		"total": total,
-		"page":  page,
-		"size":  pageSize,
-	})
+	response.SuccessPage(c, settings, total, page, pageSize)
 }
 
 // GetByID 获取奖励配置详情
@@ -65,17 +60,17 @@ func (h *AgentRewardSettingHandler) GetByID(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	setting, err := h.service.GetByID(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "奖励配置不存在"})
+		response.NotFound(c, "奖励配置不存在")
 		return
 	}
 
-	c.JSON(http.StatusOK, setting)
+	response.Success(c, setting)
 }
 
 // Create 创建奖励配置
@@ -89,7 +84,7 @@ func (h *AgentRewardSettingHandler) GetByID(c *gin.Context) {
 func (h *AgentRewardSettingHandler) Create(c *gin.Context) {
 	var req models.AgentRewardSettingRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
@@ -108,11 +103,11 @@ func (h *AgentRewardSettingHandler) Create(c *gin.Context) {
 		source,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, setting)
+	response.Success(c, setting)
 }
 
 // UpdateActivation 更新激活奖励
@@ -128,13 +123,13 @@ func (h *AgentRewardSettingHandler) UpdateActivation(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	var req models.UpdateActivationRewardRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
@@ -146,11 +141,11 @@ func (h *AgentRewardSettingHandler) UpdateActivation(c *gin.Context) {
 
 	setting, err := h.service.UpdateActivationReward(id, &req, operatorID, operatorName, source, ipAddress)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, setting)
+	response.Success(c, setting)
 }
 
 // GetChangeLogs 获取奖励配置调价记录
@@ -167,7 +162,7 @@ func (h *AgentRewardSettingHandler) GetChangeLogs(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
@@ -176,9 +171,9 @@ func (h *AgentRewardSettingHandler) GetChangeLogs(c *gin.Context) {
 
 	resp, err := h.changeLogSvc.ListByRewardSetting(id, page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, resp)
+	response.Success(c, resp)
 }

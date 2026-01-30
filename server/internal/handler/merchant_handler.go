@@ -9,6 +9,7 @@ import (
 	"xiangshoufu/internal/repository"
 	"xiangshoufu/internal/service"
 	"xiangshoufu/pkg/crypto"
+	"xiangshoufu/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -112,14 +113,10 @@ func (h *MerchantHandler) GetMerchantList(c *gin.Context) {
 
 	merchants, total, err := h.merchantRepo.FindByParams(params)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
-	// 转换为前端友好格式
 	list := make([]gin.H, 0, len(merchants))
 	for _, m := range merchants {
 		list = append(list, gin.H{
@@ -144,16 +141,7 @@ func (h *MerchantHandler) GetMerchantList(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      list,
-			"total":     total,
-			"page":      page,
-			"page_size": pageSize,
-		},
-	})
+	response.SuccessPage(c, list, total, page, pageSize)
 }
 
 // GetMerchantDetail 获取商户详情
@@ -171,28 +159,18 @@ func (h *MerchantHandler) GetMerchantDetail(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	merchant, err := h.merchantRepo.FindByID(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"code":    404,
-			"message": "商户不存在",
-		})
+		response.NotFound(c, "商户不存在")
 		return
 	}
 
-	// 验证权限
 	if merchant.AgentID != agentID {
-		c.JSON(http.StatusForbidden, gin.H{
-			"code":    403,
-			"message": "无权访问该商户",
-		})
+		response.Forbidden(c, "无权访问该商户")
 		return
 	}
 
@@ -242,39 +220,35 @@ func (h *MerchantHandler) GetMerchantDetail(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"id":              merchant.ID,
-			"merchant_no":     merchant.MerchantNo,
-			"merchant_name":   merchant.MerchantName,
-			"agent_id":        merchant.AgentID,
-			"agent_name":      agentName,
-			"agent_level":     agentLevel,
-			"channel_id":      merchant.ChannelID,
-			"channel_name":    channelName,
-			"terminal_sn":     merchant.TerminalSN,
-			"status":          merchant.Status,
-			"status_name":     getMerchantStatusName(merchant.Status),
-			"approve_status":  merchant.ApproveStatus,
-			"approve_name":    getMerchantApproveStatusName(merchant.ApproveStatus),
-			"legal_name":      merchant.LegalName,
-			"legal_id_card":   maskIDCard(merchant.LegalIDCard),
-			"mcc":             merchant.MCC,
-			"credit_rate":     merchant.CreditRate,
-			"debit_rate":      merchant.DebitRate,
-			"merchant_type":   merchant.MerchantType,
-			"is_direct":       merchant.IsDirect,
-			"activated_at":    activatedAtStr,
-			"registered_phone": getPhoneDisplay(merchant.AgentID, agentID, merchant.RegisteredPhone),
-			"register_remark": merchant.RegisterRemark,
-			"month_amount":    monthAmount,
-			"month_count":     monthCount,
-			"terminal_count":  terminalCount,
-			"created_at":      createdAtStr,
-			"updated_at":      updatedAtStr,
-		},
+	response.Success(c, gin.H{
+		"id":              merchant.ID,
+		"merchant_no":     merchant.MerchantNo,
+		"merchant_name":   merchant.MerchantName,
+		"agent_id":        merchant.AgentID,
+		"agent_name":      agentName,
+		"agent_level":     agentLevel,
+		"channel_id":      merchant.ChannelID,
+		"channel_name":    channelName,
+		"terminal_sn":     merchant.TerminalSN,
+		"status":          merchant.Status,
+		"status_name":     getMerchantStatusName(merchant.Status),
+		"approve_status":  merchant.ApproveStatus,
+		"approve_name":    getMerchantApproveStatusName(merchant.ApproveStatus),
+		"legal_name":      merchant.LegalName,
+		"legal_id_card":   maskIDCard(merchant.LegalIDCard),
+		"mcc":             merchant.MCC,
+		"credit_rate":     merchant.CreditRate,
+		"debit_rate":      merchant.DebitRate,
+		"merchant_type":   merchant.MerchantType,
+		"is_direct":       merchant.IsDirect,
+		"activated_at":    activatedAtStr,
+		"registered_phone": getPhoneDisplay(merchant.AgentID, agentID, merchant.RegisteredPhone),
+		"register_remark": merchant.RegisterRemark,
+		"month_amount":    monthAmount,
+		"month_count":     monthCount,
+		"terminal_count":  terminalCount,
+		"created_at":      createdAtStr,
+		"updated_at":      updatedAtStr,
 	})
 }
 
@@ -291,22 +265,15 @@ func (h *MerchantHandler) GetMerchantStats(c *gin.Context) {
 
 	stats, err := h.merchantRepo.GetAgentMerchantStats(agentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"total_count":    stats.TotalCount,
-			"active_count":   stats.ActiveCount,
-			"pending_count":  stats.PendingCount,
-			"disabled_count": stats.DisabledCount,
-		},
+	response.Success(c, gin.H{
+		"total_count":    stats.TotalCount,
+		"active_count":   stats.ActiveCount,
+		"pending_count":  stats.PendingCount,
+		"disabled_count": stats.DisabledCount,
 	})
 }
 
@@ -329,27 +296,17 @@ func (h *MerchantHandler) GetMerchantTransactions(c *gin.Context) {
 	idStr := c.Param("id")
 	merchantID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
-	// 验证权限
 	merchant, err := h.merchantRepo.FindByID(merchantID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"code":    404,
-			"message": "商户不存在",
-		})
+		response.NotFound(c, "商户不存在")
 		return
 	}
 	if merchant.AgentID != agentID {
-		c.JSON(http.StatusForbidden, gin.H{
-			"code":    403,
-			"message": "无权访问该商户",
-		})
+		response.Forbidden(c, "无权访问该商户")
 		return
 	}
 
@@ -379,14 +336,10 @@ func (h *MerchantHandler) GetMerchantTransactions(c *gin.Context) {
 
 	transactions, total, err := h.transactionRepo.FindByMerchantID(merchantID, startTime, endTime, pageSize, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
-	// 转换为前端友好格式
 	list := make([]gin.H, 0, len(transactions))
 	for _, tx := range transactions {
 		list = append(list, gin.H{
@@ -405,16 +358,7 @@ func (h *MerchantHandler) GetMerchantTransactions(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      list,
-			"total":     total,
-			"page":      page,
-			"page_size": pageSize,
-		},
-	})
+	response.SuccessPage(c, list, total, page, pageSize)
 }
 
 // getMerchantStatusName 商户状态名称
@@ -547,32 +491,21 @@ func getMerchantTypeName(merchantType string) string {
 func (h *MerchantHandler) CreateMerchant(c *gin.Context) {
 	var req service.CreateMerchantRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
-	// 设置代理商ID为当前用户
 	req.AgentID = middleware.GetCurrentAgentID(c)
 
 	merchant, err := h.merchantService.CreateMerchant(&req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "创建成功",
-		"data": gin.H{
-			"id":          merchant.ID,
-			"merchant_no": merchant.MerchantNo,
-		},
+	response.Success(c, gin.H{
+		"id":          merchant.ID,
+		"merchant_no": merchant.MerchantNo,
 	})
 }
 
@@ -591,34 +524,22 @@ func (h *MerchantHandler) UpdateMerchant(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	var req service.UpdateMerchantRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
 	if err := h.merchantService.UpdateMerchant(id, &req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "更新成功",
-	})
+	response.SuccessMessage(c, "更新成功")
 }
 
 // DeleteMerchant 删除商户
@@ -636,25 +557,16 @@ func (h *MerchantHandler) DeleteMerchant(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	if err := h.merchantService.DeleteMerchant(id, agentID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "删除成功",
-	})
+	response.SuccessMessage(c, "删除成功")
 }
 
 // UpdateMerchantStatus 更新商户状态
@@ -674,34 +586,22 @@ func (h *MerchantHandler) UpdateMerchantStatus(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	var req service.UpdateStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
 	if err := h.merchantService.UpdateStatus(id, agentID, req.Status); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "状态更新成功",
-	})
+	response.SuccessMessage(c, "状态更新成功")
 }
 
 // UpdateMerchantRate 更新商户费率
@@ -721,44 +621,31 @@ func (h *MerchantHandler) UpdateMerchantRate(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	var req service.UpdateRateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
 	result, err := h.merchantService.UpdateRate(id, agentID, req.CreditRate, req.DebitRate)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	// 构建响应消息
 	message := "费率更新成功"
 	if result != nil && !result.SyncSuccess {
 		message = result.SyncMessage
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": message,
-		"data": gin.H{
-			"sync_success": result != nil && result.SyncSuccess,
-			"sync_message": result.SyncMessage,
-		},
+	response.Success(c, gin.H{
+		"message":      message,
+		"sync_success": result != nil && result.SyncSuccess,
+		"sync_message": result.SyncMessage,
 	})
 }
 
@@ -779,34 +666,22 @@ func (h *MerchantHandler) RegisterMerchant(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	var req service.RegisterMerchantRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
 	if err := h.merchantService.RegisterMerchant(id, agentID, req.Phone, req.Remark); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "登记成功",
-	})
+	response.SuccessMessage(c, "登记成功")
 }
 
 // GetExtendedStats 获取扩展统计
@@ -822,18 +697,11 @@ func (h *MerchantHandler) GetExtendedStats(c *gin.Context) {
 
 	stats, err := h.merchantService.GetExtendedStats(agentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    stats,
-	})
+	response.Success(c, stats)
 }
 
 // ExportMerchants 导出商户
@@ -874,10 +742,7 @@ func (h *MerchantHandler) ExportMerchants(c *gin.Context) {
 
 	merchants, err := h.merchantRepo.ExportMerchants(params)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 

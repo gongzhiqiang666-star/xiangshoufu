@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 	"time"
 
@@ -9,6 +8,7 @@ import (
 	"xiangshoufu/internal/models"
 	"xiangshoufu/internal/repository"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 )
 
 // AlertHandler 告警配置处理器
@@ -73,7 +73,7 @@ type AlertConfigResponse struct {
 func (h *AlertHandler) ListConfigs(c *gin.Context) {
 	configs, err := h.configRepo.FindAll()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败"})
+		response.InternalError(c, "查询失败")
 		return
 	}
 
@@ -92,10 +92,7 @@ func (h *AlertHandler) ListConfigs(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"data": list,
-	})
+	response.Success(c, list)
 }
 
 // CreateAlertConfigRequest 创建告警配置请求
@@ -122,20 +119,19 @@ type CreateAlertConfigRequest struct {
 func (h *AlertHandler) CreateConfig(c *gin.Context) {
 	var req CreateAlertConfigRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误: " + err.Error()})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
-	// 验证通道类型与配置
 	if req.ChannelType == models.AlertChannelDingTalk || req.ChannelType == models.AlertChannelWeChatWork {
 		if req.WebhookURL == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Webhook地址不能为空"})
+			response.BadRequest(c, "Webhook地址不能为空")
 			return
 		}
 	}
 	if req.ChannelType == models.AlertChannelEmail {
 		if req.EmailAddresses == "" || req.EmailSMTPHost == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "邮件配置不完整"})
+			response.BadRequest(c, "邮件配置不完整")
 			return
 		}
 	}
@@ -168,15 +164,11 @@ func (h *AlertHandler) CreateConfig(c *gin.Context) {
 	}
 
 	if err := h.configRepo.Create(config); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建失败"})
+		response.InternalError(c, "创建失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "创建成功",
-		"data":    gin.H{"id": config.ID},
-	})
+	response.Success(c, gin.H{"id": config.ID})
 }
 
 // GetConfig 获取告警配置详情
@@ -189,23 +181,19 @@ func (h *AlertHandler) CreateConfig(c *gin.Context) {
 func (h *AlertHandler) GetConfig(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
 	config, err := h.configRepo.FindByID(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "配置不存在"})
+		response.NotFound(c, "配置不存在")
 		return
 	}
 
-	// 不返回密码
 	config.EmailPassword = ""
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"data": config,
-	})
+	response.Success(c, config)
 }
 
 // UpdateAlertConfigRequest 更新告警配置请求
@@ -231,19 +219,19 @@ type UpdateAlertConfigRequest struct {
 func (h *AlertHandler) UpdateConfig(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
 	config, err := h.configRepo.FindByID(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "配置不存在"})
+		response.NotFound(c, "配置不存在")
 		return
 	}
 
 	var req UpdateAlertConfigRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
@@ -274,14 +262,11 @@ func (h *AlertHandler) UpdateConfig(c *gin.Context) {
 	}
 
 	if err := h.configRepo.Update(config); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新失败"})
+		response.InternalError(c, "更新失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "更新成功",
-	})
+	response.SuccessMessage(c, "更新成功")
 }
 
 // DeleteConfig 删除告警配置
@@ -294,19 +279,16 @@ func (h *AlertHandler) UpdateConfig(c *gin.Context) {
 func (h *AlertHandler) DeleteConfig(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
 	if err := h.configRepo.Delete(id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除失败"})
+		response.InternalError(c, "删除失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "删除成功",
-	})
+	response.SuccessMessage(c, "删除成功")
 }
 
 // EnableConfigRequest 启用/禁用配置请求
@@ -325,18 +307,18 @@ type EnableConfigRequest struct {
 func (h *AlertHandler) EnableConfig(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
 	var req EnableConfigRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
 	if err := h.configRepo.UpdateEnabled(id, req.IsEnabled); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新失败"})
+		response.InternalError(c, "更新失败")
 		return
 	}
 
@@ -345,10 +327,7 @@ func (h *AlertHandler) EnableConfig(c *gin.Context) {
 		status = "禁用"
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "配置已" + status,
-	})
+	response.SuccessMessage(c, "配置已"+status)
 }
 
 // TestConfig 测试告警配置
@@ -361,19 +340,16 @@ func (h *AlertHandler) EnableConfig(c *gin.Context) {
 func (h *AlertHandler) TestConfig(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
 	if err := h.alertService.TestAlert(id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "测试失败: " + err.Error()})
+		response.InternalError(c, "测试失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "测试消息已发送，请检查接收端",
-	})
+	response.SuccessMessage(c, "测试消息已发送，请检查接收端")
 }
 
 // ListAlertLogsRequest 告警日志列表请求
@@ -399,7 +375,7 @@ type ListAlertLogsRequest struct {
 func (h *AlertHandler) ListAlertLogs(c *gin.Context) {
 	var req ListAlertLogsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
@@ -433,19 +409,11 @@ func (h *AlertHandler) ListAlertLogs(c *gin.Context) {
 	}
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败"})
+		response.InternalError(c, "查询失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"data": gin.H{
-			"list":      logs,
-			"total":     total,
-			"page":      req.Page,
-			"page_size": req.PageSize,
-		},
-	})
+	response.SuccessPage(c, logs, total, req.Page, req.PageSize)
 }
 
 // GetAlertLog 告警日志详情
@@ -458,20 +426,17 @@ func (h *AlertHandler) ListAlertLogs(c *gin.Context) {
 func (h *AlertHandler) GetAlertLog(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		response.BadRequest(c, "参数错误")
 		return
 	}
 
 	log, err := h.logRepo.FindByID(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "日志不存在"})
+		response.NotFound(c, "日志不存在")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"data": log,
-	})
+	response.Success(c, log)
 }
 
 // maskWebhookURL 隐藏Webhook URL中的敏感信息

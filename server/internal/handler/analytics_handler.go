@@ -1,13 +1,13 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"xiangshoufu/internal/middleware"
 	"xiangshoufu/internal/models"
 	"xiangshoufu/internal/repository"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -47,21 +47,14 @@ func (h *AnalyticsHandler) GetAgentRanking(c *gin.Context) {
 
 	ranking, err := h.statsRepo.GetAgentRanking(agentID, period, rankBy, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "获取排名失败: " + err.Error(),
-		})
+		response.InternalError(c, "获取排名失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"ranking": ranking,
-			"period":  period,
-			"rank_by": rankBy,
-		},
+	response.Success(c, gin.H{
+		"ranking": ranking,
+		"period":  period,
+		"rank_by": rankBy,
 	})
 }
 
@@ -88,21 +81,14 @@ func (h *AnalyticsHandler) GetMerchantRanking(c *gin.Context) {
 
 	ranking, err := h.statsRepo.GetMerchantRanking(agentID, merchantType, scope, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "获取商户排名失败: " + err.Error(),
-		})
+		response.InternalError(c, "获取商户排名失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"ranking":       ranking,
-			"merchant_type": merchantType,
-			"scope":         scope,
-		},
+	response.Success(c, gin.H{
+		"ranking":       ranking,
+		"merchant_type": merchantType,
+		"scope":         scope,
 	})
 }
 
@@ -150,23 +136,19 @@ func (h *AnalyticsHandler) GetAnalyticsSummary(c *gin.Context) {
 	// 获取终端统计
 	terminalStats, _ := h.statsRepo.GetTerminalStats(agentID, scope)
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"summary": gin.H{
-				"trans_amount":      totalTransAmount,
-				"trans_amount_yuan": float64(totalTransAmount) / 100,
-				"trans_count":       totalTransCount,
-				"profit_total":      totalProfitTotal,
-				"profit_total_yuan": float64(totalProfitTotal) / 100,
-			},
-			"trend":        trend,
-			"distribution": distribution,
-			"terminal":     terminalStats,
-			"period":       period,
-			"scope":        scope,
+	response.Success(c, gin.H{
+		"summary": gin.H{
+			"trans_amount":      totalTransAmount,
+			"trans_amount_yuan": float64(totalTransAmount) / 100,
+			"trans_count":       totalTransCount,
+			"profit_total":      totalProfitTotal,
+			"profit_total_yuan": float64(totalProfitTotal) / 100,
 		},
+		"trend":        trend,
+		"distribution": distribution,
+		"terminal":     terminalStats,
+		"period":       period,
+		"scope":        scope,
 	})
 }
 

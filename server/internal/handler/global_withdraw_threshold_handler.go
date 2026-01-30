@@ -1,9 +1,9 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -26,17 +26,13 @@ func NewGlobalWithdrawThresholdHandler(svc *service.GlobalWithdrawThresholdServi
 // @Success 200 {object} service.ThresholdListResponse
 // @Router /api/v1/withdraw-thresholds [get]
 func (h *GlobalWithdrawThresholdHandler) GetThresholds(c *gin.Context) {
-	response, err := h.svc.GetAllThresholds()
+	resp, err := h.svc.GetAllThresholds()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "获取门槛配置失败: " + err.Error()})
+		response.InternalError(c, "获取门槛配置失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    response,
-	})
+	response.Success(c, resp)
 }
 
 // SetGeneralThresholds 设置通用门槛
@@ -51,16 +47,16 @@ func (h *GlobalWithdrawThresholdHandler) GetThresholds(c *gin.Context) {
 func (h *GlobalWithdrawThresholdHandler) SetGeneralThresholds(c *gin.Context) {
 	var req service.SetGeneralThresholdRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "参数错误: " + err.Error()})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
 	if err := h.svc.SetGeneralThresholds(&req); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "设置门槛失败: " + err.Error()})
+		response.InternalError(c, "设置门槛失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "设置成功", "data": nil})
+	response.SuccessMessage(c, "设置成功")
 }
 
 // SetChannelThresholds 设置通道门槛
@@ -75,21 +71,21 @@ func (h *GlobalWithdrawThresholdHandler) SetGeneralThresholds(c *gin.Context) {
 func (h *GlobalWithdrawThresholdHandler) SetChannelThresholds(c *gin.Context) {
 	var req service.SetChannelThresholdRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "参数错误: " + err.Error()})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
 	if req.ChannelID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "通道ID不能为空"})
+		response.BadRequest(c, "通道ID不能为空")
 		return
 	}
 
 	if err := h.svc.SetChannelThresholds(&req); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "设置门槛失败: " + err.Error()})
+		response.InternalError(c, "设置门槛失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "设置成功", "data": nil})
+	response.SuccessMessage(c, "设置成功")
 }
 
 // DeleteChannelThreshold 删除通道门槛
@@ -104,14 +100,14 @@ func (h *GlobalWithdrawThresholdHandler) DeleteChannelThreshold(c *gin.Context) 
 	channelIDStr := c.Param("channel_id")
 	channelID, err := strconv.ParseInt(channelIDStr, 10, 64)
 	if err != nil || channelID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "通道ID无效"})
+		response.BadRequest(c, "通道ID无效")
 		return
 	}
 
 	if err := h.svc.DeleteChannelThreshold(channelID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "删除门槛失败: " + err.Error()})
+		response.InternalError(c, "删除门槛失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "删除成功", "data": nil})
+	response.SuccessMessage(c, "删除成功")
 }

@@ -1,11 +1,11 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"xiangshoufu/internal/middleware"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -50,10 +50,7 @@ type CreateTaxChannelRequest struct {
 func (h *TaxChannelHandler) CreateTaxChannel(c *gin.Context) {
 	var req CreateTaxChannelRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -71,20 +68,11 @@ func (h *TaxChannelHandler) CreateTaxChannel(c *gin.Context) {
 
 	taxChannel, err := h.taxChannelService.CreateTaxChannel(serviceReq)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "创建成功",
-		"data": gin.H{
-			"id": taxChannel.ID,
-		},
-	})
+	response.SuccessWithMessage(c, gin.H{"id": taxChannel.ID}, "创建成功")
 }
 
 // UpdateTaxChannelRequest 更新税筹通道请求
@@ -115,19 +103,13 @@ func (h *TaxChannelHandler) UpdateTaxChannel(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	var req UpdateTaxChannelRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -145,17 +127,11 @@ func (h *TaxChannelHandler) UpdateTaxChannel(c *gin.Context) {
 	}
 
 	if _, err := h.taxChannelService.UpdateTaxChannel(serviceReq); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "更新成功",
-	})
+	response.SuccessMessage(c, "更新成功")
 }
 
 // GetTaxChannel 获取税筹通道详情
@@ -171,27 +147,17 @@ func (h *TaxChannelHandler) GetTaxChannel(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	taxChannel, err := h.taxChannelService.GetTaxChannel(id)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    taxChannel,
-	})
+	response.Success(c, taxChannel)
 }
 
 // GetTaxChannelList 获取税筹通道列表
@@ -215,20 +181,13 @@ func (h *TaxChannelHandler) GetTaxChannelList(c *gin.Context) {
 
 	list, err := h.taxChannelService.GetTaxChannelList(status)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":  list,
-			"total": len(list),
-		},
+	response.Success(c, gin.H{
+		"list":  list,
+		"total": len(list),
 	})
 }
 
@@ -245,25 +204,16 @@ func (h *TaxChannelHandler) DeleteTaxChannel(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	if err := h.taxChannelService.DeleteTaxChannel(id); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "删除成功",
-	})
+	response.SuccessMessage(c, "删除成功")
 }
 
 // ========== 通道-税筹通道映射 ==========
@@ -288,10 +238,7 @@ type SetChannelTaxMappingRequest struct {
 func (h *TaxChannelHandler) SetChannelTaxMapping(c *gin.Context) {
 	var req SetChannelTaxMappingRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -302,17 +249,11 @@ func (h *TaxChannelHandler) SetChannelTaxMapping(c *gin.Context) {
 	}
 
 	if err := h.taxChannelService.SetChannelTaxMapping(serviceReq); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "设置成功",
-	})
+	response.SuccessMessage(c, "设置成功")
 }
 
 // GetChannelTaxMappings 获取通道税筹映射
@@ -328,29 +269,17 @@ func (h *TaxChannelHandler) GetChannelTaxMappings(c *gin.Context) {
 	channelIDStr := c.Param("channel_id")
 	channelID, err := strconv.ParseInt(channelIDStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的通道ID",
-		})
+		response.BadRequest(c, "无效的通道ID")
 		return
 	}
 
 	mappings, err := h.taxChannelService.GetChannelTaxMappings(channelID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list": mappings,
-		},
-	})
+	response.Success(c, gin.H{"list": mappings})
 }
 
 // DeleteChannelTaxMapping 删除通道税筹映射
@@ -366,25 +295,16 @@ func (h *TaxChannelHandler) DeleteChannelTaxMapping(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	if err := h.taxChannelService.DeleteChannelTaxMapping(id); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "删除成功",
-	})
+	response.SuccessMessage(c, "删除成功")
 }
 
 // ========== 税费计算 ==========
@@ -409,27 +329,17 @@ type CalculateTaxRequest struct {
 func (h *TaxChannelHandler) CalculateWithdrawalTax(c *gin.Context) {
 	var req CalculateTaxRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
 	result, err := h.taxChannelService.CalculateWithdrawalTax(req.ChannelID, req.WalletType, req.Amount)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    result,
-	})
+	response.Success(c, result)
 }
 
 // RegisterTaxChannelRoutes 注册税筹通道路由

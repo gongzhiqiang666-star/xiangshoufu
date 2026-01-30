@@ -1,10 +1,9 @@
 package handler
 
 import (
-	"net/http"
-
 	"xiangshoufu/internal/middleware"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -40,19 +39,12 @@ func (h *WalletHandler) GetWalletList(c *gin.Context) {
 
 	list, err := h.walletService.GetWalletList(agentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list": list,
-		},
+	response.Success(c, gin.H{
+		"list": list,
 	})
 }
 
@@ -69,18 +61,11 @@ func (h *WalletHandler) GetWalletSummary(c *gin.Context) {
 
 	summary, err := h.walletService.GetWalletSummary(agentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    summary,
-	})
+	response.Success(c, summary)
 }
 
 // GetWalletLogs 获取钱包流水
@@ -100,10 +85,7 @@ func (h *WalletHandler) GetWalletLogs(c *gin.Context) {
 
 	var req service.GetWalletLogsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -116,23 +98,11 @@ func (h *WalletHandler) GetWalletLogs(c *gin.Context) {
 
 	logs, total, err := h.walletService.GetWalletLogs(agentID, &req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      logs,
-			"total":     total,
-			"page":      req.Page,
-			"page_size": req.PageSize,
-		},
-	})
+	response.SuccessPage(c, logs, total, req.Page, req.PageSize)
 }
 
 // WithdrawRequest 提现请求
@@ -157,10 +127,7 @@ func (h *WalletHandler) Withdraw(c *gin.Context) {
 
 	var req WalletWithdrawRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -172,28 +139,20 @@ func (h *WalletHandler) Withdraw(c *gin.Context) {
 	}
 
 	if err := h.walletService.Withdraw(serviceReq); err != nil {
-		// 记录提现失败审计日志
 		if h.auditService != nil {
 			auditCtx := service.NewAuditContextFromGin(c)
 			h.auditService.LogWithdraw(auditCtx, 0, req.Amount, false, err.Error())
 		}
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	// 记录提现成功审计日志
 	if h.auditService != nil {
 		auditCtx := service.NewAuditContextFromGin(c)
 		h.auditService.LogWithdraw(auditCtx, 0, req.Amount, true, "")
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "提现申请已提交",
-	})
+	response.SuccessMessage(c, "提现申请已提交")
 }
 
 // RegisterWalletRoutes 注册钱包路由

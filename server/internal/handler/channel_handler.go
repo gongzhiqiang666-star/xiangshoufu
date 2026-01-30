@@ -1,12 +1,12 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 )
 
 // ChannelHandler 通道处理器
@@ -27,26 +27,17 @@ func (h *ChannelHandler) GetRateTypes(c *gin.Context) {
 	channelIDStr := c.Param("channelId")
 	channelID, err := strconv.ParseInt(channelIDStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的通道ID",
-		})
+		response.BadRequest(c, "无效的通道ID")
 		return
 	}
 
 	rateTypes, err := h.channelService.GetRateTypes(channelID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"data": rateTypes,
-	})
+	response.Success(c, rateTypes)
 }
 
 // GetChannelList 获取通道列表
@@ -54,17 +45,11 @@ func (h *ChannelHandler) GetRateTypes(c *gin.Context) {
 func (h *ChannelHandler) GetChannelList(c *gin.Context) {
 	channels, err := h.channelService.GetEnabledChannels()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"data": channels,
-	})
+	response.Success(c, channels)
 }
 
 // GetChannelDetail 获取通道详情
@@ -73,24 +58,15 @@ func (h *ChannelHandler) GetChannelDetail(c *gin.Context) {
 	channelIDStr := c.Param("channelId")
 	channelID, err := strconv.ParseInt(channelIDStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的通道ID",
-		})
+		response.BadRequest(c, "无效的通道ID")
 		return
 	}
 
 	channel, err := h.channelService.GetChannelByID(channelID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"code":    404,
-			"message": "通道不存在",
-		})
+		response.NotFound(c, "通道不存在")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"data": channel,
-	})
+	response.Success(c, channel)
 }

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -12,13 +13,15 @@ import (
 
 // ChannelService 通道服务
 type ChannelService struct {
-	channelRepo *repository.GormChannelRepository
+	channelRepo       *repository.GormChannelRepository
+	channelConfigRepo *repository.GormChannelConfigRepository
 }
 
 // NewChannelService 创建通道服务
-func NewChannelService(channelRepo *repository.GormChannelRepository) *ChannelService {
+func NewChannelService(channelRepo *repository.GormChannelRepository, channelConfigRepo *repository.GormChannelConfigRepository) *ChannelService {
 	return &ChannelService{
-		channelRepo: channelRepo,
+		channelRepo:       channelRepo,
+		channelConfigRepo: channelConfigRepo,
 	}
 }
 
@@ -30,12 +33,42 @@ type ChannelConfig struct {
 }
 
 // GetRateTypes 获取通道费率类型列表
+// 优先从 channel_rate_configs 表读取，确保与通道配置管理页面数据一致
 func (s *ChannelService) GetRateTypes(channelID int64) ([]models.RateTypeDefinition, error) {
-	channel, err := s.channelRepo.FindByID(channelID)
+	// 验证通道存在
+	_, err := s.channelRepo.FindByID(channelID)
 	if err != nil {
 		return nil, fmt.Errorf("通道不存在: %d", channelID)
 	}
 
+	// 优先从 channel_rate_configs 表读取（新版数据源）
+	if s.channelConfigRepo != nil {
+		rateConfigs, err := s.channelConfigRepo.GetRateConfigs(context.Background(), channelID)
+		if err == nil && len(rateConfigs) > 0 {
+			rateTypes := make([]models.RateTypeDefinition, 0, len(rateConfigs))
+			for _, rc := range rateConfigs {
+				if rc.Status != 1 {
+					continue // 跳过禁用的配置
+				}
+				rateTypes = append(rateTypes, models.RateTypeDefinition{
+					Code:        rc.RateCode,
+					Name:        rc.RateName,
+					MinRate:     rc.MinRate,
+					MaxRate:     rc.MaxRate,
+					DefaultRate: rc.DefaultRate,
+					SortOrder:   rc.SortOrder,
+				})
+			}
+			// 按 sort_order 排序
+			sort.Slice(rateTypes, func(i, j int) bool {
+				return rateTypes[i].SortOrder < rateTypes[j].SortOrder
+			})
+			return rateTypes, nil
+		}
+	}
+
+	// 降级：从 channels.config JSON 读取（兼容旧数据）
+	channel, _ := s.channelRepo.FindByID(channelID)
 	if channel.Config == "" {
 		return []models.RateTypeDefinition{}, nil
 	}

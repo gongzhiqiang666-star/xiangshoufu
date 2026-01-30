@@ -954,10 +954,14 @@ func (s *PolicyService) validateTemplateAgainstChannel(ctx context.Context, chan
 	}
 
 	// 3. 校验押金返现配置
-	for _, dc := range req.DepositCashbacks {
-		depositTier := findChannelDepositTier(channelConfig.DepositTiers, dc.DepositAmount)
-		if depositTier != nil && depositTier.MaxCashbackAmount > 0 {
-			if dc.CashbackAmount > depositTier.MaxCashbackAmount {
+	// 如果通道配置了押金档位，则必须验证档位存在性和返现上限
+	if len(channelConfig.DepositTiers) > 0 {
+		for _, dc := range req.DepositCashbacks {
+			depositTier := findChannelDepositTier(channelConfig.DepositTiers, dc.DepositAmount)
+			if depositTier == nil {
+				return fmt.Errorf("押金档位%d元在通道配置中不存在", dc.DepositAmount/100)
+			}
+			if depositTier.MaxCashbackAmount > 0 && dc.CashbackAmount > depositTier.MaxCashbackAmount {
 				return fmt.Errorf("押金%d元的返现%d元超过通道上限%d元",
 					dc.DepositAmount/100, dc.CashbackAmount/100, depositTier.MaxCashbackAmount/100)
 			}
@@ -965,22 +969,32 @@ func (s *PolicyService) validateTemplateAgainstChannel(ctx context.Context, chan
 	}
 
 	// 4. 校验流量费返现配置
-	if req.SimCashback != nil {
+	// 如果通道配置了流量费档位，则必须验证档位存在性和返现上限
+	if req.SimCashback != nil && len(channelConfig.SimCashbackTiers) > 0 {
 		// 校验首次返现
 		tier1 := findChannelSimCashbackTier(channelConfig.SimCashbackTiers, 1)
-		if tier1 != nil && req.SimCashback.FirstTimeCashback > tier1.MaxCashbackAmount {
+		if tier1 == nil {
+			return fmt.Errorf("流量费首次档位在通道配置中不存在")
+		}
+		if req.SimCashback.FirstTimeCashback > tier1.MaxCashbackAmount {
 			return fmt.Errorf("首次流量费返现%d元超过通道上限%d元",
 				req.SimCashback.FirstTimeCashback/100, tier1.MaxCashbackAmount/100)
 		}
 		// 校验第2次返现
 		tier2 := findChannelSimCashbackTier(channelConfig.SimCashbackTiers, 2)
-		if tier2 != nil && req.SimCashback.SecondTimeCashback > tier2.MaxCashbackAmount {
+		if tier2 == nil {
+			return fmt.Errorf("流量费第2次档位在通道配置中不存在")
+		}
+		if req.SimCashback.SecondTimeCashback > tier2.MaxCashbackAmount {
 			return fmt.Errorf("第2次流量费返现%d元超过通道上限%d元",
 				req.SimCashback.SecondTimeCashback/100, tier2.MaxCashbackAmount/100)
 		}
 		// 校验第3次及以后返现
 		tier3 := findChannelSimCashbackTier(channelConfig.SimCashbackTiers, 3)
-		if tier3 != nil && req.SimCashback.ThirdPlusCashback > tier3.MaxCashbackAmount {
+		if tier3 == nil {
+			return fmt.Errorf("流量费第3次及以后档位在通道配置中不存在")
+		}
+		if req.SimCashback.ThirdPlusCashback > tier3.MaxCashbackAmount {
 			return fmt.Errorf("第3次及以后流量费返现%d元超过通道上限%d元",
 				req.SimCashback.ThirdPlusCashback/100, tier3.MaxCashbackAmount/100)
 		}

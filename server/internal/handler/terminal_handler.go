@@ -1,13 +1,13 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"xiangshoufu/internal/middleware"
 	"xiangshoufu/internal/models"
 	"xiangshoufu/internal/repository"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -102,10 +102,7 @@ func (h *TerminalHandler) GetTerminalList(c *gin.Context) {
 
 	terminals, total, err := h.terminalRepo.FindByOwnerWithFilter(params)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
@@ -132,16 +129,7 @@ func (h *TerminalHandler) GetTerminalList(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      list,
-			"total":     total,
-			"page":      page,
-			"page_size": pageSize,
-		},
-	})
+	response.SuccessPage(c, list, total, page, pageSize)
 }
 
 // getTerminalStatusGroup 获取终端状态分组
@@ -181,43 +169,33 @@ func (h *TerminalHandler) GetTerminalDetail(c *gin.Context) {
 
 	terminal, err := h.terminalRepo.FindBySN(sn)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"code":    404,
-			"message": "终端不存在",
-		})
+		response.NotFound(c, "终端不存在")
 		return
 	}
 
 	// 验证权限
 	if terminal.OwnerAgentID != agentID {
-		c.JSON(http.StatusForbidden, gin.H{
-			"code":    403,
-			"message": "无权访问该终端",
-		})
+		response.Forbidden(c, "无权访问该终端")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"id":             terminal.ID,
-			"terminal_sn":    terminal.TerminalSN,
-			"channel_id":     terminal.ChannelID,
-			"channel_code":   terminal.ChannelCode,
-			"brand_code":     terminal.BrandCode,
-			"model_code":     terminal.ModelCode,
-			"merchant_id":    terminal.MerchantID,
-			"merchant_no":    terminal.MerchantNo,
-			"status":         terminal.Status,
-			"status_name":    getTerminalStatusName(terminal.Status),
-			"sim_fee_count":  terminal.SimFeeCount,
-			"last_sim_fee_at": terminal.LastSimFeeAt,
-			"activated_at":   terminal.ActivatedAt,
-			"bound_at":       terminal.BoundAt,
-			"created_at":     terminal.CreatedAt,
-			"updated_at":     terminal.UpdatedAt,
-		},
+	response.Success(c, gin.H{
+		"id":              terminal.ID,
+		"terminal_sn":     terminal.TerminalSN,
+		"channel_id":      terminal.ChannelID,
+		"channel_code":    terminal.ChannelCode,
+		"brand_code":      terminal.BrandCode,
+		"model_code":      terminal.ModelCode,
+		"merchant_id":     terminal.MerchantID,
+		"merchant_no":     terminal.MerchantNo,
+		"status":          terminal.Status,
+		"status_name":     getTerminalStatusName(terminal.Status),
+		"sim_fee_count":   terminal.SimFeeCount,
+		"last_sim_fee_at": terminal.LastSimFeeAt,
+		"activated_at":    terminal.ActivatedAt,
+		"bound_at":        terminal.BoundAt,
+		"created_at":      terminal.CreatedAt,
+		"updated_at":      terminal.UpdatedAt,
 	})
 }
 
@@ -234,18 +212,11 @@ func (h *TerminalHandler) GetTerminalStats(c *gin.Context) {
 
 	stats, err := h.terminalService.GetTerminalStats(agentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "获取统计失败: " + err.Error(),
-		})
+		response.InternalError(c, "获取统计失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    stats,
-	})
+	response.Success(c, stats)
 }
 
 // ImportTerminalsRequest 终端入库请求
@@ -270,10 +241,7 @@ type ImportTerminalsRequest struct {
 func (h *TerminalHandler) ImportTerminals(c *gin.Context) {
 	var req ImportTerminalsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -292,18 +260,11 @@ func (h *TerminalHandler) ImportTerminals(c *gin.Context) {
 
 	result, err := h.terminalService.ImportTerminals(serviceReq)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "入库完成",
-		"data":    result,
-	})
+	response.Success(c, result)
 }
 
 // RecallTerminalRequest 终端回拨请求
@@ -327,10 +288,7 @@ type RecallTerminalRequest struct {
 func (h *TerminalHandler) RecallTerminal(c *gin.Context) {
 	var req RecallTerminalRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -350,18 +308,11 @@ func (h *TerminalHandler) RecallTerminal(c *gin.Context) {
 
 	recall, err := h.terminalService.RecallTerminal(serviceReq)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "回拨成功，等待接收方确认",
-		"data":    recall,
-	})
+	response.Success(c, recall)
 }
 
 // BatchRecallRequest 批量回拨请求
@@ -384,10 +335,7 @@ type BatchRecallRequest struct {
 func (h *TerminalHandler) BatchRecallTerminals(c *gin.Context) {
 	var req BatchRecallRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -406,18 +354,11 @@ func (h *TerminalHandler) BatchRecallTerminals(c *gin.Context) {
 
 	result, err := h.terminalService.BatchRecallTerminals(serviceReq)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "批量回拨完成",
-		"data":    result,
-	})
+	response.Success(c, result)
 }
 
 // ConfirmRecall 确认接收终端回拨
@@ -433,27 +374,18 @@ func (h *TerminalHandler) ConfirmRecall(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	confirmedBy := getCurrentUserID(c)
 
 	if err := h.terminalService.ConfirmRecall(id, confirmedBy); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "确认成功",
-	})
+	response.SuccessMessage(c, "确认成功")
 }
 
 // RejectRecall 拒绝终端回拨
@@ -469,27 +401,18 @@ func (h *TerminalHandler) RejectRecall(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	confirmedBy := getCurrentUserID(c)
 
 	if err := h.terminalService.RejectRecall(id, confirmedBy); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "已拒绝",
-	})
+	response.SuccessMessage(c, "已拒绝")
 }
 
 // CancelRecall 取消终端回拨
@@ -505,27 +428,18 @@ func (h *TerminalHandler) CancelRecall(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	cancelBy := middleware.GetCurrentAgentID(c)
 
 	if err := h.terminalService.CancelRecall(id, cancelBy); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "已取消",
-	})
+	response.SuccessMessage(c, "已取消")
 }
 
 // GetRecallList 获取回拨列表
@@ -543,10 +457,7 @@ func (h *TerminalHandler) CancelRecall(c *gin.Context) {
 func (h *TerminalHandler) GetRecallList(c *gin.Context) {
 	direction := c.Query("direction")
 	if direction != "from" && direction != "to" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "direction 参数必须是 from 或 to",
-		})
+		response.BadRequest(c, "direction 参数必须是 from 或 to")
 		return
 	}
 
@@ -564,23 +475,11 @@ func (h *TerminalHandler) GetRecallList(c *gin.Context) {
 
 	list, total, err := h.terminalService.GetRecallList(agentID, direction, nil, pageSize, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": err.Error(),
-		})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      list,
-			"total":     total,
-			"page":      page,
-			"page_size": pageSize,
-		},
-	})
+	response.SuccessPage(c, list, total, page, pageSize)
 }
 
 // getTerminalStatusName 终端状态名称
@@ -647,16 +546,12 @@ func RegisterTerminalRoutes(r *gin.RouterGroup, h *TerminalHandler, authService 
 // @Success 200 {object} map[string]interface{}
 // @Router /api/v1/terminals/policy-options [get]
 func (h *TerminalHandler) GetPolicyOptions(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"rate_options":              models.RateOptions,
-			"first_sim_fee_options":     models.FirstSimFeeOptions,
-			"non_first_sim_fee_options": models.NonFirstSimFeeOptions,
-			"sim_fee_interval_options":  models.SimFeeIntervalDaysOptions,
-			"deposit_options":           models.DepositOptions,
-		},
+	response.Success(c, gin.H{
+		"rate_options":              models.RateOptions,
+		"first_sim_fee_options":     models.FirstSimFeeOptions,
+		"non_first_sim_fee_options": models.NonFirstSimFeeOptions,
+		"sim_fee_interval_options":  models.SimFeeIntervalDaysOptions,
+		"deposit_options":           models.DepositOptions,
 	})
 }
 
@@ -675,18 +570,11 @@ func (h *TerminalHandler) GetTerminalPolicy(c *gin.Context) {
 
 	policy, err := h.terminalService.GetTerminalPolicy(sn, agentID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"code":    404,
-			"message": err.Error(),
-		})
+		response.NotFound(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    policy,
-	})
+	response.Success(c, policy)
 }
 
 // BatchSetRateRequest 批量设置费率请求
@@ -713,10 +601,7 @@ type BatchSetRateRequest struct {
 func (h *TerminalHandler) BatchSetRate(c *gin.Context) {
 	var req BatchSetRateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -736,18 +621,11 @@ func (h *TerminalHandler) BatchSetRate(c *gin.Context) {
 	})
 
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "设置成功",
-		"data":    result,
-	})
+	response.Success(c, result)
 }
 
 // BatchSetSimFeeRequest 批量设置SIM卡费用请求
@@ -771,10 +649,7 @@ type BatchSetSimFeeRequest struct {
 func (h *TerminalHandler) BatchSetSimFee(c *gin.Context) {
 	var req BatchSetSimFeeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -791,18 +666,11 @@ func (h *TerminalHandler) BatchSetSimFee(c *gin.Context) {
 	})
 
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "设置成功",
-		"data":    result,
-	})
+	response.Success(c, result)
 }
 
 // BatchSetDepositRequest 批量设置押金请求
@@ -824,10 +692,7 @@ type BatchSetDepositRequest struct {
 func (h *TerminalHandler) BatchSetDeposit(c *gin.Context) {
 	var req BatchSetDepositRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "参数错误: " + err.Error(),
-		})
+		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 
@@ -842,18 +707,11 @@ func (h *TerminalHandler) BatchSetDeposit(c *gin.Context) {
 	})
 
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": err.Error(),
-		})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "设置成功",
-		"data":    result,
-	})
+	response.Success(c, result)
 }
 
 // GetFilterOptions 获取筛选选项
@@ -883,41 +741,28 @@ func (h *TerminalHandler) GetFilterOptions(c *gin.Context) {
 	// 获取通道列表
 	channels, err := h.terminalRepo.GetChannelList(agentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "获取通道列表失败: " + err.Error(),
-		})
+		response.InternalError(c, "获取通道列表失败: "+err.Error())
 		return
 	}
 
 	// 获取终端类型列表
 	terminalTypes, err := h.terminalRepo.GetTerminalTypes(agentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "获取终端类型失败: " + err.Error(),
-		})
+		response.InternalError(c, "获取终端类型失败: "+err.Error())
 		return
 	}
 
 	// 获取状态分组统计
 	statusGroups, err := h.terminalRepo.GetStatusGroupCounts(agentID, channelID, brandCode, modelCode)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "获取状态统计失败: " + err.Error(),
-		})
+		response.InternalError(c, "获取状态统计失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"channels":       channels,
-			"terminal_types": terminalTypes,
-			"status_groups":  statusGroups,
-		},
+	response.Success(c, gin.H{
+		"channels":       channels,
+		"terminal_types": terminalTypes,
+		"status_groups":  statusGroups,
 	})
 }
 
@@ -940,18 +785,12 @@ func (h *TerminalHandler) GetTerminalFlowLogs(c *gin.Context) {
 	// 验证终端权限
 	terminal, err := h.terminalRepo.FindBySN(sn)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"code":    404,
-			"message": "终端不存在",
-		})
+		response.NotFound(c, "终端不存在")
 		return
 	}
 
 	if terminal.OwnerAgentID != agentID {
-		c.JSON(http.StatusForbidden, gin.H{
-			"code":    403,
-			"message": "无权访问该终端",
-		})
+		response.Forbidden(c, "无权访问该终端")
 		return
 	}
 
@@ -970,28 +809,21 @@ func (h *TerminalHandler) GetTerminalFlowLogs(c *gin.Context) {
 
 	logs, total, err := h.terminalRepo.GetTerminalFlowLogs(sn, logType, pageSize, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "获取流动记录失败: " + err.Error(),
-		})
+		response.InternalError(c, "获取流动记录失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"terminal": gin.H{
-				"terminal_sn":  terminal.TerminalSN,
-				"channel_id":   terminal.ChannelID,
-				"channel_code": terminal.ChannelCode,
-				"brand_code":   terminal.BrandCode,
-				"model_code":   terminal.ModelCode,
-			},
-			"list":      logs,
-			"total":     total,
-			"page":      page,
-			"page_size": pageSize,
+	response.Success(c, gin.H{
+		"terminal": gin.H{
+			"terminal_sn":  terminal.TerminalSN,
+			"channel_id":   terminal.ChannelID,
+			"channel_code": terminal.ChannelCode,
+			"brand_code":   terminal.BrandCode,
+			"model_code":   terminal.ModelCode,
 		},
+		"list":      logs,
+		"total":     total,
+		"page":      page,
+		"page_size": pageSize,
 	})
 }

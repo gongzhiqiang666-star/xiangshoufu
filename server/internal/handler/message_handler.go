@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 	"strings"
 
@@ -9,16 +8,15 @@ import (
 	"xiangshoufu/internal/models"
 	"xiangshoufu/internal/repository"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
 
-// MessageHandler 消息处理器
 type MessageHandler struct {
 	messageRepo *repository.GormMessageRepository
 }
 
-// NewMessageHandler 创建消息处理器
 func NewMessageHandler(messageRepo *repository.GormMessageRepository) *MessageHandler {
 	return &MessageHandler{
 		messageRepo: messageRepo,
@@ -50,16 +48,13 @@ func (h *MessageHandler) GetMessageList(c *gin.Context) {
 	}
 	offset := (page - 1) * pageSize
 
-	// 解析类型筛选参数
 	var types []int16
 	typeStr := c.Query("type")
 	category := c.Query("category")
 
 	if category != "" && category != "all" {
-		// 按分类获取类型
 		types = models.GetMessageTypesByCategory(category)
 	} else if typeStr != "" {
-		// 按指定类型筛选
 		typeStrs := strings.Split(typeStr, ",")
 		for _, ts := range typeStrs {
 			if t, err := strconv.ParseInt(strings.TrimSpace(ts), 10, 16); err == nil {
@@ -85,14 +80,10 @@ func (h *MessageHandler) GetMessageList(c *gin.Context) {
 	}
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
-	// 转换为前端友好格式
 	list := make([]gin.H, 0, len(messages))
 	for _, m := range messages {
 		list = append(list, gin.H{
@@ -107,16 +98,7 @@ func (h *MessageHandler) GetMessageList(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"list":      list,
-			"total":     total,
-			"page":      page,
-			"page_size": pageSize,
-		},
-	})
+	response.SuccessPage(c, list, total, page, pageSize)
 }
 
 // GetUnreadCount 获取未读消息数
@@ -132,19 +114,12 @@ func (h *MessageHandler) GetUnreadCount(c *gin.Context) {
 
 	messages, err := h.messageRepo.FindUnreadByAgentID(agentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"count": len(messages),
-		},
+	response.Success(c, gin.H{
+		"count": len(messages),
 	})
 }
 
@@ -161,24 +136,17 @@ func (h *MessageHandler) GetMessageStats(c *gin.Context) {
 
 	stats, err := h.messageRepo.GetStatsByAgentID(agentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "查询失败: " + err.Error(),
-		})
+		response.InternalError(c, "查询失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"total":             stats.Total,
-			"unread_total":      stats.UnreadTotal,
-			"profit_count":      stats.ProfitCount,
-			"register_count":    stats.RegisterCount,
-			"consumption_count": stats.ConsumptionCount,
-			"system_count":      stats.SystemCount,
-		},
+	response.Success(c, gin.H{
+		"total":             stats.Total,
+		"unread_total":      stats.UnreadTotal,
+		"profit_count":      stats.ProfitCount,
+		"register_count":    stats.RegisterCount,
+		"consumption_count": stats.ConsumptionCount,
+		"system_count":      stats.SystemCount,
 	})
 }
 
@@ -196,52 +164,37 @@ func (h *MessageHandler) GetMessageDetail(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	message, err := h.messageRepo.FindByID(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"code":    404,
-			"message": "消息不存在",
-		})
+		response.NotFound(c, "消息不存在")
 		return
 	}
 
-	// 验证消息归属
 	if message.AgentID != agentID {
-		c.JSON(http.StatusForbidden, gin.H{
-			"code":    403,
-			"message": "无权查看此消息",
-		})
+		response.Forbidden(c, "无权查看此消息")
 		return
 	}
 
-	// 自动标记为已读
 	if !message.IsRead {
 		_ = h.messageRepo.MarkAsRead(id)
 		message.IsRead = true
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"id":           message.ID,
-			"title":        message.Title,
-			"content":      message.Content,
-			"message_type": message.MessageType,
-			"type_name":    models.GetMessageTypeName(message.MessageType),
-			"is_read":      message.IsRead,
-			"related_id":   message.RelatedID,
-			"related_type": message.RelatedType,
-			"expire_at":    message.ExpireAt,
-			"created_at":   message.CreatedAt,
-		},
+	response.Success(c, gin.H{
+		"id":           message.ID,
+		"title":        message.Title,
+		"content":      message.Content,
+		"message_type": message.MessageType,
+		"type_name":    models.GetMessageTypeName(message.MessageType),
+		"is_read":      message.IsRead,
+		"related_id":   message.RelatedID,
+		"related_type": message.RelatedType,
+		"expire_at":    message.ExpireAt,
+		"created_at":   message.CreatedAt,
 	})
 }
 
@@ -258,25 +211,16 @@ func (h *MessageHandler) MarkAsRead(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "无效的ID",
-		})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	if err := h.messageRepo.MarkAsRead(id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "操作失败: " + err.Error(),
-		})
+		response.InternalError(c, "操作失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-	})
+	response.SuccessMessage(c, "success")
 }
 
 // MarkAllAsRead 标记全部已读
@@ -291,17 +235,11 @@ func (h *MessageHandler) MarkAllAsRead(c *gin.Context) {
 	agentID := middleware.GetCurrentAgentID(c)
 
 	if err := h.messageRepo.MarkAllAsRead(agentID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "操作失败: " + err.Error(),
-		})
+		response.InternalError(c, "操作失败: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-	})
+	response.SuccessMessage(c, "success")
 }
 
 // GetMessageTypes 获取消息类型列表
@@ -332,17 +270,12 @@ func (h *MessageHandler) GetMessageTypes(c *gin.Context) {
 		{"value": "system", "label": "系统"},
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"types":      types,
-			"categories": categories,
-		},
+	response.Success(c, gin.H{
+		"types":      types,
+		"categories": categories,
 	})
 }
 
-// RegisterMessageRoutes 注册消息中心路由
 func RegisterMessageRoutes(r *gin.RouterGroup, h *MessageHandler, authService *service.AuthService) {
 	messages := r.Group("/messages")
 	messages.Use(middleware.AuthMiddleware(authService))

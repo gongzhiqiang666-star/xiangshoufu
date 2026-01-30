@@ -1,12 +1,12 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"xiangshoufu/internal/models"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 )
 
 // PriceChangeLogHandler 调价记录处理器
@@ -37,7 +37,7 @@ func NewPriceChangeLogHandler(service *service.PriceChangeLogService) *PriceChan
 func (h *PriceChangeLogHandler) List(c *gin.Context) {
 	var req models.PriceChangeLogListRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
@@ -50,11 +50,11 @@ func (h *PriceChangeLogHandler) List(c *gin.Context) {
 
 	resp, err := h.service.List(&req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, resp)
+	response.Success(c, resp)
 }
 
 // GetByID 获取调价记录详情
@@ -69,17 +69,17 @@ func (h *PriceChangeLogHandler) GetByID(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
+		response.BadRequest(c, "无效的ID")
 		return
 	}
 
 	log, err := h.service.GetByID(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "调价记录不存在"})
+		response.NotFound(c, "调价记录不存在")
 		return
 	}
 
-	c.JSON(http.StatusOK, log)
+	response.Success(c, log)
 }
 
 // ListByAgent 按代理商获取调价记录
@@ -96,7 +96,7 @@ func (h *PriceChangeLogHandler) ListByAgent(c *gin.Context) {
 	agentIDStr := c.Param("agent_id")
 	agentID, err := strconv.ParseInt(agentIDStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的代理商ID"})
+		response.BadRequest(c, "无效的代理商ID")
 		return
 	}
 
@@ -105,9 +105,9 @@ func (h *PriceChangeLogHandler) ListByAgent(c *gin.Context) {
 
 	resp, err := h.service.ListByAgent(agentID, page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, resp)
+	response.Success(c, resp)
 }

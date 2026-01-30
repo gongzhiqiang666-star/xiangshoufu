@@ -1,12 +1,12 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"xiangshoufu/internal/middleware"
 	"xiangshoufu/internal/service"
+	"xiangshoufu/pkg/response"
 )
 
 // WalletSplitHandler 钱包拆分配置处理器
@@ -30,20 +30,17 @@ func (h *WalletSplitHandler) GetSplitConfig(c *gin.Context) {
 	agentIDStr := c.Param("id")
 	agentID, err := strconv.ParseInt(agentIDStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的代理商ID"})
+		response.BadRequest(c, "无效的代理商ID")
 		return
 	}
 
 	config, err := h.splitService.GetSplitConfig(agentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"data": config,
-	})
+	response.Success(c, config)
 }
 
 // SetSplitConfigRequest 设置拆分配置请求
@@ -64,17 +61,16 @@ func (h *WalletSplitHandler) SetSplitConfig(c *gin.Context) {
 	agentIDStr := c.Param("id")
 	agentID, err := strconv.ParseInt(agentIDStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的代理商ID"})
+		response.BadRequest(c, "无效的代理商ID")
 		return
 	}
 
 	var req SetSplitConfigRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数错误: " + err.Error()})
+		response.BadRequest(c, "请求参数错误: "+err.Error())
 		return
 	}
 
-	// 获取当前操作者ID（从JWT或session中获取）
 	configuredBy := getOperatorID(c)
 
 	serviceReq := &service.SetSplitConfigRequest{
@@ -84,14 +80,11 @@ func (h *WalletSplitHandler) SetSplitConfig(c *gin.Context) {
 	}
 
 	if err := h.splitService.SetSplitConfig(serviceReq); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "设置成功",
-	})
+	response.SuccessMessage(c, "设置成功")
 }
 
 // CheckSplitStatus 检查代理商是否按通道拆分
@@ -105,21 +98,18 @@ func (h *WalletSplitHandler) CheckSplitStatus(c *gin.Context) {
 	agentIDStr := c.Param("id")
 	agentID, err := strconv.ParseInt(agentIDStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的代理商ID"})
+		response.BadRequest(c, "无效的代理商ID")
 		return
 	}
 
 	isSplit, err := h.splitService.IsSplitByChannel(agentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"data": gin.H{
-			"split_by_channel": isSplit,
-		},
+	response.Success(c, gin.H{
+		"split_by_channel": isSplit,
 	})
 }
 
@@ -138,20 +128,17 @@ func (h *WalletSplitHandler) GetWithdrawThresholds(c *gin.Context) {
 	templateIDStr := c.Param("id")
 	templateID, err := strconv.ParseInt(templateIDStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的政策模版ID"})
+		response.BadRequest(c, "无效的政策模版ID")
 		return
 	}
 
 	thresholds, err := h.splitService.GetWithdrawThresholds(templateID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"data": thresholds,
-	})
+	response.Success(c, thresholds)
 }
 
 // SetWithdrawThresholdRequest 设置提现门槛请求
@@ -174,13 +161,13 @@ func (h *WalletSplitHandler) SetWithdrawThreshold(c *gin.Context) {
 	templateIDStr := c.Param("id")
 	templateID, err := strconv.ParseInt(templateIDStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的政策模版ID"})
+		response.BadRequest(c, "无效的政策模版ID")
 		return
 	}
 
 	var req SetWithdrawThresholdRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数错误: " + err.Error()})
+		response.BadRequest(c, "请求参数错误: "+err.Error())
 		return
 	}
 
@@ -192,14 +179,11 @@ func (h *WalletSplitHandler) SetWithdrawThreshold(c *gin.Context) {
 	}
 
 	if err := h.splitService.SetWithdrawThreshold(serviceReq); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "设置成功",
-	})
+	response.SuccessMessage(c, "设置成功")
 }
 
 // BatchSetWithdrawThresholdsRequest 批量设置提现门槛请求
@@ -220,17 +204,16 @@ func (h *WalletSplitHandler) BatchSetWithdrawThresholds(c *gin.Context) {
 	templateIDStr := c.Param("id")
 	templateID, err := strconv.ParseInt(templateIDStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的政策模版ID"})
+		response.BadRequest(c, "无效的政策模版ID")
 		return
 	}
 
 	var req BatchSetWithdrawThresholdsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数错误: " + err.Error()})
+		response.BadRequest(c, "请求参数错误: "+err.Error())
 		return
 	}
 
-	// 转换请求
 	serviceReqs := make([]*service.SetWithdrawThresholdRequest, 0, len(req.Thresholds))
 	for _, t := range req.Thresholds {
 		serviceReqs = append(serviceReqs, &service.SetWithdrawThresholdRequest{
@@ -242,19 +225,15 @@ func (h *WalletSplitHandler) BatchSetWithdrawThresholds(c *gin.Context) {
 	}
 
 	if err := h.splitService.BatchSetWithdrawThresholds(templateID, serviceReqs); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "批量设置成功",
-	})
+	response.SuccessMessage(c, "批量设置成功")
 }
 
 // RegisterWalletSplitRoutes 注册钱包拆分配置路由
 func RegisterWalletSplitRoutes(rg *gin.RouterGroup, h *WalletSplitHandler, authService *service.AuthService) {
-	// 代理商钱包拆分配置（需要管理员或上级权限）
 	agents := rg.Group("/agents")
 	agents.Use(middleware.AuthMiddleware(authService))
 	{
@@ -263,7 +242,6 @@ func RegisterWalletSplitRoutes(rg *gin.RouterGroup, h *WalletSplitHandler, authS
 		agents.GET("/:id/wallet-split/status", h.CheckSplitStatus)
 	}
 
-	// 政策模版提现门槛配置（仅管理员）
 	policies := rg.Group("/policy-templates")
 	policies.Use(middleware.AuthMiddleware(authService))
 	{
