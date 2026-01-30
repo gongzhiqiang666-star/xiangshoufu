@@ -78,6 +78,7 @@ export const MENU_LIST: MenuItem[] = [
       { path: '/wallets/charging', title: '充值钱包', icon: '' },
       { path: '/wallets/settlement', title: '沉淀钱包', icon: '' },
       { path: '/wallets/tax-channels', title: '税筹通道', icon: '' },
+      { path: '/wallets/adjustments', title: '调账管理', icon: '' },
     ],
   },
   {

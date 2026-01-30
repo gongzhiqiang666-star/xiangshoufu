@@ -363,6 +363,24 @@ export const privateRoutes: RouteRecordRaw[] = [
               breadcrumb: [{ title: '首页' }, { title: '钱包管理' }, { title: '钱包流水' }],
             },
           },
+          {
+            path: 'adjustments',
+            name: 'WalletAdjustments',
+            component: () => import('@/views/wallets/AdjustmentListView.vue'),
+            meta: {
+              title: '调账管理',
+              breadcrumb: [{ title: '首页' }, { title: '钱包管理' }, { title: '调账管理' }],
+            },
+          },
+          {
+            path: 'withdraw-thresholds',
+            name: 'WithdrawThresholds',
+            component: () => import('@/views/wallets/WithdrawThresholdView.vue'),
+            meta: {
+              title: '提现门槛',
+              breadcrumb: [{ title: '首页' }, { title: '钱包管理' }, { title: '提现门槛' }],
+            },
+          },
         ],
       },
       // 政策管理

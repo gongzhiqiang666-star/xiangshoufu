@@ -328,3 +328,53 @@ export interface WithdrawWithChannelRequest {
   amount: number
 }
 
+// ========== 钱包调账相关类型 ==========
+
+// 调账状态
+export type AdjustmentStatus = 1 | 2 | 3 // 1=已生效 2=待审批 3=已驳回
+
+// 调账记录
+export interface WalletAdjustment {
+  id: number
+  adjustment_no: string
+  agent_id: number
+  agent_name: string
+  wallet_id: number
+  wallet_type: number
+  wallet_type_name: string
+  channel_id: number
+  amount: number
+  amount_yuan: number
+  adjustment_type: string // 充入/扣减
+  balance_before: number
+  balance_before_yuan: number
+  balance_after: number
+  balance_after_yuan: number
+  reason: string
+  operator_id: number
+  operator_name: string
+  status: AdjustmentStatus
+  status_name: string
+  created_at: string
+}
+
+// 创建调账请求
+export interface CreateAdjustmentParams {
+  agent_id: number
+  wallet_type: number // 1分润 2服务费 3奖励 4充值 5沉淀
+  channel_id?: number // 0表示不区分通道
+  amount: number // 正数充入，负数扣减（分）
+  reason: string
+}
+
+// 调账查询参数
+export interface AdjustmentQueryParams {
+  agent_id?: number
+  wallet_type?: number
+  channel_id?: number
+  start_date?: string
+  end_date?: string
+  page?: number
+  page_size?: number
+}
+

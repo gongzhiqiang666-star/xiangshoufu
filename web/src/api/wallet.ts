@@ -7,6 +7,9 @@ import type {
   Withdrawal,
   WalletLogQueryParams,
   PaginatedResponse,
+  WalletAdjustment,
+  CreateAdjustmentParams,
+  AdjustmentQueryParams,
 } from '@/types'
 
 /**
@@ -109,4 +112,27 @@ export function updateWithdrawThreshold(data: {
   threshold: number
 }): Promise<void> {
   return put<void>('/v1/withdrawals/thresholds', data)
+}
+
+// ======== 钱包调账 ========
+
+/**
+ * 创建钱包调账
+ */
+export function createWalletAdjustment(data: CreateAdjustmentParams): Promise<WalletAdjustment> {
+  return post<WalletAdjustment>('/v1/wallet-adjustments', data)
+}
+
+/**
+ * 获取钱包调账列表
+ */
+export function getWalletAdjustments(params: AdjustmentQueryParams): Promise<PaginatedResponse<WalletAdjustment>> {
+  return get<PaginatedResponse<WalletAdjustment>>('/v1/wallet-adjustments', params)
+}
+
+/**
+ * 获取钱包调账详情
+ */
+export function getWalletAdjustmentDetail(id: number): Promise<WalletAdjustment> {
+  return get<WalletAdjustment>(`/v1/wallet-adjustments/${id}`)
 }

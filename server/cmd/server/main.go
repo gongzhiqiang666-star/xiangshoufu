@@ -387,10 +387,25 @@ func main() {
 	)
 	walletSplitHandler := handler.NewWalletSplitHandler(walletSplitService)
 
+	// 20.3.2 初始化钱包调账服务
+	walletAdjustmentRepo := repository.NewGormWalletAdjustmentRepository(db)
+	walletAdjustmentService := service.NewWalletAdjustmentService(
+		walletAdjustmentRepo,
+		walletRepo,
+		walletLogRepo,
+		agentRepo,
+	)
+	walletAdjustmentHandler := handler.NewWalletAdjustmentHandler(walletAdjustmentService)
+
 	// 注入拆分配置仓库到钱包服务（用于展示逻辑）
 	walletService.SetSplitConfigRepo(walletSplitConfigRepo)
 	walletService.SetThresholdRepo(withdrawThresholdRepo)
 	walletService.SetAgentPolicyRepo(agentPolicyRepo)
+
+	// 20.3.3 初始化全局提现门槛服务
+	globalThresholdRepo := repository.NewGlobalWithdrawThresholdRepository(db)
+	globalThresholdService := service.NewGlobalWithdrawThresholdService(globalThresholdRepo)
+	globalThresholdHandler := handler.NewGlobalWithdrawThresholdHandler(globalThresholdService)
 
 	// 20.4 初始化税筹通道服务
 	taxChannelRepo := repository.NewGormTaxChannelRepository(db)
@@ -534,6 +549,8 @@ func main() {
 		merchantHandler, terminalHandler, terminalRateHandler, policyHandler, agentChannelHandler,
 		chargingWalletHandler, settlementWalletHandler, taxChannelHandler,
 		walletSplitHandler, // 新增：钱包拆分配置Handler
+		walletAdjustmentHandler, // 新增：钱包调账Handler
+		globalThresholdHandler, // 新增：全局提现门槛Handler
 		channelHandler, // 新增：通道费率类型Handler
 		uploadHandler, bannerHandler, posterHandler,
 		jobHandler, alertHandler, // 新增：任务管理和告警Handler
@@ -794,6 +811,8 @@ func setupRouter(
 	settlementWalletHandler *handler.SettlementWalletHandler,
 	taxChannelHandler *handler.TaxChannelHandler,
 	walletSplitHandler *handler.WalletSplitHandler, // 新增：钱包拆分配置Handler
+	walletAdjustmentHandler *handler.WalletAdjustmentHandler, // 新增：钱包调账Handler
+	globalThresholdHandler *handler.GlobalWithdrawThresholdHandler, // 新增：全局提现门槛Handler
 	channelHandler *handler.ChannelHandler, // 新增：通道费率类型Handler
 	uploadHandler *handler.UploadHandler,
 	bannerHandler *handler.BannerHandler,
@@ -905,6 +924,17 @@ func setupRouter(
 		handler.RegisterSettlementWalletRoutes(apiV1, settlementWalletHandler, authService)
 		handler.RegisterTaxChannelRoutes(apiV1, taxChannelHandler, authService)
 		handler.RegisterWalletSplitRoutes(apiV1, walletSplitHandler, authService) // 新增：钱包拆分配置路由
+		handler.RegisterWalletAdjustmentRoutes(apiV1, walletAdjustmentHandler, authService) // 新增：钱包调账路由
+
+		// 注册全局提现门槛路由
+		thresholdGroup := apiV1.Group("/withdraw-thresholds")
+		thresholdGroup.Use(middleware.AuthMiddleware(authService))
+		{
+			thresholdGroup.GET("", globalThresholdHandler.GetThresholds)
+			thresholdGroup.PUT("/general", globalThresholdHandler.SetGeneralThresholds)
+			thresholdGroup.PUT("/channel", globalThresholdHandler.SetChannelThresholds)
+			thresholdGroup.DELETE("/channel/:channel_id", globalThresholdHandler.DeleteChannelThreshold)
+		}
 
 		// 注册营销模块路由（Banner、海报、上传）
 		handler.RegisterUploadRoutes(apiV1, uploadHandler, authService)
