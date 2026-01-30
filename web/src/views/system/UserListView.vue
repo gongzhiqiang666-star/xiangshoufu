@@ -9,7 +9,7 @@
         <el-input v-model="searchForm.keyword" placeholder="用户名/昵称/手机号" clearable />
       </el-form-item>
       <el-form-item label="角色">
-        <el-select v-model="searchForm.role" placeholder="请选择角色" clearable>
+        <el-select v-model="searchForm.role" placeholder="请选择角色" clearable style="width: 120px">
           <el-option
             v-for="(config, key) in USER_ROLE_CONFIG"
             :key="key"
@@ -19,7 +19,7 @@
         </el-select>
       </el-form-item>
       <el-form-item label="状态">
-        <el-select v-model="searchForm.status" placeholder="请选择状态" clearable>
+        <el-select v-model="searchForm.status" placeholder="请选择状态" clearable style="width: 100px">
           <el-option label="正常" :value="1" />
           <el-option label="禁用" :value="0" />
         </el-select>

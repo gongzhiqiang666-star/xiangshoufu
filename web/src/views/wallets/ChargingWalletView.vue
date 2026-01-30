@@ -165,7 +165,7 @@
           <span class="form-tip">元</span>
         </el-form-item>
         <el-form-item label="付款方式" required>
-          <el-select v-model="depositForm.payment_method" placeholder="请选择">
+          <el-select v-model="depositForm.payment_method" placeholder="请选择" style="width: 100%">
             <el-option label="银行转账" :value="1" />
             <el-option label="微信转账" :value="2" />
             <el-option label="支付宝转账" :value="3" />

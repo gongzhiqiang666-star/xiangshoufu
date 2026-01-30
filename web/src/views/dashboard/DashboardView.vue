@@ -96,7 +96,7 @@
           <template #header>
             <div class="card-header">
               <span class="title">下级代理排名 TOP10</span>
-              <el-select v-model="rankingPeriod" size="small" @change="fetchAgentRanking">
+              <el-select v-model="rankingPeriod" size="small" @change="fetchAgentRanking" style="width: 100px">
                 <el-option label="本日" value="day" />
                 <el-option label="本周" value="week" />
                 <el-option label="本月" value="month" />

@@ -17,7 +17,7 @@
       <el-table :data="stageItems" border>
         <el-table-column label="类型" width="150">
           <template #default="{ row }">
-            <el-select v-model="row.stageType" @change="emitChange">
+            <el-select v-model="row.stageType" @change="emitChange" style="width: 100%">
               <el-option :value="1" label="商户入网天数" />
               <el-option :value="2" label="代理商入网天数" />
             </el-select>

@@ -14,7 +14,7 @@
       <!-- 筛选栏 -->
       <el-form :inline="true" class="filter-form">
         <el-form-item label="状态">
-          <el-select v-model="filters.enabled" placeholder="全部" clearable @change="loadData">
+          <el-select v-model="filters.enabled" placeholder="全部" clearable @change="loadData" style="width: 100px">
             <el-option label="启用" :value="true" />
             <el-option label="禁用" :value="false" />
           </el-select>

@@ -93,7 +93,7 @@
     <el-dialog v-model="withdrawDialogVisible" title="申请提现" width="500px">
       <el-form :model="withdrawForm" label-width="100px">
         <el-form-item label="选择钱包" required>
-          <el-select v-model="withdrawForm.wallet_id" placeholder="请选择钱包">
+          <el-select v-model="withdrawForm.wallet_id" placeholder="请选择钱包" style="width: 100%">
             <el-option
               v-for="wallet in availableWallets"
               :key="wallet.id"

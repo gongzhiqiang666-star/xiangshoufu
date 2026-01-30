@@ -14,7 +14,7 @@
           <el-input v-model.number="searchForm.channel_id" placeholder="请输入通道ID" clearable />
         </el-form-item>
         <el-form-item label="变更类型">
-          <el-select v-model="searchForm.change_type" placeholder="请选择" clearable>
+          <el-select v-model="searchForm.change_type" placeholder="请选择" clearable style="width: 120px">
             <el-option label="初始化" :value="1" />
             <el-option label="费率调整" :value="2" />
             <el-option label="押金返现调整" :value="3" />
@@ -23,7 +23,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="配置类型">
-          <el-select v-model="searchForm.config_type" placeholder="请选择" clearable>
+          <el-select v-model="searchForm.config_type" placeholder="请选择" clearable style="width: 120px">
             <el-option label="结算价" :value="1" />
             <el-option label="奖励配置" :value="2" />
           </el-select>

@@ -24,7 +24,7 @@
     <!-- 搜索表单 -->
     <SearchForm v-model="searchForm" @search="handleSearch" @reset="handleReset">
       <el-form-item label="流水类型">
-        <el-select v-model="searchForm.log_type" placeholder="请选择类型" clearable>
+        <el-select v-model="searchForm.log_type" placeholder="请选择类型" clearable style="width: 120px">
           <el-option label="收入" value="income" />
           <el-option label="支出" value="expense" />
           <el-option label="冻结" value="freeze" />

@@ -52,7 +52,7 @@
         <ChannelSelect v-model="searchForm.channel_id" />
       </el-form-item>
       <el-form-item label="状态">
-        <el-select v-model="searchForm.status" placeholder="请选择状态" clearable>
+        <el-select v-model="searchForm.status" placeholder="请选择状态" clearable style="width: 120px">
           <el-option label="库存" value="stock" />
           <el-option label="已下发" value="distributed" />
           <el-option label="已激活" value="activated" />

@@ -6,7 +6,7 @@
         <el-button type="primary" :icon="Plus" @click="handleSendMessage">发送消息</el-button>
       </template>
       <el-form-item label="消息类型">
-        <el-select v-model="searchForm.message_type" placeholder="请选择" clearable>
+        <el-select v-model="searchForm.message_type" placeholder="请选择" clearable style="width: 120px">
           <el-option
             v-for="(config, key) in MESSAGE_TYPE_CONFIG"
             :key="key"
@@ -16,7 +16,7 @@
         </el-select>
       </el-form-item>
       <el-form-item label="阅读状态">
-        <el-select v-model="searchForm.is_read" placeholder="请选择" clearable>
+        <el-select v-model="searchForm.is_read" placeholder="请选择" clearable style="width: 100px">
           <el-option label="未读" :value="false" />
           <el-option label="已读" :value="true" />
         </el-select>

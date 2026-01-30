@@ -9,7 +9,7 @@
         <el-input v-model="searchForm.username" placeholder="用户名" clearable />
       </el-form-item>
       <el-form-item label="操作模块">
-        <el-select v-model="searchForm.module" placeholder="请选择模块" clearable>
+        <el-select v-model="searchForm.module" placeholder="请选择模块" clearable style="width: 150px">
           <el-option
             v-for="(config, key) in LOG_MODULE_CONFIG"
             :key="key"
