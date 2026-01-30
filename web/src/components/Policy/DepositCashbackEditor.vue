@@ -7,25 +7,26 @@
       </template>
     </el-alert>
 
-    <el-form label-position="top">
-      <el-row :gutter="16">
+    <el-form label-position="top" v-loading="loading">
+      <el-row :gutter="16" v-if="depositItems.length > 0">
         <el-col :span="6" v-for="item in depositItems" :key="item.deposit">
           <el-form-item :label="`押金 ¥${item.deposit} 返现`">
             <el-input-number
               v-model="item.cashback"
               :min="0"
-              :max="limits?.[item.deposit] ?? 999"
+              :max="item.maxCashback ?? 999"
               :precision="2"
               :step="1"
               controls-position="right"
               @change="emitChange"
             />
-            <div class="limit-hint" v-if="limits?.[item.deposit]">
-              最高 ¥{{ limits[item.deposit] }}
+            <div class="limit-hint" v-if="item.maxCashback">
+              最高 ¥{{ item.maxCashback }}
             </div>
           </el-form-item>
         </el-col>
       </el-row>
+      <el-empty v-else-if="!loading" description="该通道未配置押金档位" />
     </el-form>
   </div>
 </template>
@@ -33,14 +34,22 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
 import { InfoFilled } from '@element-plus/icons-vue'
+import { getChannelDepositTiers } from '@/api/channel'
 
 interface DepositCashbackItem {
   deposit_amount: number
   cashback_amount: number
 }
 
+interface DepositItem {
+  deposit: number
+  cashback: number
+  maxCashback: number
+}
+
 const props = defineProps<{
   modelValue: DepositCashbackItem[]
+  channelId?: number
   limits?: Record<number, number>
 }>()
 
@@ -48,16 +57,52 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: DepositCashbackItem[]): void
 }>()
 
-// 默认的押金档位（分转换为元显示）
-const depositItems = ref([
-  { deposit: 0, cashback: 0 },
-  { deposit: 99, cashback: 0 },
-  { deposit: 199, cashback: 0 },
-  { deposit: 299, cashback: 0 },
-])
+const loading = ref(false)
+const depositItems = ref<DepositItem[]>([])
 
-onMounted(() => {
-  // 从props初始化
+// 从通道配置加载押金档位
+async function loadDepositTiers() {
+  if (!props.channelId) {
+    // 没有channelId时使用默认档位（兼容旧逻辑）
+    depositItems.value = [
+      { deposit: 0, cashback: 0, maxCashback: props.limits?.[0] ?? 999 },
+      { deposit: 99, cashback: 0, maxCashback: props.limits?.[99] ?? 999 },
+      { deposit: 199, cashback: 0, maxCashback: props.limits?.[199] ?? 999 },
+      { deposit: 299, cashback: 0, maxCashback: props.limits?.[299] ?? 999 },
+    ]
+    syncFromModelValue()
+    return
+  }
+
+  loading.value = true
+  try {
+    const tiers = await getChannelDepositTiers(props.channelId)
+    if (tiers?.length) {
+      depositItems.value = tiers.map((tier: any) => ({
+        deposit: tier.deposit_amount / 100,
+        cashback: 0,
+        maxCashback: tier.max_cashback_amount / 100,
+      }))
+    } else {
+      depositItems.value = []
+    }
+    syncFromModelValue()
+  } catch (error) {
+    console.error('加载押金档位失败:', error)
+    // 降级使用默认档位
+    depositItems.value = [
+      { deposit: 0, cashback: 0, maxCashback: props.limits?.[0] ?? 999 },
+      { deposit: 99, cashback: 0, maxCashback: props.limits?.[99] ?? 999 },
+      { deposit: 199, cashback: 0, maxCashback: props.limits?.[199] ?? 999 },
+      { deposit: 299, cashback: 0, maxCashback: props.limits?.[299] ?? 999 },
+    ]
+    syncFromModelValue()
+  } finally {
+    loading.value = false
+  }
+}
+
+function syncFromModelValue() {
   if (props.modelValue?.length) {
     for (const item of props.modelValue) {
       const deposit = item.deposit_amount / 100
@@ -67,18 +112,18 @@ onMounted(() => {
       }
     }
   }
+}
+
+onMounted(() => {
+  loadDepositTiers()
 })
 
-watch(() => props.modelValue, (newVal) => {
-  if (newVal?.length) {
-    for (const item of newVal) {
-      const deposit = item.deposit_amount / 100
-      const target = depositItems.value.find(d => d.deposit === deposit)
-      if (target) {
-        target.cashback = item.cashback_amount / 100
-      }
-    }
-  }
+watch(() => props.channelId, () => {
+  loadDepositTiers()
+})
+
+watch(() => props.modelValue, () => {
+  syncFromModelValue()
 }, { deep: true })
 
 function emitChange() {

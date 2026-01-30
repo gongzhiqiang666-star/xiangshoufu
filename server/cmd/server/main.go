@@ -502,7 +502,7 @@ func main() {
 
 	// 21.4.2 初始化押金档位相关Repository、Service、Handler
 	depositTierRepo := repository.NewGormChannelDepositTierRepository(db)
-	depositTierService := service.NewDepositTierService(depositTierRepo)
+	depositTierService := service.NewDepositTierService(depositTierRepo, db)
 	depositTierHandler := handler.NewDepositTierHandler(depositTierService)
 
 	agentRewardSettingService := service.NewAgentRewardSettingService(

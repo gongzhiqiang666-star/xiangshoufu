@@ -84,9 +84,37 @@ class DepositCashbackItem {
   double get cashbackAmountYuan => cashbackAmount / 100;
 }
 
+/// 流量卡返现档位项（动态N档支持）
+@JsonSerializable()
+class SimCashbackTier {
+  @JsonKey(name: 'tier_order')
+  final int tierOrder;
+  @JsonKey(name: 'tier_name')
+  final String tierName;
+  @JsonKey(name: 'cashback_amount')
+  final int cashbackAmount;
+  @JsonKey(name: 'is_last_tier')
+  final bool isLastTier;
+
+  SimCashbackTier({
+    required this.tierOrder,
+    required this.tierName,
+    required this.cashbackAmount,
+    this.isLastTier = false,
+  });
+
+  factory SimCashbackTier.fromJson(Map<String, dynamic> json) =>
+      _$SimCashbackTierFromJson(json);
+  Map<String, dynamic> toJson() => _$SimCashbackTierToJson(this);
+
+  /// 获取返现金额（元）
+  double get cashbackAmountYuan => cashbackAmount / 100;
+}
+
 /// 流量卡返现配置
 @JsonSerializable()
 class SimCashbackConfig {
+  // 旧版固定3档字段（兼容）
   @JsonKey(name: 'first_time_cashback')
   final int firstTimeCashback;
   @JsonKey(name: 'second_time_cashback')
@@ -96,11 +124,16 @@ class SimCashbackConfig {
   @JsonKey(name: 'sim_fee_amount')
   final int? simFeeAmount;
 
+  // 新版动态N档字段
+  @JsonKey(name: 'tiers')
+  final List<SimCashbackTier>? tiers;
+
   SimCashbackConfig({
     required this.firstTimeCashback,
     required this.secondTimeCashback,
     required this.thirdPlusCashback,
     this.simFeeAmount,
+    this.tiers,
   });
 
   factory SimCashbackConfig.fromJson(Map<String, dynamic> json) =>
@@ -112,12 +145,14 @@ class SimCashbackConfig {
     int? secondTimeCashback,
     int? thirdPlusCashback,
     int? simFeeAmount,
+    List<SimCashbackTier>? tiers,
   }) {
     return SimCashbackConfig(
       firstTimeCashback: firstTimeCashback ?? this.firstTimeCashback,
       secondTimeCashback: secondTimeCashback ?? this.secondTimeCashback,
       thirdPlusCashback: thirdPlusCashback ?? this.thirdPlusCashback,
       simFeeAmount: simFeeAmount ?? this.simFeeAmount,
+      tiers: tiers ?? this.tiers,
     );
   }
 
@@ -132,6 +167,19 @@ class SimCashbackConfig {
 
   /// 获取流量费金额（元）
   double get simFeeAmountYuan => (simFeeAmount ?? 9900) / 100;
+
+  /// 获取动态档位列表（优先使用新版tiers，否则从旧字段构造）
+  List<SimCashbackTier> get dynamicTiers {
+    if (tiers != null && tiers!.isNotEmpty) {
+      return tiers!;
+    }
+    // 从旧版固定字段构造默认3档
+    return [
+      SimCashbackTier(tierOrder: 1, tierName: '首次', cashbackAmount: firstTimeCashback),
+      SimCashbackTier(tierOrder: 2, tierName: '二次', cashbackAmount: secondTimeCashback),
+      SimCashbackTier(tierOrder: 3, tierName: '后续', cashbackAmount: thirdPlusCashback, isLastTier: true),
+    ];
+  }
 }
 
 /// 激活奖励配置项

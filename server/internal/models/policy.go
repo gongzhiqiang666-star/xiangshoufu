@@ -13,11 +13,12 @@ import (
 
 // RateTypeDefinition 费率类型定义（从通道配置读取）
 type RateTypeDefinition struct {
-	Code      string `json:"code"`       // 费率类型编码（与通道回调的payTypeCode一致）
-	Name      string `json:"name"`       // 费率类型名称（用于前端显示）
-	SortOrder int    `json:"sort_order"` // 排序
-	MinRate   string `json:"min_rate"`   // 费率下限（通道成本底线）
-	MaxRate   string `json:"max_rate"`   // 费率上限（商户最高费率）
+	Code        string `json:"code"`         // 费率类型编码（与通道回调的payTypeCode一致）
+	Name        string `json:"name"`         // 费率类型名称（用于前端显示）
+	SortOrder   int    `json:"sort_order"`   // 排序
+	MinRate     string `json:"min_rate"`     // 费率下限（通道成本底线）
+	MaxRate     string `json:"max_rate"`     // 费率上限（商户最高费率）
+	DefaultRate string `json:"default_rate"` // 默认费率
 }
 
 // RateConfigValue 费率配置值

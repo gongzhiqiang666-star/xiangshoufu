@@ -159,14 +159,11 @@ class _PolicyCard extends StatelessWidget {
 
   Widget _buildSimCashbackSection() {
     final sim = policy.simCashback!;
+    final tiers = sim.dynamicTiers;
     return Wrap(
       spacing: 12,
       runSpacing: 8,
-      children: [
-        _buildCashbackChip('首次', sim.firstTimeCashbackYuan),
-        _buildCashbackChip('二次', sim.secondTimeCashbackYuan),
-        _buildCashbackChip('后续', sim.thirdPlusCashbackYuan),
-      ],
+      children: tiers.map((tier) => _buildCashbackChip(tier.tierName, tier.cashbackAmountYuan)).toList(),
     );
   }
 

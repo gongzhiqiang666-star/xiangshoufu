@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"gorm.io/gorm"
 	"xiangshoufu/internal/models"
 	"xiangshoufu/internal/repository"
 )
@@ -11,11 +12,12 @@ import (
 // DepositTierService 押金档位服务
 type DepositTierService struct {
 	tierRepo repository.ChannelDepositTierRepository
+	db       *gorm.DB
 }
 
 // NewDepositTierService 创建押金档位服务
-func NewDepositTierService(tierRepo repository.ChannelDepositTierRepository) *DepositTierService {
-	return &DepositTierService{tierRepo: tierRepo}
+func NewDepositTierService(tierRepo repository.ChannelDepositTierRepository, db *gorm.DB) *DepositTierService {
+	return &DepositTierService{tierRepo: tierRepo, db: db}
 }
 
 // CreateDepositTierRequest 创建押金档位请求
@@ -104,10 +106,29 @@ func (s *DepositTierService) Update(id int64, req *UpdateDepositTierRequest) (*m
 
 // Delete 删除押金档位
 func (s *DepositTierService) Delete(id int64) error {
-	_, err := s.tierRepo.FindByID(id)
+	tier, err := s.tierRepo.FindByID(id)
 	if err != nil {
 		return errors.New("押金档位不存在")
 	}
+
+	// 检查是否被政策模板引用
+	var templateCount int64
+	s.db.Model(&models.DepositCashbackPolicy{}).
+		Where("channel_id = ? AND deposit_amount = ?", tier.ChannelID, tier.DepositAmount).
+		Count(&templateCount)
+	if templateCount > 0 {
+		return errors.New("该押金档位已被政策模板引用，无法删除")
+	}
+
+	// 检查是否被代理商政策引用
+	var agentCount int64
+	s.db.Model(&models.AgentDepositCashbackPolicy{}).
+		Where("channel_id = ? AND deposit_amount = ?", tier.ChannelID, tier.DepositAmount).
+		Count(&agentCount)
+	if agentCount > 0 {
+		return errors.New("该押金档位已被代理商政策引用，无法删除")
+	}
+
 	return s.tierRepo.Delete(id)
 }
 

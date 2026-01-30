@@ -38,12 +38,31 @@ Map<String, dynamic> _$DepositCashbackItemToJson(
       'cashback_amount': instance.cashbackAmount,
     };
 
+SimCashbackTier _$SimCashbackTierFromJson(Map<String, dynamic> json) =>
+    SimCashbackTier(
+      tierOrder: (json['tier_order'] as num).toInt(),
+      tierName: json['tier_name'] as String,
+      cashbackAmount: (json['cashback_amount'] as num).toInt(),
+      isLastTier: json['is_last_tier'] as bool? ?? false,
+    );
+
+Map<String, dynamic> _$SimCashbackTierToJson(SimCashbackTier instance) =>
+    <String, dynamic>{
+      'tier_order': instance.tierOrder,
+      'tier_name': instance.tierName,
+      'cashback_amount': instance.cashbackAmount,
+      'is_last_tier': instance.isLastTier,
+    };
+
 SimCashbackConfig _$SimCashbackConfigFromJson(Map<String, dynamic> json) =>
     SimCashbackConfig(
       firstTimeCashback: (json['first_time_cashback'] as num).toInt(),
       secondTimeCashback: (json['second_time_cashback'] as num).toInt(),
       thirdPlusCashback: (json['third_plus_cashback'] as num).toInt(),
       simFeeAmount: (json['sim_fee_amount'] as num?)?.toInt(),
+      tiers: (json['tiers'] as List<dynamic>?)
+          ?.map((e) => SimCashbackTier.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
 
 Map<String, dynamic> _$SimCashbackConfigToJson(SimCashbackConfig instance) =>
@@ -52,6 +71,7 @@ Map<String, dynamic> _$SimCashbackConfigToJson(SimCashbackConfig instance) =>
       'second_time_cashback': instance.secondTimeCashback,
       'third_plus_cashback': instance.thirdPlusCashback,
       'sim_fee_amount': instance.simFeeAmount,
+      'tiers': instance.tiers,
     };
 
 ActivationRewardItem _$ActivationRewardItemFromJson(

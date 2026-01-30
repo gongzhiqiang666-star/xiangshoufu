@@ -77,7 +77,7 @@ func (h *AlertHandler) ListConfigs(c *gin.Context) {
 		return
 	}
 
-	var list []AlertConfigResponse
+	list := make([]AlertConfigResponse, 0, len(configs))
 	for _, config := range configs {
 		list = append(list, AlertConfigResponse{
 			ID:              config.ID,

@@ -59,6 +59,11 @@
 
         <!-- 押金档位 Tab -->
         <el-tab-pane label="押金档位" name="deposit">
+          <div class="tab-toolbar">
+            <el-button type="primary" :icon="Plus" @click="showAddDepositDialog">
+              新增押金档位
+            </el-button>
+          </div>
           <ProTable
             :data="depositTiers"
             :loading="loadingDeposits"
@@ -90,6 +95,11 @@
             </el-table-column>
             <template #action="{ row }">
               <el-button type="primary" link @click="editDepositTier(row)">编辑</el-button>
+              <el-popconfirm title="确定删除吗？" @confirm="deleteDepositTier(row)">
+                <template #reference>
+                  <el-button type="danger" link>删除</el-button>
+                </template>
+              </el-popconfirm>
             </template>
           </ProTable>
         </el-tab-pane>
@@ -208,13 +218,30 @@
     </el-dialog>
 
     <!-- 押金档位对话框 -->
-    <el-dialog v-model="depositDialogVisible" title="编辑押金档位" width="500px">
-      <el-form :model="depositForm" ref="depositFormRef" label-width="100px">
-        <el-form-item label="档位名称">
-          <el-input :value="depositForm.tier_name" disabled />
+    <el-dialog
+      v-model="depositDialogVisible"
+      :title="depositForm.id ? '编辑押金档位' : '新增押金档位'"
+      width="500px"
+    >
+      <el-form :model="depositForm" :rules="depositRules" ref="depositFormRef" label-width="100px">
+        <el-form-item label="档位编码" prop="tier_code">
+          <el-input
+            v-model="depositForm.tier_code"
+            :disabled="!!depositForm.id"
+            placeholder="如：TIER_199"
+          />
         </el-form-item>
-        <el-form-item label="押金金额">
-          <el-input :value="formatMoney(depositForm.deposit_amount) + '元'" disabled />
+        <el-form-item label="档位名称" prop="tier_name">
+          <el-input v-model="depositForm.tier_name" placeholder="如：199元押金" />
+        </el-form-item>
+        <el-form-item label="押金金额" prop="deposit_amount">
+          <el-input-number
+            v-model="depositForm.deposit_amount"
+            :min="0"
+            :precision="0"
+            :disabled="!!depositForm.id"
+          />
+          <span class="unit">分</span>
         </el-form-item>
         <el-form-item label="返现上限" prop="max_cashback_amount">
           <el-input-number
@@ -232,6 +259,9 @@
             :precision="0"
           />
           <span class="unit">分</span>
+        </el-form-item>
+        <el-form-item label="排序" prop="sort_order">
+          <el-input-number v-model="depositForm.sort_order" :min="0" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -255,13 +285,17 @@ import {
   updateChannelRateConfig,
   deleteChannelRateConfig as deleteRateConfigApi,
   getChannelDepositTiers,
-  updateChannelDepositTier,
   getChannelSimCashbackTiers,
   batchSetChannelSimCashbackTiers,
   type ChannelRateConfig,
   type ChannelDepositTier,
   type ChannelSimCashbackTier,
 } from '@/api/channel'
+import {
+  createDepositTier,
+  updateDepositTier,
+  deleteDepositTier as deleteDepositTierApi,
+} from '@/api/depositTier'
 import type { Channel } from '@/types'
 
 // 搜索表单（SearchForm需要）
@@ -301,13 +335,21 @@ const rateRules = {
 const depositTiers = ref<ChannelDepositTier[]>([])
 const depositDialogVisible = ref(false)
 const submittingDeposit = ref(false)
+const depositFormRef = ref()
 const depositForm = reactive({
   id: 0,
+  tier_code: '',
   tier_name: '',
   deposit_amount: 0,
   max_cashback_amount: 0,
   default_cashback: 0,
+  sort_order: 0,
 })
+const depositRules = {
+  tier_code: [{ required: true, message: '请输入档位编码', trigger: 'blur' }],
+  tier_name: [{ required: true, message: '请输入档位名称', trigger: 'blur' }],
+  deposit_amount: [{ required: true, message: '请输入押金金额', trigger: 'blur' }],
+}
 
 // 流量费返现档位
 const simCashbackTiers = ref<ChannelSimCashbackTier[]>([])
@@ -446,14 +488,30 @@ const deleteRateConfig = async (row: ChannelRateConfig) => {
   }
 }
 
+// 显示新增押金档位对话框
+const showAddDepositDialog = () => {
+  Object.assign(depositForm, {
+    id: 0,
+    tier_code: '',
+    tier_name: '',
+    deposit_amount: 0,
+    max_cashback_amount: 0,
+    default_cashback: 0,
+    sort_order: 0,
+  })
+  depositDialogVisible.value = true
+}
+
 // 编辑押金档位
 const editDepositTier = (row: ChannelDepositTier) => {
   Object.assign(depositForm, {
     id: row.id,
+    tier_code: row.tier_code,
     tier_name: row.tier_name,
     deposit_amount: row.deposit_amount,
     max_cashback_amount: row.max_cashback_amount,
     default_cashback: row.default_cashback,
+    sort_order: row.sort_order,
   })
   depositDialogVisible.value = true
 }
@@ -461,18 +519,46 @@ const editDepositTier = (row: ChannelDepositTier) => {
 // 提交押金表单
 const submitDepositForm = async () => {
   try {
+    await depositFormRef.value.validate()
     submittingDeposit.value = true
-    await updateChannelDepositTier(selectedChannelId.value!, depositForm.id, {
-      max_cashback_amount: depositForm.max_cashback_amount,
-      default_cashback: depositForm.default_cashback,
-    })
-    ElMessage.success('更新成功')
+
+    if (depositForm.id) {
+      await updateDepositTier(depositForm.id, {
+        tier_name: depositForm.tier_name,
+        deposit_amount: depositForm.deposit_amount,
+        sort_order: depositForm.sort_order,
+      })
+      ElMessage.success('更新成功')
+    } else {
+      await createDepositTier({
+        channel_id: selectedChannelId.value!,
+        tier_code: depositForm.tier_code,
+        tier_name: depositForm.tier_name,
+        deposit_amount: depositForm.deposit_amount,
+        sort_order: depositForm.sort_order,
+      })
+      ElMessage.success('创建成功')
+    }
+
     depositDialogVisible.value = false
     await loadDepositTiers(selectedChannelId.value!)
   } catch (error: any) {
-    ElMessage.error(error.message || '更新失败')
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '操作失败')
+    }
   } finally {
     submittingDeposit.value = false
+  }
+}
+
+// 删除押金档位
+const deleteDepositTier = async (row: ChannelDepositTier) => {
+  try {
+    await deleteDepositTierApi(row.id)
+    ElMessage.success('删除成功')
+    await loadDepositTiers(selectedChannelId.value!)
+  } catch (error: any) {
+    ElMessage.error(error.message || '删除失败')
   }
 }
 
