@@ -3,7 +3,10 @@
  * @param amount 金额（分）
  * @param decimals 小数位数
  */
-export function formatAmount(amount: number, decimals = 2): string {
+export function formatAmount(amount: number | undefined | null, decimals = 2): string {
+  if (amount === undefined || amount === null || isNaN(amount)) {
+    return '0.00'
+  }
   const yuan = amount / 100
   return yuan.toLocaleString('zh-CN', {
     minimumFractionDigits: decimals,
