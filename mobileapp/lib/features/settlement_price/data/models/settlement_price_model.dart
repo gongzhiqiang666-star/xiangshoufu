@@ -128,6 +128,37 @@ class ActivationRewardItem {
   }
 }
 
+/// 流量费返现档位
+class SimCashbackTier {
+  final int tierOrder;
+  final String tierName;
+  final int cashbackAmount;
+
+  SimCashbackTier({
+    required this.tierOrder,
+    required this.tierName,
+    required this.cashbackAmount,
+  });
+
+  double get cashbackAmountYuan => cashbackAmount / 100.0;
+
+  factory SimCashbackTier.fromJson(Map<String, dynamic> json) {
+    return SimCashbackTier(
+      tierOrder: json['tier_order'] ?? 0,
+      tierName: json['tier_name'] ?? '',
+      cashbackAmount: json['cashback_amount'] ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'tier_order': tierOrder,
+      'tier_name': tierName,
+      'cashback_amount': cashbackAmount,
+    };
+  }
+}
+
 /// 结算价模型
 class SettlementPriceModel {
   final int id;
@@ -138,16 +169,8 @@ class SettlementPriceModel {
   final int? templateId;
   final String brandCode;
   final Map<String, RateConfig> rateConfigs;
-  final String? creditRate;
-  final String? debitRate;
-  final String? debitCap;
-  final String? unionpayRate;
-  final String? wechatRate;
-  final String? alipayRate;
   final List<DepositCashbackItem> depositCashbacks;
-  final int simFirstCashback;
-  final int simSecondCashback;
-  final int simThirdPlusCashback;
+  final List<SimCashbackTier> simCashbackTiers;
   final int version;
   final int status;
   final String? effectiveAt;
@@ -163,16 +186,8 @@ class SettlementPriceModel {
     this.templateId,
     required this.brandCode,
     required this.rateConfigs,
-    this.creditRate,
-    this.debitRate,
-    this.debitCap,
-    this.unionpayRate,
-    this.wechatRate,
-    this.alipayRate,
     required this.depositCashbacks,
-    required this.simFirstCashback,
-    required this.simSecondCashback,
-    required this.simThirdPlusCashback,
+    required this.simCashbackTiers,
     required this.version,
     required this.status,
     this.effectiveAt,
@@ -180,9 +195,6 @@ class SettlementPriceModel {
     required this.updatedAt,
   });
 
-  double get simFirstCashbackYuan => simFirstCashback / 100.0;
-  double get simSecondCashbackYuan => simSecondCashback / 100.0;
-  double get simThirdPlusCashbackYuan => simThirdPlusCashback / 100.0;
   String get statusName => status == 1 ? '启用' : '禁用';
 
   factory SettlementPriceModel.fromJson(Map<String, dynamic> json) {
@@ -203,6 +215,13 @@ class SettlementPriceModel {
           .toList();
     }
 
+    List<SimCashbackTier> simCashbackTiers = [];
+    if (json['sim_cashback_tiers'] != null && json['sim_cashback_tiers'] is List) {
+      simCashbackTiers = (json['sim_cashback_tiers'] as List)
+          .map((e) => SimCashbackTier.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+
     return SettlementPriceModel(
       id: json['id'] ?? 0,
       agentId: json['agent_id'] ?? 0,
@@ -212,16 +231,8 @@ class SettlementPriceModel {
       templateId: json['template_id'],
       brandCode: json['brand_code'] ?? '',
       rateConfigs: rateConfigs,
-      creditRate: json['credit_rate'],
-      debitRate: json['debit_rate'],
-      debitCap: json['debit_cap'],
-      unionpayRate: json['unionpay_rate'],
-      wechatRate: json['wechat_rate'],
-      alipayRate: json['alipay_rate'],
       depositCashbacks: depositCashbacks,
-      simFirstCashback: json['sim_first_cashback'] ?? 0,
-      simSecondCashback: json['sim_second_cashback'] ?? 0,
-      simThirdPlusCashback: json['sim_third_plus_cashback'] ?? 0,
+      simCashbackTiers: simCashbackTiers,
       version: json['version'] ?? 1,
       status: json['status'] ?? 0,
       effectiveAt: json['effective_at'],

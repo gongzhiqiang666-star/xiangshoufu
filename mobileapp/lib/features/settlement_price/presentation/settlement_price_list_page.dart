@@ -129,16 +129,13 @@ class _SettlementPriceListPageState extends ConsumerState<SettlementPriceListPag
           const SizedBox(height: 12),
 
           // 费率信息
-          if (item.creditRate != null || item.debitRate != null) ...[
-            Row(
-              children: [
-                if (item.creditRate != null) ...[
-                  _buildRateChip('贷记卡', '${item.creditRate}%'),
-                  const SizedBox(width: 8),
-                ],
-                if (item.debitRate != null)
-                  _buildRateChip('借记卡', '${item.debitRate}%'),
-              ],
+          if (item.rateConfigs.isNotEmpty) ...[
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: item.rateConfigs.entries.map((e) =>
+                _buildRateChip(e.key, '${e.value.rate}%')
+              ).toList(),
             ),
             const SizedBox(height: 8),
           ],
@@ -159,15 +156,14 @@ class _SettlementPriceListPageState extends ConsumerState<SettlementPriceListPag
           ],
 
           // 流量费返现
-          if (item.simFirstCashback > 0 || item.simSecondCashback > 0) ...[
-            Row(
-              children: [
-                _buildSimChip('首次', '¥${item.simFirstCashbackYuan.toStringAsFixed(0)}'),
-                const SizedBox(width: 8),
-                _buildSimChip('第2次', '¥${item.simSecondCashbackYuan.toStringAsFixed(0)}'),
-                const SizedBox(width: 8),
-                _buildSimChip('第3次+', '¥${item.simThirdPlusCashbackYuan.toStringAsFixed(0)}'),
-              ],
+          if (item.simCashbackTiers.any((tier) => tier.cashbackAmount > 0)) ...[
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: item.simCashbackTiers
+                  .where((tier) => tier.cashbackAmount > 0)
+                  .map((tier) => _buildSimChip(tier.tierName, '¥${tier.cashbackAmountYuan.toStringAsFixed(0)}'))
+                  .toList(),
             ),
           ],
 

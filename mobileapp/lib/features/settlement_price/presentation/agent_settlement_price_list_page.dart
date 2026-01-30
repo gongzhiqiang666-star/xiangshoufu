@@ -161,7 +161,7 @@ class _AgentSettlementPriceListPageState extends ConsumerState<AgentSettlementPr
           ],
 
           // 流量费返现配置
-          if (item.simFirstCashback > 0 || item.simSecondCashback > 0 || item.simThirdPlusCashback > 0) ...[
+          if (item.simCashbackTiers.any((tier) => tier.cashbackAmount > 0)) ...[
             const Divider(height: 1, indent: 16, endIndent: 16, color: AppColors.divider),
             _buildSimSection(item),
           ],
@@ -271,18 +271,9 @@ class _AgentSettlementPriceListPageState extends ConsumerState<AgentSettlementPr
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: [
-              if (item.creditRate != null && item.creditRate!.isNotEmpty)
-                _buildRateChip('贷记卡', '${item.creditRate}%'),
-              if (item.debitRate != null && item.debitRate!.isNotEmpty)
-                _buildRateChip('借记卡', '${item.debitRate}%${item.debitCap != null ? ' 封顶${item.debitCap}' : ''}'),
-              if (item.unionpayRate != null && item.unionpayRate!.isNotEmpty)
-                _buildRateChip('云闪付', '${item.unionpayRate}%'),
-              if (item.wechatRate != null && item.wechatRate!.isNotEmpty)
-                _buildRateChip('微信', '${item.wechatRate}%'),
-              if (item.alipayRate != null && item.alipayRate!.isNotEmpty)
-                _buildRateChip('支付宝', '${item.alipayRate}%'),
-            ],
+            children: item.rateConfigs.entries.map((e) =>
+              _buildRateChip(e.key, '${e.value.rate}%')
+            ).toList(),
           ),
         ],
       ),
@@ -386,14 +377,10 @@ class _AgentSettlementPriceListPageState extends ConsumerState<AgentSettlementPr
           ),
           const SizedBox(height: 12),
           Row(
-            children: [
-              if (item.simFirstCashback > 0)
-                Expanded(child: _buildSimItem('首次', item.simFirstCashbackYuan)),
-              if (item.simSecondCashback > 0)
-                Expanded(child: _buildSimItem('第2次', item.simSecondCashbackYuan)),
-              if (item.simThirdPlusCashback > 0)
-                Expanded(child: _buildSimItem('第3次+', item.simThirdPlusCashbackYuan)),
-            ],
+            children: item.simCashbackTiers
+                .where((tier) => tier.cashbackAmount > 0)
+                .map((tier) => Expanded(child: _buildSimItem(tier.tierName, tier.cashbackAmountYuan)))
+                .toList(),
           ),
         ],
       ),

@@ -30,6 +30,13 @@ export interface ActivationRewardItem {
   priority: number
 }
 
+/** 流量费返现档位 */
+export interface SimCashbackTier {
+  tier_order: number
+  tier_name: string
+  cashback_amount: number
+}
+
 /** 结算价 */
 export interface SettlementPrice {
   id: number
@@ -50,6 +57,7 @@ export interface SettlementPrice {
   sim_first_cashback: number
   sim_second_cashback: number
   sim_third_plus_cashback: number
+  sim_cashback_tiers?: SimCashbackTier[]
   high_rate_configs: HighRateConfigs
   d0_extra_configs: D0ExtraConfigs
   version: number
@@ -123,9 +131,10 @@ export interface UpdateDepositCashbackRequest {
 
 /** 更新流量费返现请求 */
 export interface UpdateSimCashbackRequest {
-  sim_first_cashback: number
-  sim_second_cashback: number
-  sim_third_plus_cashback: number
+  sim_first_cashback?: number
+  sim_second_cashback?: number
+  sim_third_plus_cashback?: number
+  sim_cashback_tiers?: SimCashbackTier[]
 }
 
 /** 高调费率配置项 */

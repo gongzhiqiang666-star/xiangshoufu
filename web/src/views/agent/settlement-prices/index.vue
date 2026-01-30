@@ -221,54 +221,97 @@
     </el-dialog>
 
     <!-- 编辑对话框 -->
-    <el-dialog v-model="editDialogVisible" title="编辑结算价" width="700px">
-      <el-form :model="editForm" label-width="120px">
+    <el-dialog v-model="editDialogVisible" title="编辑结算价" width="750px">
+      <el-form :model="editForm" label-width="120px" v-loading="editLoading">
         <el-form-item label="代理商">
           <el-input :value="`${editForm.agent_name} (ID: ${editForm.agent_id})`" disabled />
         </el-form-item>
         <el-form-item label="通道">
           <el-input :value="`${editForm.channel_name} (ID: ${editForm.channel_id})`" disabled />
         </el-form-item>
+
+        <!-- 费率配置（动态从通道配置获取） -->
         <el-divider content-position="left">费率配置</el-divider>
-        <el-form-item label="贷记卡费率">
-          <el-input v-model="editForm.credit_rate" placeholder="如: 0.60">
-            <template #append>%</template>
-          </el-input>
-        </el-form-item>
-        <el-form-item label="借记卡费率">
-          <el-input v-model="editForm.debit_rate" placeholder="如: 0.50">
-            <template #append>%</template>
-          </el-input>
-        </el-form-item>
+        <template v-if="channelRateConfigs.length">
+          <el-form-item
+            v-for="rateConfig in channelRateConfigs"
+            :key="rateConfig.rate_code"
+            :label="rateConfig.rate_name"
+          >
+            <el-input
+              v-model="editForm.rate_configs[rateConfig.rate_code].rate"
+              :placeholder="`范围: ${rateConfig.min_rate}% ~ ${rateConfig.max_rate}%`"
+              style="width: 200px"
+              @focus="ensureRateConfig(rateConfig.rate_code)"
+            >
+              <template #append>%</template>
+            </el-input>
+            <span class="rate-hint">
+              成本: {{ rateConfig.min_rate }}% ~ {{ rateConfig.max_rate }}%
+            </span>
+          </el-form-item>
+        </template>
+        <el-empty v-else description="该通道未配置费率类型" :image-size="60" />
+
+        <!-- 押金返现配置（动态从通道配置获取） -->
         <el-divider content-position="left">押金返现配置</el-divider>
-        <div v-for="(dc, idx) in editForm.deposit_cashbacks" :key="idx" class="deposit-item">
-          <el-row :gutter="10">
-            <el-col :span="10">
-              <el-form-item label="押金金额(分)">
-                <el-input-number v-model="dc.deposit_amount" :min="0" />
+        <template v-if="channelDepositTiers.length">
+          <div v-for="(dc, idx) in editForm.deposit_cashbacks" :key="idx" class="deposit-item">
+            <el-row :gutter="10" align="middle">
+              <el-col :span="10">
+                <el-form-item label="押金档位">
+                  <el-select v-model="dc.deposit_amount" style="width: 100%">
+                    <el-option
+                      v-for="tier in channelDepositTiers"
+                      :key="tier.deposit_amount"
+                      :label="`${tier.tier_name} (¥${(tier.deposit_amount/100).toFixed(0)})`"
+                      :value="tier.deposit_amount"
+                    />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :span="10">
+                <el-form-item label="返现金额">
+                  <el-input-number
+                    v-model="dc.cashback_amount"
+                    :min="0"
+                    :max="getDepositMaxCashback(dc.deposit_amount)"
+                    :precision="0"
+                  />
+                  <span class="unit">分</span>
+                  <span class="limit-hint" v-if="getDepositMaxCashback(dc.deposit_amount)">
+                    (上限: {{ getDepositMaxCashback(dc.deposit_amount) }}分)
+                  </span>
+                </el-form-item>
+              </el-col>
+              <el-col :span="4">
+                <el-button type="danger" :icon="Delete" circle @click="removeDeposit(idx)" />
+              </el-col>
+            </el-row>
+          </div>
+          <el-button type="primary" link @click="addDeposit">+ 添加押金返现配置</el-button>
+        </template>
+        <el-empty v-else description="该通道未配置押金档位" :image-size="60" />
+
+        <!-- 流量费返现配置（动态从通道配置获取） -->
+        <el-divider content-position="left">流量费返现配置</el-divider>
+        <template v-if="channelSimTiers.length">
+          <el-row :gutter="16">
+            <el-col :span="8" v-for="tier in channelSimTiers" :key="tier.tier_order">
+              <el-form-item :label="tier.tier_name">
+                <el-input-number
+                  v-model="getSimTierValue(tier.tier_order).cashback_amount"
+                  :min="0"
+                  :max="tier.max_cashback_amount"
+                  :precision="0"
+                  style="width: 100%"
+                />
+                <div class="limit-hint">上限: {{ tier.max_cashback_amount }}分</div>
               </el-form-item>
-            </el-col>
-            <el-col :span="10">
-              <el-form-item label="返现金额(分)">
-                <el-input-number v-model="dc.cashback_amount" :min="0" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="4">
-              <el-button type="danger" :icon="Delete" circle @click="removeDeposit(idx)" />
             </el-col>
           </el-row>
-        </div>
-        <el-button type="primary" link @click="addDeposit">+ 添加押金返现配置</el-button>
-        <el-divider content-position="left">流量费返现配置</el-divider>
-        <el-form-item label="首次返现(分)">
-          <el-input-number v-model="editForm.sim_first_cashback" :min="0" />
-        </el-form-item>
-        <el-form-item label="第2次返现(分)">
-          <el-input-number v-model="editForm.sim_second_cashback" :min="0" />
-        </el-form-item>
-        <el-form-item label="第3次+返现(分)">
-          <el-input-number v-model="editForm.sim_third_plus_cashback" :min="0" />
-        </el-form-item>
+        </template>
+        <el-empty v-else description="该通道未配置流量费档位" :image-size="60" />
       </el-form>
       <template #footer>
         <el-button @click="editDialogVisible = false">取消</el-button>
@@ -315,7 +358,15 @@ import {
   type DepositCashbackItem,
 } from '@/api/settlementPrice'
 import { searchAgentList } from '@/api/agent'
-import { getChannelList } from '@/api/channel'
+import {
+  getChannelList,
+  getChannelRateConfigs,
+  getChannelDepositTiers,
+  getChannelSimCashbackTiers,
+  type ChannelRateConfig,
+  type ChannelDepositTier,
+  type ChannelSimCashbackTier,
+} from '@/api/channel'
 import { getPolicyTemplates, getPolicyTemplateDetail } from '@/api/policy'
 import type { PolicyTemplate, PolicyTemplateDetail, Channel, Agent } from '@/types'
 
@@ -356,18 +407,24 @@ const createForm = reactive({
 
 // ============= 编辑相关状态 =============
 const editDialogVisible = ref(false)
+const editLoading = ref(false)
+
+// 通道配置（动态获取）
+const channelRateConfigs = ref<ChannelRateConfig[]>([])
+const channelDepositTiers = ref<ChannelDepositTier[]>([])
+const channelSimTiers = ref<ChannelSimCashbackTier[]>([])
+
+// 编辑表单 - 费率使用动态Map
+interface RateValue { rate: string }
 const editForm = reactive({
   id: 0,
   agent_id: 0,
   agent_name: '',
   channel_id: 0,
   channel_name: '',
-  credit_rate: '',
-  debit_rate: '',
+  rate_configs: {} as Record<string, RateValue>,
   deposit_cashbacks: [] as DepositCashbackItem[],
-  sim_first_cashback: 0,
-  sim_second_cashback: 0,
-  sim_third_plus_cashback: 0,
+  sim_cashback_tiers: [] as { tier_order: number; tier_name: string; cashback_amount: number }[],
 })
 
 // 调价记录对话框
@@ -525,26 +582,44 @@ const handleConfirmCreate = async () => {
 
 // ============= 编辑功能 =============
 
+// 加载通道配置
+const loadChannelConfig = async (channelId: number) => {
+  const [rateConfigs, depositTiers, simTiers] = await Promise.all([
+    getChannelRateConfigs(channelId),
+    getChannelDepositTiers(channelId),
+    getChannelSimCashbackTiers(channelId),
+  ])
+  channelRateConfigs.value = rateConfigs.filter((r: ChannelRateConfig) => r.status === 1)
+  channelDepositTiers.value = depositTiers.filter((d: ChannelDepositTier) => d.status === 1)
+  channelSimTiers.value = simTiers.filter((s: ChannelSimCashbackTier) => s.status === 1)
+}
+
 // 编辑
 const handleEdit = async (row: SettlementPriceItem) => {
+  editLoading.value = true
+  editDialogVisible.value = true
   try {
-    const detail = await getSettlementPrice(row.id)
+    // 并行加载结算价详情和通道配置
+    const [detail] = await Promise.all([
+      getSettlementPrice(row.id),
+      loadChannelConfig(row.channel_id),
+    ])
+
     Object.assign(editForm, {
       id: detail.id,
       agent_id: detail.agent_id,
       agent_name: row.agent_name || '',
       channel_id: detail.channel_id,
       channel_name: row.channel_name || '',
-      credit_rate: detail.credit_rate || '',
-      debit_rate: detail.debit_rate || '',
+      rate_configs: detail.rate_configs || {},
       deposit_cashbacks: detail.deposit_cashbacks || [],
-      sim_first_cashback: detail.sim_first_cashback,
-      sim_second_cashback: detail.sim_second_cashback,
-      sim_third_plus_cashback: detail.sim_third_plus_cashback,
+      sim_cashback_tiers: detail.sim_cashback_tiers || [],
     })
-    editDialogVisible.value = true
   } catch (e) {
     ElMessage.error('获取结算价详情失败')
+    editDialogVisible.value = false
+  } finally {
+    editLoading.value = false
   }
 }
 
@@ -552,11 +627,10 @@ const handleEdit = async (row: SettlementPriceItem) => {
 const handleSave = async () => {
   saving.value = true
   try {
-    // 更新费率
-    if (editForm.credit_rate || editForm.debit_rate) {
+    // 更新费率（使用动态rate_configs）
+    if (Object.keys(editForm.rate_configs).length > 0) {
       await updateSettlementPriceRate(editForm.id, {
-        credit_rate: editForm.credit_rate || undefined,
-        debit_rate: editForm.debit_rate || undefined,
+        rate_configs: editForm.rate_configs,
       })
     }
     // 更新押金返现
@@ -565,17 +639,15 @@ const handleSave = async () => {
         deposit_cashbacks: editForm.deposit_cashbacks,
       })
     }
-    // 更新流量费返现
+    // 更新流量费返现（使用动态档位）
     await updateSettlementPriceSim(editForm.id, {
-      sim_first_cashback: editForm.sim_first_cashback,
-      sim_second_cashback: editForm.sim_second_cashback,
-      sim_third_plus_cashback: editForm.sim_third_plus_cashback,
+      sim_cashback_tiers: editForm.sim_cashback_tiers,
     })
     ElMessage.success('更新成功')
     editDialogVisible.value = false
     loadData()
-  } catch (e) {
-    ElMessage.error('保存失败')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '保存失败')
   } finally {
     saving.value = false
   }
@@ -583,7 +655,17 @@ const handleSave = async () => {
 
 // 添加押金返现配置
 const addDeposit = () => {
-  editForm.deposit_cashbacks.push({ deposit_amount: 0, cashback_amount: 0 })
+  // 找到尚未添加的押金档位
+  const existingAmounts = new Set(editForm.deposit_cashbacks.map(d => d.deposit_amount))
+  const available = channelDepositTiers.value.find((t: ChannelDepositTier) => !existingAmounts.has(t.deposit_amount))
+  if (available) {
+    editForm.deposit_cashbacks.push({
+      deposit_amount: available.deposit_amount,
+      cashback_amount: 0,
+    })
+  } else {
+    ElMessage.warning('已添加所有可用押金档位')
+  }
 }
 
 // 删除押金返现配置
@@ -603,6 +685,34 @@ const handleViewLogs = async (row: SettlementPriceItem) => {
   } finally {
     logsLoading.value = false
   }
+}
+
+// 确保费率配置存在
+const ensureRateConfig = (rateCode: string) => {
+  if (!editForm.rate_configs[rateCode]) {
+    editForm.rate_configs[rateCode] = { rate: '' }
+  }
+}
+
+// 获取押金档位的最大返现
+const getDepositMaxCashback = (depositAmount: number): number => {
+  const tier = channelDepositTiers.value.find(t => t.deposit_amount === depositAmount)
+  return tier?.max_cashback_amount || 0
+}
+
+// 获取流量费档位值（确保存在）
+const getSimTierValue = (tierOrder: number) => {
+  let tier = editForm.sim_cashback_tiers.find(t => t.tier_order === tierOrder)
+  if (!tier) {
+    const channelTier = channelSimTiers.value.find(t => t.tier_order === tierOrder)
+    tier = {
+      tier_order: tierOrder,
+      tier_name: channelTier?.tier_name || `第${tierOrder}次`,
+      cashback_amount: 0,
+    }
+    editForm.sim_cashback_tiers.push(tier)
+  }
+  return tier
 }
 
 onMounted(() => {
@@ -631,5 +741,22 @@ onMounted(() => {
 
 .deposit-item {
   margin-bottom: 10px;
+}
+
+.rate-hint {
+  margin-left: 12px;
+  color: #909399;
+  font-size: 12px;
+}
+
+.limit-hint {
+  color: #909399;
+  font-size: 12px;
+  margin-left: 8px;
+}
+
+.unit {
+  margin-left: 4px;
+  color: #606266;
 }
 </style>

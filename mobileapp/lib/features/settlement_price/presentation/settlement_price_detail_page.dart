@@ -60,18 +60,6 @@ class SettlementPriceDetailPage extends ConsumerWidget {
 
           // 费率配置卡片
           _buildSection('费率配置', [
-            if (item.creditRate != null)
-              _buildInfoRow('贷记卡费率', '${item.creditRate}%'),
-            if (item.debitRate != null)
-              _buildInfoRow('借记卡费率', '${item.debitRate}%'),
-            if (item.debitCap != null)
-              _buildInfoRow('借记卡封顶', '¥${item.debitCap}'),
-            if (item.unionpayRate != null)
-              _buildInfoRow('云闪付费率', '${item.unionpayRate}%'),
-            if (item.wechatRate != null)
-              _buildInfoRow('微信费率', '${item.wechatRate}%'),
-            if (item.alipayRate != null)
-              _buildInfoRow('支付宝费率', '${item.alipayRate}%'),
             if (item.rateConfigs.isNotEmpty)
               ...item.rateConfigs.entries.map((e) =>
                 _buildInfoRow(e.key, '${e.value.rate}%'),
@@ -95,9 +83,9 @@ class SettlementPriceDetailPage extends ConsumerWidget {
 
           // 流量费返现配置卡片
           _buildSection('流量费返现配置', [
-            _buildInfoRow('首次返现', '¥${item.simFirstCashbackYuan.toStringAsFixed(2)}'),
-            _buildInfoRow('第2次返现', '¥${item.simSecondCashbackYuan.toStringAsFixed(2)}'),
-            _buildInfoRow('第3次+返现', '¥${item.simThirdPlusCashbackYuan.toStringAsFixed(2)}'),
+            ...item.simCashbackTiers.map((tier) =>
+              _buildInfoRow(tier.tierName, '¥${tier.cashbackAmountYuan.toStringAsFixed(2)}'),
+            ),
           ]),
 
           const SizedBox(height: 16),

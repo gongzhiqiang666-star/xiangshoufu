@@ -14,18 +14,18 @@ void main() {
         'template_id': 10,
         'brand_code': 'HXT',
         'rate_configs': {
-          'credit': {'rate': '0.60'},
-          'debit': {'rate': '0.50'},
+          'CREDIT': {'rate': '0.60'},
+          'DEBIT': {'rate': '0.50'},
         },
-        'credit_rate': '0.60',
-        'debit_rate': '0.50',
         'deposit_cashbacks': [
           {'deposit_amount': 9900, 'cashback_amount': 5000},
           {'deposit_amount': 19900, 'cashback_amount': 12000},
         ],
-        'sim_first_cashback': 5000,
-        'sim_second_cashback': 3000,
-        'sim_third_plus_cashback': 2000,
+        'sim_cashback_tiers': [
+          {'tier_order': 1, 'tier_name': '首次返现', 'cashback_amount': 5000},
+          {'tier_order': 2, 'tier_name': '第2次返现', 'cashback_amount': 3000},
+          {'tier_order': 3, 'tier_name': '第3次+返现', 'cashback_amount': 2000},
+        ],
         'version': 1,
         'status': 1,
         'effective_at': '2024-01-01T00:00:00Z',
@@ -40,14 +40,14 @@ void main() {
       expect(model.agentName, '测试代理商');
       expect(model.channelId, 1);
       expect(model.channelName, '恒信通');
-      expect(model.creditRate, '0.60');
-      expect(model.debitRate, '0.50');
       expect(model.rateConfigs.length, 2);
-      expect(model.rateConfigs['credit']?.rate, '0.60');
+      expect(model.rateConfigs['CREDIT']?.rate, '0.60');
+      expect(model.rateConfigs['DEBIT']?.rate, '0.50');
       expect(model.depositCashbacks.length, 2);
       expect(model.depositCashbacks[0].depositAmount, 9900);
       expect(model.depositCashbacks[0].cashbackAmount, 5000);
-      expect(model.simFirstCashback, 5000);
+      expect(model.simCashbackTiers.length, 3);
+      expect(model.simCashbackTiers[0].cashbackAmount, 5000);
       expect(model.version, 1);
       expect(model.status, 1);
     });
@@ -62,9 +62,11 @@ void main() {
         'brand_code': '',
         'rate_configs': {},
         'deposit_cashbacks': [],
-        'sim_first_cashback': 5000,
-        'sim_second_cashback': 3000,
-        'sim_third_plus_cashback': 2000,
+        'sim_cashback_tiers': [
+          {'tier_order': 1, 'tier_name': '首次返现', 'cashback_amount': 5000},
+          {'tier_order': 2, 'tier_name': '第2次返现', 'cashback_amount': 3000},
+          {'tier_order': 3, 'tier_name': '第3次+返现', 'cashback_amount': 2000},
+        ],
         'version': 1,
         'status': 1,
         'created_at': '',
@@ -73,9 +75,9 @@ void main() {
 
       final model = SettlementPriceModel.fromJson(json);
 
-      expect(model.simFirstCashbackYuan, 50.0);
-      expect(model.simSecondCashbackYuan, 30.0);
-      expect(model.simThirdPlusCashbackYuan, 20.0);
+      expect(model.simCashbackTiers[0].cashbackAmountYuan, 50.0);
+      expect(model.simCashbackTiers[1].cashbackAmountYuan, 30.0);
+      expect(model.simCashbackTiers[2].cashbackAmountYuan, 20.0);
     });
 
     // ✅ 边界情况
@@ -92,8 +94,8 @@ void main() {
 
       expect(model.agentName, '');
       expect(model.channelName, '');
-      expect(model.creditRate, isNull);
-      expect(model.debitRate, isNull);
+      expect(model.rateConfigs, isEmpty);
+      expect(model.simCashbackTiers, isEmpty);
       expect(model.templateId, isNull);
       expect(model.effectiveAt, isNull);
     });
