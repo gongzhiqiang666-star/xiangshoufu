@@ -6,6 +6,7 @@
         <ChannelSelect
           v-model="selectedChannelId"
           style="width: 200px"
+          :select-first="true"
           @change="handleChannelChange"
         />
       </el-form-item>
@@ -36,6 +37,18 @@
             <el-table-column prop="default_rate" label="默认费率" width="100">
               <template #default="{ row }">
                 {{ row.default_rate }}%
+              </template>
+            </el-table-column>
+            <el-table-column label="高调上限" width="100">
+              <template #default="{ row }">
+                <span v-if="row.max_high_rate">{{ row.max_high_rate }}%</span>
+                <span v-else class="text-muted">-</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="P+0上限" width="100">
+              <template #default="{ row }">
+                <span v-if="row.max_d0_extra">{{ formatMoney(row.max_d0_extra) }}元</span>
+                <span v-else class="text-muted">-</span>
               </template>
             </el-table-column>
             <el-table-column prop="sort_order" label="排序" width="80" />
@@ -207,6 +220,20 @@
             <template #suffix>%</template>
           </el-input>
         </el-form-item>
+        <el-form-item label="高调上限" prop="max_high_rate">
+          <el-input v-model="rateForm.max_high_rate" placeholder="如：0.65（留空表示不限制）">
+            <template #suffix>%</template>
+          </el-input>
+        </el-form-item>
+        <el-form-item label="P+0上限" prop="max_d0_extra">
+          <el-input-number
+            v-model="rateForm.max_d0_extra"
+            :min="0"
+            :precision="0"
+            placeholder="留空表示不限制"
+          />
+          <span class="unit">分</span>
+        </el-form-item>
         <el-form-item label="排序" prop="sort_order">
           <el-input-number v-model="rateForm.sort_order" :min="0" />
         </el-form-item>
@@ -322,6 +349,8 @@ const rateForm = reactive({
   min_rate: '',
   max_rate: '',
   default_rate: '',
+  max_high_rate: '' as string | null,
+  max_d0_extra: null as number | null,
   sort_order: 0,
 })
 const rateRules = {
@@ -420,6 +449,8 @@ const showAddRateDialog = () => {
     min_rate: '',
     max_rate: '',
     default_rate: '',
+    max_high_rate: '',
+    max_d0_extra: null,
     sort_order: 0,
   })
   rateDialogVisible.value = true
@@ -434,6 +465,8 @@ const editRateConfig = (row: ChannelRateConfig) => {
     min_rate: row.min_rate,
     max_rate: row.max_rate,
     default_rate: row.default_rate,
+    max_high_rate: row.max_high_rate || '',
+    max_d0_extra: row.max_d0_extra || null,
     sort_order: row.sort_order,
   })
   rateDialogVisible.value = true
@@ -451,6 +484,8 @@ const submitRateForm = async () => {
         min_rate: rateForm.min_rate,
         max_rate: rateForm.max_rate,
         default_rate: rateForm.default_rate,
+        max_high_rate: rateForm.max_high_rate || null,
+        max_d0_extra: rateForm.max_d0_extra || null,
         sort_order: rateForm.sort_order,
       })
       ElMessage.success('更新成功')

@@ -21,6 +21,8 @@ export interface RateTypeDefinition {
   sort_order: number // 排序
   min_rate: string   // 费率下限
   max_rate: string   // 费率上限
+  max_high_rate?: string | null  // 高调费率上限
+  max_d0_extra?: number | null   // P+0加价上限（分）
 }
 
 // 费率配置值
@@ -66,6 +68,12 @@ export interface PolicyTemplateDetail extends PolicyTemplate {
 
   // 流量卡返现配置（表单用）
   sim_cashback?: SimCashbackConfig | null
+
+  // 高调费率配置
+  high_rate_configs?: Record<string, { rate: number }> | null
+
+  // P+0加价配置
+  d0_extra_configs?: Record<string, { extra_fee: number }> | null
 }
 
 // 费率阶梯

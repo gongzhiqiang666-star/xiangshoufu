@@ -13,6 +13,7 @@ type ChannelConfigRepository interface {
 	// 费率配置
 	GetRateConfigs(ctx context.Context, channelID int64) ([]models.ChannelRateConfig, error)
 	GetRateConfigByCode(ctx context.Context, channelID int64, rateCode string) (*models.ChannelRateConfig, error)
+	GetRateConfigByID(ctx context.Context, id int64) (*models.ChannelRateConfig, error)
 	CreateRateConfig(ctx context.Context, config *models.ChannelRateConfig) error
 	UpdateRateConfig(ctx context.Context, config *models.ChannelRateConfig) error
 	DeleteRateConfig(ctx context.Context, id int64) error
@@ -29,6 +30,10 @@ type ChannelConfigRepository interface {
 
 	// 通道完整配置
 	GetFullConfig(ctx context.Context, channelID int64) (*models.ChannelFullConfig, error)
+
+	// 影响检查相关
+	GetPolicyTemplatesByChannel(ctx context.Context, channelID int64) ([]models.PolicyTemplateComplete, error)
+	GetSettlementPricesByChannel(ctx context.Context, channelID int64) ([]models.SettlementPrice, error)
 }
 
 // GormChannelConfigRepository GORM实现的通道配置仓库
@@ -195,4 +200,32 @@ func (r *GormChannelConfigRepository) GetFullConfig(ctx context.Context, channel
 		DepositTiers:     depositTiers,
 		SimCashbackTiers: simCashbackTiers,
 	}, nil
+}
+
+// GetRateConfigByID 根据ID获取费率配置
+func (r *GormChannelConfigRepository) GetRateConfigByID(ctx context.Context, id int64) (*models.ChannelRateConfig, error) {
+	var config models.ChannelRateConfig
+	err := r.db.WithContext(ctx).First(&config, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &config, nil
+}
+
+// GetPolicyTemplatesByChannel 获取通道的政策模版列表
+func (r *GormChannelConfigRepository) GetPolicyTemplatesByChannel(ctx context.Context, channelID int64) ([]models.PolicyTemplateComplete, error) {
+	var templates []models.PolicyTemplateComplete
+	err := r.db.WithContext(ctx).
+		Where("channel_id = ? AND status = 1", channelID).
+		Find(&templates).Error
+	return templates, err
+}
+
+// GetSettlementPricesByChannel 获取通道的结算价列表
+func (r *GormChannelConfigRepository) GetSettlementPricesByChannel(ctx context.Context, channelID int64) ([]models.SettlementPrice, error) {
+	var prices []models.SettlementPrice
+	err := r.db.WithContext(ctx).
+		Where("channel_id = ? AND status = 1", channelID).
+		Find(&prices).Error
+	return prices, err
 }

@@ -32,6 +32,12 @@ type ChannelConfigService interface {
 	ValidateRateForSettlement(ctx context.Context, channelID int64, rateCode string, rate string, upperRate string) error
 	ValidateCashbackForTemplate(ctx context.Context, channelID int64, depositAmount int64, cashback int64) error
 	ValidateSimCashbackForTemplate(ctx context.Context, channelID int64, tierOrder int, cashback int64) error
+
+	// 高调费率和P+0加价校验
+	ValidateHighRateAndD0Extra(ctx context.Context, channelID int64, highRateConfigs models.HighRateConfigs, d0ExtraConfigs models.D0ExtraConfigs) error
+
+	// 配置变更影响检查
+	CheckRateConfigChangeImpact(ctx context.Context, channelID int64, configID int64, req *models.CheckRateConfigChangeImpactRequest) (*models.ConfigChangeImpact, error)
 }
 
 // channelConfigService 通道配置服务实现
@@ -65,6 +71,8 @@ func (s *channelConfigService) GetRateConfigs(ctx context.Context, channelID int
 			MinRate:     c.MinRate,
 			MaxRate:     c.MaxRate,
 			DefaultRate: c.DefaultRate,
+			MaxHighRate: c.MaxHighRate,
+			MaxD0Extra:  c.MaxD0Extra,
 			SortOrder:   c.SortOrder,
 			Status:      c.Status,
 		}
@@ -134,6 +142,12 @@ func (s *channelConfigService) UpdateRateConfig(ctx context.Context, channelID i
 	}
 	if req.DefaultRate != "" {
 		config.DefaultRate = req.DefaultRate
+	}
+	if req.MaxHighRate != nil {
+		config.MaxHighRate = req.MaxHighRate
+	}
+	if req.MaxD0Extra != nil {
+		config.MaxD0Extra = req.MaxD0Extra
 	}
 	if req.SortOrder != 0 {
 		config.SortOrder = req.SortOrder
@@ -334,4 +348,144 @@ func (s *channelConfigService) ValidateSimCashbackForTemplate(ctx context.Contex
 	}
 
 	return fmt.Errorf("未找到档位 %d 对应的流量费返现配置", tierOrder)
+}
+
+// ValidateHighRateAndD0Extra 校验高调费率和P+0加价是否在通道上限内
+func (s *channelConfigService) ValidateHighRateAndD0Extra(ctx context.Context, channelID int64, highRateConfigs models.HighRateConfigs, d0ExtraConfigs models.D0ExtraConfigs) error {
+	configs, err := s.repo.GetRateConfigs(ctx, channelID)
+	if err != nil {
+		return fmt.Errorf("获取通道费率配置失败: %w", err)
+	}
+
+	// 构建费率配置映射
+	configMap := make(map[string]*models.ChannelRateConfig)
+	for i := range configs {
+		configMap[configs[i].RateCode] = &configs[i]
+	}
+
+	// 校验高调费率
+	for rateCode, hrConfig := range highRateConfigs {
+		channelConfig, ok := configMap[rateCode]
+		if !ok {
+			continue // 未找到对应通道配置，跳过
+		}
+		if err := models.ValidateHighRate(hrConfig.Rate, channelConfig.MaxHighRate, channelConfig.RateName); err != nil {
+			return err
+		}
+	}
+
+	// 校验P+0加价
+	for rateCode, d0Config := range d0ExtraConfigs {
+		channelConfig, ok := configMap[rateCode]
+		if !ok {
+			continue // 未找到对应通道配置，跳过
+		}
+		if err := models.ValidateD0Extra(d0Config.ExtraFee, channelConfig.MaxD0Extra, channelConfig.RateName); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// CheckRateConfigChangeImpact 检查费率配置变更影响
+func (s *channelConfigService) CheckRateConfigChangeImpact(ctx context.Context, channelID int64, configID int64, req *models.CheckRateConfigChangeImpactRequest) (*models.ConfigChangeImpact, error) {
+	// 获取当前费率配置
+	config, err := s.repo.GetRateConfigByID(ctx, configID)
+	if err != nil {
+		return nil, fmt.Errorf("获取费率配置失败: %w", err)
+	}
+
+	if config.ChannelID != channelID {
+		return nil, fmt.Errorf("费率配置不属于该通道")
+	}
+
+	impact := &models.ConfigChangeImpact{
+		AffectedTemplates:   make([]models.AffectedTemplate, 0),
+		AffectedSettlements: make([]models.AffectedSettlement, 0),
+	}
+
+	// 检查政策模版
+	templates, err := s.repo.GetPolicyTemplatesByChannel(ctx, channelID)
+	if err == nil {
+		for _, t := range templates {
+			if rateVal, ok := t.RateConfigs[config.RateCode]; ok {
+				rateFloat := models.ParseRateToFloat(rateVal.Rate)
+				newMinFloat := models.ParseRateToFloat(req.NewMinRate)
+				newMaxFloat := models.ParseRateToFloat(req.NewMaxRate)
+
+				var issue string
+				if rateFloat < newMinFloat {
+					issue = fmt.Sprintf("费率%s低于新下限%s", rateVal.Rate, req.NewMinRate)
+				} else if rateFloat > newMaxFloat {
+					issue = fmt.Sprintf("费率%s超过新上限%s", rateVal.Rate, req.NewMaxRate)
+				}
+
+				if issue != "" {
+					impact.AffectedTemplates = append(impact.AffectedTemplates, models.AffectedTemplate{
+						TemplateID:   t.ID,
+						TemplateName: t.TemplateName,
+						Issue:        issue,
+					})
+				}
+			}
+		}
+	}
+
+	// 检查结算价
+	settlements, err := s.repo.GetSettlementPricesByChannel(ctx, channelID)
+	if err == nil {
+		agentMap := make(map[int64]bool)
+		for _, sp := range settlements {
+			if rateVal, ok := sp.RateConfigs[config.RateCode]; ok {
+				rateFloat := models.ParseRateToFloat(rateVal.Rate)
+				newMinFloat := models.ParseRateToFloat(req.NewMinRate)
+				newMaxFloat := models.ParseRateToFloat(req.NewMaxRate)
+
+				var issue string
+				if rateFloat < newMinFloat {
+					issue = fmt.Sprintf("费率%s低于新下限%s", rateVal.Rate, req.NewMinRate)
+				} else if rateFloat > newMaxFloat {
+					issue = fmt.Sprintf("费率%s超过新上限%s", rateVal.Rate, req.NewMaxRate)
+				}
+
+				// 检查高调费率
+				if req.NewMaxHighRate != nil {
+					if hrConfig, ok := sp.HighRateConfigs[config.RateCode]; ok {
+						if err := models.ValidateHighRate(hrConfig.Rate, req.NewMaxHighRate, config.RateName); err != nil {
+							if issue != "" {
+								issue += "; "
+							}
+							issue += err.Error()
+						}
+					}
+				}
+
+				// 检查P+0加价
+				if req.NewMaxD0Extra != nil {
+					if d0Config, ok := sp.D0ExtraConfigs[config.RateCode]; ok {
+						if err := models.ValidateD0Extra(d0Config.ExtraFee, req.NewMaxD0Extra, config.RateName); err != nil {
+							if issue != "" {
+								issue += "; "
+							}
+							issue += err.Error()
+						}
+					}
+				}
+
+				if issue != "" {
+					impact.AffectedSettlements = append(impact.AffectedSettlements, models.AffectedSettlement{
+						SettlementID: sp.ID,
+						AgentID:      sp.AgentID,
+						AgentName:    "", // 需要额外查询代理商名称
+						Issue:        issue,
+					})
+					agentMap[sp.AgentID] = true
+				}
+			}
+		}
+		impact.TotalAffectedAgents = len(agentMap)
+	}
+
+	return impact, nil
 }

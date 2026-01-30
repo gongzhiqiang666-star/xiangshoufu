@@ -27,20 +27,20 @@
         <span>{{ agentName }}</span>
       </el-form-item>
       <el-form-item label="当前状态">
-        <el-tag :type="currentConfig.split_by_channel ? 'success' : 'info'">
-          {{ currentConfig.split_by_channel ? '已开启拆分' : '未拆分（汇总显示）' }}
+        <el-tag :type="currentConfig?.split_by_channel ? 'success' : 'info'">
+          {{ currentConfig?.split_by_channel ? '已开启拆分' : '未拆分（汇总显示）' }}
         </el-tag>
       </el-form-item>
-      <el-form-item label="拆分设置" v-if="!currentConfig.split_by_channel">
+      <el-form-item label="拆分设置" v-if="!currentConfig?.split_by_channel">
         <el-switch
           v-model="form.split_by_channel"
           active-text="按通道拆分"
           inactive-text="汇总显示"
         />
       </el-form-item>
-      <el-form-item v-if="currentConfig.configured_at">
+      <el-form-item v-if="currentConfig?.configured_at">
         <span class="config-info">
-          配置时间: {{ formatTime(currentConfig.configured_at) }}
+          配置时间: {{ formatTime(currentConfig?.configured_at) }}
         </span>
       </el-form-item>
     </el-form>
@@ -50,10 +50,10 @@
       <el-button
         type="primary"
         :loading="saving"
-        :disabled="currentConfig.split_by_channel"
+        :disabled="currentConfig?.split_by_channel"
         @click="handleSave"
       >
-        {{ currentConfig.split_by_channel ? '已开启（不可修改）' : '保存' }}
+        {{ currentConfig?.split_by_channel ? '已开启（不可修改）' : '保存' }}
       </el-button>
     </template>
   </el-dialog>

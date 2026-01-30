@@ -14,7 +14,7 @@ import type {
  * 获取代理商钱包拆分配置
  */
 export function getSplitConfig(agentId: number): Promise<AgentWalletSplitConfig> {
-  return get<{ data: AgentWalletSplitConfig }>(`/v1/agents/${agentId}/wallet-split`).then(res => res.data)
+  return get<{ data: AgentWalletSplitConfig }>(`/v1/agents/${agentId}/wallet-split`).then(res => res.data || { agent_id: agentId, split_by_channel: false })
 }
 
 /**

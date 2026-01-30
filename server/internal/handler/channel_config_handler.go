@@ -290,3 +290,41 @@ func (h *ChannelConfigHandler) GetFullConfig(c *gin.Context) {
 
 	response.Success(c, config)
 }
+
+// CheckRateConfigChangeImpact 检查费率配置变更影响
+// @Summary 检查费率配置变更对政策模版和结算价的影响
+// @Tags 通道配置
+// @Accept json
+// @Produce json
+// @Param id path int true "通道ID"
+// @Param configId path int true "配置ID"
+// @Param body body models.CheckRateConfigChangeImpactRequest true "变更参数"
+// @Success 200 {object} map[string]interface{}
+// @Router /api/admin/channels/{id}/rate-configs/{configId}/change-impact [post]
+func (h *ChannelConfigHandler) CheckRateConfigChangeImpact(c *gin.Context) {
+	channelID, err := strconv.ParseInt(c.Param("channelId"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的通道ID")
+		return
+	}
+
+	configID, err := strconv.ParseInt(c.Param("configId"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的配置ID")
+		return
+	}
+
+	var req models.CheckRateConfigChangeImpactRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	impact, err := h.svc.CheckRateConfigChangeImpact(c.Request.Context(), channelID, configID, &req)
+	if err != nil {
+		response.InternalError(c, err.Error())
+		return
+	}
+
+	response.Success(c, impact)
+}

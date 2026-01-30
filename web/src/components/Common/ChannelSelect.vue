@@ -29,6 +29,7 @@ interface Props {
   disabled?: boolean
   size?: 'small' | 'default' | 'large'
   clearable?: boolean
+  selectFirst?: boolean // 是否自动选择第一个通道
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -36,6 +37,7 @@ const props = withDefaults(defineProps<Props>(), {
   disabled: false,
   size: 'default',
   clearable: true,
+  selectFirst: false,
 })
 
 const emit = defineEmits<{
@@ -62,6 +64,12 @@ async function loadChannels() {
   loading.value = true
   try {
     channels.value = await getChannelList()
+    // 如果设置了自动选择第一个且当前没有选中值
+    if (props.selectFirst && channels.value.length > 0 && !props.modelValue) {
+      const firstChannel = channels.value[0]
+      emit('update:modelValue', firstChannel.id)
+      emit('change', firstChannel)
+    }
   } catch (e) {
     console.error('加载通道列表失败', e)
   } finally {

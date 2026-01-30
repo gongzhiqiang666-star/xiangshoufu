@@ -88,7 +88,7 @@
             <span>2. 押金返现配置</span>
             <el-tag type="info" size="small">服务费钱包</el-tag>
           </div>
-          <DepositCashbackEditor v-model="form.deposit_cashbacks" :limits="depositLimits" />
+          <DepositCashbackEditor v-model="form.deposit_cashbacks" :channelId="form.channel_id" :limits="depositLimits" />
         </div>
 
         <!-- 3. 流量卡返现配置 -->
@@ -97,7 +97,7 @@
             <span>3. 流量卡返现配置</span>
             <el-tag type="info" size="small">服务费钱包</el-tag>
           </div>
-          <SimCashbackEditor v-model="form.sim_cashback" :limits="simCashbackLimits" />
+          <SimCashbackEditor v-model="form.sim_cashback" :channelId="form.channel_id" :limits="simCashbackLimits" />
         </div>
 
         <!-- 4. 激活奖励配置 -->
@@ -116,6 +116,65 @@
             <el-tag size="small">可选</el-tag>
           </div>
           <RateStageEditor v-model="form.rate_stages" />
+        </div>
+
+        <!-- 6. 高调费率配置 -->
+        <div class="form-section">
+          <div class="section-title">
+            <span>6. 高调费率配置</span>
+            <el-tag type="warning" size="small">分润钱包</el-tag>
+          </div>
+          <el-row :gutter="24" v-loading="rateTypesLoading">
+            <template v-if="rateTypes && rateTypes.length > 0">
+              <el-col :span="8" v-for="rateType in rateTypes" :key="'high_' + rateType.code">
+                <el-form-item :label="rateType.name">
+                  <el-input-number
+                    v-model="form.high_rate_configs[rateType.code].rate"
+                    :min="0"
+                    :max="rateType.max_high_rate ? parseFloat(rateType.max_high_rate) : undefined"
+                    :precision="4"
+                    :step="0.01"
+                    style="width: 140px"
+                    @focus="ensureHighRateConfig(rateType.code)"
+                  />
+                  <span class="form-unit">%</span>
+                  <span class="rate-range" v-if="rateType.max_high_rate">(上限: {{ rateType.max_high_rate }}%)</span>
+                </el-form-item>
+              </el-col>
+            </template>
+            <el-col :span="24" v-else-if="!rateTypesLoading">
+              <el-empty description="请先选择通道" :image-size="60" />
+            </el-col>
+          </el-row>
+        </div>
+
+        <!-- 7. P+0加价配置 -->
+        <div class="form-section">
+          <div class="section-title">
+            <span>7. P+0加价配置</span>
+            <el-tag type="warning" size="small">分润钱包</el-tag>
+          </div>
+          <el-row :gutter="24" v-loading="rateTypesLoading">
+            <template v-if="rateTypes && rateTypes.length > 0">
+              <el-col :span="8" v-for="rateType in rateTypes" :key="'d0_' + rateType.code">
+                <el-form-item :label="rateType.name">
+                  <el-input-number
+                    v-model="form.d0_extra_configs[rateType.code].extra_fee"
+                    :min="0"
+                    :max="rateType.max_d0_extra || undefined"
+                    :precision="0"
+                    style="width: 140px"
+                    @focus="ensureD0ExtraConfig(rateType.code)"
+                  />
+                  <span class="form-unit">分</span>
+                  <span class="rate-range" v-if="rateType.max_d0_extra">(上限: {{ rateType.max_d0_extra }}分)</span>
+                </el-form-item>
+              </el-col>
+            </template>
+            <el-col :span="24" v-else-if="!rateTypesLoading">
+              <el-empty description="请先选择通道" :image-size="60" />
+            </el-col>
+          </el-row>
         </div>
       </el-form>
     </el-card>
@@ -139,6 +198,18 @@ import { getPolicyTemplateDetail, createPolicyTemplate, updatePolicyTemplate } f
 import { getChannelRateTypes, getChannelFullConfig } from '@/api/channel'
 import type { ChannelDepositTier, ChannelSimCashbackTier } from '@/api/channel'
 import type { RateTypeDefinition, RateConfigs } from '@/types/policy'
+
+// 高调费率配置类型
+interface HighRateConfig {
+  rate: number
+}
+type HighRateConfigs = Record<string, HighRateConfig>
+
+// P+0加价配置类型
+interface D0ExtraConfig {
+  extra_fee: number
+}
+type D0ExtraConfigs = Record<string, D0ExtraConfig>
 
 const route = useRoute()
 const router = useRouter()
@@ -236,6 +307,10 @@ const form = reactive({
   activation_rewards: [] as ActivationRewardItem[],
   // 5. 费率阶梯
   rate_stages: [] as RateStageItem[],
+  // 6. 高调费率配置
+  high_rate_configs: {} as HighRateConfigs,
+  // 7. P+0加价配置
+  d0_extra_configs: {} as D0ExtraConfigs,
 })
 
 // 表单验证规则
@@ -286,9 +361,13 @@ watch(() => form.channel_id, async (channelId) => {
 function initRateConfigs() {
   if (!rateTypes.value || rateTypes.value.length === 0) {
     form.rate_configs = {}
+    form.high_rate_configs = {}
+    form.d0_extra_configs = {}
     return
   }
   const configs: RateConfigs = {}
+  const highConfigs: HighRateConfigs = {}
+  const d0Configs: D0ExtraConfigs = {}
   for (const rt of rateTypes.value) {
     if (form.rate_configs[rt.code]) {
       // 保留已有配置
@@ -297,8 +376,36 @@ function initRateConfigs() {
       // 使用最小费率作为默认值
       configs[rt.code] = { rate: rt.min_rate }
     }
+    // 初始化高调费率配置
+    if (form.high_rate_configs[rt.code]) {
+      highConfigs[rt.code] = form.high_rate_configs[rt.code]
+    } else {
+      highConfigs[rt.code] = { rate: 0 }
+    }
+    // 初始化P+0加价配置
+    if (form.d0_extra_configs[rt.code]) {
+      d0Configs[rt.code] = form.d0_extra_configs[rt.code]
+    } else {
+      d0Configs[rt.code] = { extra_fee: 0 }
+    }
   }
   form.rate_configs = configs
+  form.high_rate_configs = highConfigs
+  form.d0_extra_configs = d0Configs
+}
+
+// 确保高调费率配置存在
+function ensureHighRateConfig(code: string) {
+  if (!form.high_rate_configs[code]) {
+    form.high_rate_configs[code] = { rate: 0 }
+  }
+}
+
+// 确保P+0加价配置存在
+function ensureD0ExtraConfig(code: string) {
+  if (!form.d0_extra_configs[code]) {
+    form.d0_extra_configs[code] = { extra_fee: 0 }
+  }
 }
 
 // 获取模板详情
@@ -319,6 +426,8 @@ async function fetchDetail() {
       sim_cashback: data.sim_cashback || null,
       activation_rewards: data.activation_rewards || [],
       rate_stages: data.rate_stages || [],
+      high_rate_configs: data.high_rate_configs || {},
+      d0_extra_configs: data.d0_extra_configs || {},
     })
     // 加载费率类型和完整配置
     if (data.channel_id) {
@@ -372,6 +481,8 @@ async function handleSubmit() {
       sim_cashback: form.sim_cashback,
       activation_rewards: form.activation_rewards,
       rate_stages: form.rate_stages,
+      high_rate_configs: form.high_rate_configs,
+      d0_extra_configs: form.d0_extra_configs,
     }
 
     if (isEdit.value) {

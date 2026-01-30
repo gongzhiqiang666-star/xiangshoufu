@@ -312,6 +312,53 @@
           </el-row>
         </template>
         <el-empty v-else description="该通道未配置流量费档位" :image-size="60" />
+
+        <!-- 高调费率配置 -->
+        <el-divider content-position="left">高调费率配置</el-divider>
+        <template v-if="channelRateConfigs.length">
+          <el-row :gutter="24">
+            <el-col :span="8" v-for="rateConfig in channelRateConfigs" :key="'high_' + rateConfig.rate_code">
+              <el-form-item :label="rateConfig.rate_name">
+                <el-input
+                  v-model="editForm.high_rate_configs[rateConfig.rate_code].rate"
+                  :placeholder="rateConfig.max_high_rate ? `上限: ${rateConfig.max_high_rate}%` : '无上限'"
+                  style="width: 140px"
+                  @focus="ensureHighRateConfig(rateConfig.rate_code)"
+                >
+                  <template #append>%</template>
+                </el-input>
+                <span class="limit-hint" v-if="rateConfig.max_high_rate">
+                  (上限: {{ rateConfig.max_high_rate }}%)
+                </span>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </template>
+        <el-empty v-else description="该通道未配置费率类型" :image-size="60" />
+
+        <!-- P+0加价配置 -->
+        <el-divider content-position="left">P+0加价配置</el-divider>
+        <template v-if="channelRateConfigs.length">
+          <el-row :gutter="24">
+            <el-col :span="8" v-for="rateConfig in channelRateConfigs" :key="'d0_' + rateConfig.rate_code">
+              <el-form-item :label="rateConfig.rate_name">
+                <el-input-number
+                  v-model="editForm.d0_extra_configs[rateConfig.rate_code].extra_fee"
+                  :min="0"
+                  :max="rateConfig.max_d0_extra || undefined"
+                  :precision="0"
+                  style="width: 140px"
+                  @focus="ensureD0ExtraConfig(rateConfig.rate_code)"
+                />
+                <span class="unit">分</span>
+                <span class="limit-hint" v-if="rateConfig.max_d0_extra">
+                  (上限: {{ rateConfig.max_d0_extra }}分)
+                </span>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </template>
+        <el-empty v-else description="该通道未配置费率类型" :image-size="60" />
       </el-form>
       <template #footer>
         <el-button @click="editDialogVisible = false">取消</el-button>
@@ -352,10 +399,14 @@ import {
   updateSettlementPriceRate,
   updateSettlementPriceDeposit,
   updateSettlementPriceSim,
+  updateSettlementPriceHighRate,
+  updateSettlementPriceD0Extra,
   getSettlementPriceChangeLogs,
   type SettlementPriceItem,
   type PriceChangeLog,
   type DepositCashbackItem,
+  type HighRateConfigs,
+  type D0ExtraConfigs,
 } from '@/api/settlementPrice'
 import { searchAgentList } from '@/api/agent'
 import {
@@ -425,6 +476,8 @@ const editForm = reactive({
   rate_configs: {} as Record<string, RateValue>,
   deposit_cashbacks: [] as DepositCashbackItem[],
   sim_cashback_tiers: [] as { tier_order: number; tier_name: string; cashback_amount: number }[],
+  high_rate_configs: {} as HighRateConfigs,
+  d0_extra_configs: {} as D0ExtraConfigs,
 })
 
 // 调价记录对话框
@@ -614,6 +667,8 @@ const handleEdit = async (row: SettlementPriceItem) => {
       rate_configs: detail.rate_configs || {},
       deposit_cashbacks: detail.deposit_cashbacks || [],
       sim_cashback_tiers: detail.sim_cashback_tiers || [],
+      high_rate_configs: detail.high_rate_configs || {},
+      d0_extra_configs: detail.d0_extra_configs || {},
     })
   } catch (e) {
     ElMessage.error('获取结算价详情失败')
@@ -643,6 +698,18 @@ const handleSave = async () => {
     await updateSettlementPriceSim(editForm.id, {
       sim_cashback_tiers: editForm.sim_cashback_tiers,
     })
+    // 更新高调费率
+    if (Object.keys(editForm.high_rate_configs).length > 0) {
+      await updateSettlementPriceHighRate(editForm.id, {
+        high_rate_configs: editForm.high_rate_configs,
+      })
+    }
+    // 更新P+0加价
+    if (Object.keys(editForm.d0_extra_configs).length > 0) {
+      await updateSettlementPriceD0Extra(editForm.id, {
+        d0_extra_configs: editForm.d0_extra_configs,
+      })
+    }
     ElMessage.success('更新成功')
     editDialogVisible.value = false
     loadData()
@@ -691,6 +758,20 @@ const handleViewLogs = async (row: SettlementPriceItem) => {
 const ensureRateConfig = (rateCode: string) => {
   if (!editForm.rate_configs[rateCode]) {
     editForm.rate_configs[rateCode] = { rate: '' }
+  }
+}
+
+// 确保高调费率配置存在
+const ensureHighRateConfig = (rateCode: string) => {
+  if (!editForm.high_rate_configs[rateCode]) {
+    editForm.high_rate_configs[rateCode] = { rate: '' }
+  }
+}
+
+// 确保P+0加价配置存在
+const ensureD0ExtraConfig = (rateCode: string) => {
+  if (!editForm.d0_extra_configs[rateCode]) {
+    editForm.d0_extra_configs[rateCode] = { extra_fee: 0 }
   }
 }
 

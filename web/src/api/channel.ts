@@ -35,6 +35,8 @@ export interface ChannelRateConfig {
   min_rate: string
   max_rate: string
   default_rate: string
+  max_high_rate?: string | null  // 高调费率上限
+  max_d0_extra?: number | null   // P+0加价上限（分）
   sort_order: number
   status: number
 }
@@ -113,6 +115,8 @@ export function updateChannelRateConfig(channelId: number, configId: number, dat
   min_rate?: string
   max_rate?: string
   default_rate?: string
+  max_high_rate?: string | null
+  max_d0_extra?: number | null
   sort_order?: number
   status?: number
 }): Promise<void> {
@@ -124,6 +128,54 @@ export function updateChannelRateConfig(channelId: number, configId: number, dat
  */
 export function deleteChannelRateConfig(channelId: number, configId: number): Promise<void> {
   return del<void>(`/v1/admin/channels/${channelId}/rate-configs/${configId}`)
+}
+
+// ============================================================
+// 配置变更影响检查
+// ============================================================
+
+/** 受影响的政策模版 */
+export interface AffectedTemplate {
+  template_id: number
+  template_name: string
+  issue: string
+}
+
+/** 受影响的结算价 */
+export interface AffectedSettlement {
+  settlement_id: number
+  agent_id: number
+  agent_name: string
+  issue: string
+}
+
+/** 配置变更影响 */
+export interface ConfigChangeImpact {
+  affected_templates: AffectedTemplate[]
+  affected_settlements: AffectedSettlement[]
+  total_affected_agents: number
+}
+
+/** 检查费率配置变更影响请求 */
+export interface CheckRateConfigChangeImpactRequest {
+  new_min_rate: string
+  new_max_rate: string
+  new_max_high_rate?: string | null
+  new_max_d0_extra?: number | null
+}
+
+/**
+ * 检查费率配置变更影响
+ */
+export function checkRateConfigChangeImpact(
+  channelId: number,
+  configId: number,
+  data: CheckRateConfigChangeImpactRequest
+): Promise<ConfigChangeImpact> {
+  return post<ConfigChangeImpact>(
+    `/v1/admin/channels/${channelId}/rate-configs/${configId}/change-impact`,
+    data
+  )
 }
 
 /**
